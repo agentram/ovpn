@@ -76,7 +76,8 @@ jobs:
         id: gofmt
         run: |
           set -euo pipefail
-          files="$(gofmt -l $(git ls-files '*.go'))"
+          mapfile -t go_files < <(git ls-files '*.go')
+          files="$(gofmt -l "${go_files[@]}")"
           if [ -n "$files" ]; then
             echo "The following files are not gofmt-formatted:" >&2
             echo "$files" >&2
@@ -105,10 +106,12 @@ jobs:
           tests_passed="$(jq -s '[.[] | select(.Action=="pass" and .Test!=null)] | length' test-report.jsonl)"
           tests_failed="$(jq -s '[.[] | select(.Action=="fail" and .Test!=null)] | length' test-report.jsonl)"
 
-          echo "total=${total}" >> "$GITHUB_OUTPUT"
-          echo "packages_passed=${packages_passed}" >> "$GITHUB_OUTPUT"
-          echo "tests_passed=${tests_passed}" >> "$GITHUB_OUTPUT"
-          echo "tests_failed=${tests_failed}" >> "$GITHUB_OUTPUT"
+          {
+            echo "total=${total}"
+            echo "packages_passed=${packages_passed}"
+            echo "tests_passed=${tests_passed}"
+            echo "tests_failed=${tests_failed}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload test artifacts
         if: always()
@@ -187,6 +190,18 @@ jobs:
             go_version="$(go version)"
           fi
 
+          repo_hygiene_status="$(status_icon "${REPO_HYGIENE_OUTCOME}")"
+          version_files_status="$(status_icon "${VERSION_FILES_OUTCOME}")"
+          template_status="$(status_icon "${TEMPLATE_OUTCOME}")"
+          actionlint_status="$(status_icon "${ACTIONLINT_OUTCOME}")"
+          gofmt_status="$(status_icon "${GOFMT_OUTCOME}")"
+          govet_status="$(status_icon "${GOVET_OUTCOME}")"
+          gotest_status="$(status_icon "${GOTEST_OUTCOME}")"
+          golangci_status="$(status_icon "${GOLANGCI_OUTCOME}")"
+          gosec_status="$(status_icon "${GOSEC_GATE_OUTCOME}")"
+          json_validate_status="$(status_icon "${JSON_VALIDATE_OUTCOME}")"
+          compose_validate_status="$(status_icon "${COMPOSE_VALIDATE_OUTCOME}")"
+
           {
             echo "## CI Summary"
             echo
@@ -198,17 +213,17 @@ jobs:
             printf -- "- Test artifacts: \`go-test-artifacts\` ([run artifacts](%s))\n" "${RUN_URL}"
             echo
             echo "### Checks"
-            echo "- $(status_icon \"${REPO_HYGIENE_OUTCOME}\") repository hygiene"
-            echo "- $(status_icon \"${VERSION_FILES_OUTCOME}\") VERSION/CHANGELOG validation"
-            echo "- $(status_icon \"${TEMPLATE_OUTCOME}\") GitHub template validation"
-            echo "- $(status_icon \"${ACTIONLINT_OUTCOME}\") actionlint"
-            echo "- $(status_icon \"${GOFMT_OUTCOME}\") gofmt"
-            echo "- $(status_icon \"${GOVET_OUTCOME}\") go vet"
-            echo "- $(status_icon \"${GOTEST_OUTCOME}\") go test"
-            echo "- $(status_icon \"${GOLANGCI_OUTCOME}\") golangci-lint"
-            echo "- $(status_icon \"${GOSEC_GATE_OUTCOME}\") gosec gate (high/high)"
-            echo "- $(status_icon \"${JSON_VALIDATE_OUTCOME}\") JSON example validation"
-            echo "- $(status_icon \"${COMPOSE_VALIDATE_OUTCOME}\") docker compose validation"
+            echo "- ${repo_hygiene_status} repository hygiene"
+            echo "- ${version_files_status} VERSION/CHANGELOG validation"
+            echo "- ${template_status} GitHub template validation"
+            echo "- ${actionlint_status} actionlint"
+            echo "- ${gofmt_status} gofmt"
+            echo "- ${govet_status} go vet"
+            echo "- ${gotest_status} go test"
+            echo "- ${golangci_status} golangci-lint"
+            echo "- ${gosec_status} gosec gate (high/high)"
+            echo "- ${json_validate_status} JSON example validation"
+            echo "- ${compose_validate_status} docker compose validation"
           } >> "$GITHUB_STEP_SUMMARY"
 
   ansible-quality:
@@ -271,11 +286,15 @@ jobs:
             esac
           }
 
+          install_status="$(status_icon "${INSTALL_OUTCOME}")"
+          lint_status="$(status_icon "${LINT_OUTCOME}")"
+          syntax_status="$(status_icon "${SYNTAX_OUTCOME}")"
+
           {
             echo "## Ansible Summary"
             echo
-            echo "- $(status_icon \"${INSTALL_OUTCOME}\") tooling installation"
-            echo "- $(status_icon \"${LINT_OUTCOME}\") ansible-lint"
-            echo "- $(status_icon \"${SYNTAX_OUTCOME}\") playbook syntax checks"
+            echo "- ${install_status} tooling installation"
+            echo "- ${lint_status} ansible-lint"
+            echo "- ${syntax_status} playbook syntax checks"
             echo "- Playbooks checked: bootstrap, deploy, security"
           } >> "$GITHUB_STEP_SUMMARY"

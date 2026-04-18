@@ -183,6 +183,9 @@ jobs:
             esac
           }
 
+          trivy_scan_status="$(status_icon "${TRIVY_SCAN_OUTCOME}")"
+          gate_status="$(status_icon "${GATE_OUTCOME}")"
+
           {
             echo "## Security Summary"
             echo
@@ -190,8 +193,8 @@ jobs:
             echo "- Findings (HIGH/CRITICAL): \`${TRIVY_FINDING_COUNT:-0}\`"
             echo
             echo "### Checks"
-            echo "- $(status_icon \"${TRIVY_SCAN_OUTCOME}\") trivy fs scan"
-            echo "- $(status_icon \"${GATE_OUTCOME}\") trivy finding gate"
+            echo "- ${trivy_scan_status} trivy fs scan"
+            echo "- ${gate_status} trivy finding gate"
             echo
             echo "### SARIF"
             echo "- Upload allowed: \`${SARIF_ALLOWED:-false}\`"
