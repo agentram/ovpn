@@ -1,0 +1,26 @@
+# Example host inventory. Keep your real production inventory private and untracked.
+ansible_host: "203.0.113.10"
+ansible_user: "root"
+ansible_port: 22
+
+ovpn_domain: "vpn-1.example.com"
+ovpn_public_ip: "203.0.113.10"
+ovpn_timezone: "UTC"
+
+ovpn_harden_ssh: true
+ovpn_ssh_permit_root_login: true
+ovpn_ssh_password_auth: false
+# Needed for SSH local port forwarding (Grafana/monitoring tunnels).
+ovpn_ssh_allow_tcp_forwarding: true
+
+ovpn_manage_firewall: true
+ovpn_use_fail2ban: true
+ovpn_firewall_extra_tcp_ports: []
+
+ovpn_xray_version: "26.3.27"
+
+# If using ansible-vault:
+# ovpn_reality_private_key: "{{ vault_ovpn_reality_private_key | default('') }}"
+
+ovpn_block_tor_exit_nodes: false
+ovpn_tor_exit_block_port: 443

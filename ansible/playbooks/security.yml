@@ -1,0 +1,8 @@
+---
+- name: Apply ovpn host security hardening
+  hosts: vpn_servers
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: security

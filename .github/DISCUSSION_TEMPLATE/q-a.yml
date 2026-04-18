@@ -1,0 +1,43 @@
+title: "[Q&A] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for setup help, troubleshooting, or operator questions.
+        Do not post secrets, private keys, tokens, or real production IPs/domains.
+  - type: input
+    id: version
+    attributes:
+      label: ovpn version
+      placeholder: 1.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - Agent
+        - Telegram bot
+        - Monitoring
+        - Ansible
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: State the problem clearly and include the command or workflow you are trying to use.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: Redact secrets and private infrastructure details first.
+      render: text
+    validations:
+      required: false

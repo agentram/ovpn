@@ -1,0 +1,10 @@
+---
+- name: Install common packages
+  ansible.builtin.apt:
+    name: "{{ ovpn_common_packages }}"
+    state: present
+    update_cache: true
+
+- name: Configure timezone
+  ansible.builtin.command: "timedatectl set-timezone {{ ovpn_timezone }}"
+  changed_when: false

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run ovpn Tor exit IP set updater
+
+[Timer]
+OnBootSec=2m
+OnCalendar={{ ovpn_tor_update_schedule }}
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

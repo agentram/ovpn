@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  xray:
+    image: ${XRAY_IMAGE}
+    container_name: ovpn-xray-base
+    restart: unless-stopped
+    command: ["xray", "run", "-config", "/etc/xray/config.json"]
+    ports:
+      - "{{ ovpn_xray_inbound_port }}:{{ ovpn_xray_inbound_port }}/tcp"
+    volumes:
+      - ./xray/config.json:/etc/xray/config.json:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

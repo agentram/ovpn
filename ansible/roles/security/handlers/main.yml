@@ -1,0 +1,24 @@
+---
+- name: Reload sshd
+  ansible.builtin.service:
+    name: ssh
+    state: reloaded
+
+- name: Restart fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+
+- name: Reload ufw
+  ansible.builtin.command: ufw reload
+  changed_when: false
+
+- name: Reload systemd daemon
+  ansible.builtin.command: systemctl daemon-reload
+  check_mode: false
+  changed_when: false
+
+- name: Restart systemd-journald
+  ansible.builtin.service:
+    name: systemd-journald
+    state: restarted

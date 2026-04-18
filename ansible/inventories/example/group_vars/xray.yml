@@ -1,0 +1,14 @@
+---
+ovpn_xray_version: "26.3.27"
+ovpn_xray_image: "ghcr.io/xtls/xray-core:{{ ovpn_xray_version }}"
+ovpn_xray_config_path: "{{ ovpn_deploy_root }}/xray/config.json"
+ovpn_xray_api_port: 10085
+ovpn_xray_inbound_port: 443
+
+# REALITY defaults; set per host via host_vars (and keep private key in ansible-vault)
+ovpn_reality_private_key: ""
+ovpn_reality_server_name: "www.microsoft.com"
+ovpn_reality_target: "www.microsoft.com:443"
+ovpn_reality_short_id: "0123456789abcdef"
+ovpn_xray_bootstrap_uuid: "11111111-1111-1111-1111-111111111111"
+ovpn_xray_bootstrap_email: "bootstrap@example.com"

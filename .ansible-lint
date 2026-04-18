@@ -1,0 +1,7 @@
+profile: basic
+exclude_paths:
+  - .git/
+  - .github/
+skip_list:
+  - yaml[line-length]
+  - command-instead-of-module

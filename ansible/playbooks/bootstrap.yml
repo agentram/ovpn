@@ -1,0 +1,30 @@
+---
+- name: Bootstrap ovpn hosts (Debian/Ubuntu)
+  hosts: vpn_servers
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Assert supported Linux distribution/version
+      ansible.builtin.assert:
+        that:
+          - >
+            (ansible_distribution == "Debian" and (ansible_distribution_major_version | int) >= 12)
+            or
+            (ansible_distribution == "Ubuntu" and (ansible_distribution_major_version | int) >= 22)
+        fail_msg: "This bootstrap supports Debian 12+ and Ubuntu 22.04+"
+
+    - name: Assert required ovpn host vars are set
+      ansible.builtin.assert:
+        that:
+          - ovpn_domain is defined
+          - ovpn_domain | length > 0
+          - ovpn_deploy_root is defined
+          - ovpn_deploy_root | length > 0
+        fail_msg: "Set ovpn_domain and ovpn_deploy_root in inventory/group_vars before bootstrap"
+
+  roles:
+    - role: common
+    - role: docker
+    - role: ovpn_host
+    - role: security

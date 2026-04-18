@@ -1,0 +1,17 @@
+# Managed by Ansible (ovpn security role)
+[DEFAULT]
+bantime = {{ ovpn_fail2ban_bantime }}
+findtime = {{ ovpn_fail2ban_findtime }}
+maxretry = {{ ovpn_fail2ban_maxretry }}
+banaction = {{ ovpn_fail2ban_banaction }}
+ignoreip = {{ ovpn_fail2ban_ignoreip | join(' ') }}
+{% if ovpn_fail2ban_destemail | default('') | length > 0 %}
+destemail = {{ ovpn_fail2ban_destemail }}
+sender = {{ ovpn_fail2ban_sender }}
+{% endif %}
+action = {{ ovpn_fail2ban_action }}
+
+[sshd]
+enabled = {{ 'true' if (ovpn_fail2ban_sshd_enabled | bool) else 'false' }}
+port = {{ security_ssh_effective_ports | join(',') }}
+backend = systemd

@@ -1,0 +1,400 @@
+---
+- name: Build effective SSH and firewall port sets
+  ansible.builtin.set_fact:
+    security_ssh_effective_ports: [22]
+    security_firewall_effective_ssh_ports: [22]
+
+- name: Build effective public HTTP/HTTPS toggles
+  ansible.builtin.set_fact:
+    security_firewall_effective_http: "{{ ovpn_firewall_allow_http | bool }}"
+    security_firewall_effective_https: "{{ ovpn_firewall_allow_https | bool }}"
+
+- name: Build effective public service port sets
+  ansible.builtin.set_fact:
+    security_firewall_effective_tcp_ports: >-
+      {{
+        (
+          security_firewall_effective_ssh_ports
+          + ([80] if security_firewall_effective_http else [])
+          + ([443] if security_firewall_effective_https else [])
+          + (ovpn_firewall_extra_tcp_ports | default([]) | map('int') | list)
+        ) | unique | sort
+      }}
+    security_firewall_effective_udp_ports: "{{ (ovpn_firewall_extra_udp_ports | default([]) | map('int') | list) | unique | sort }}"
+
+- name: Assert fixed SSH policy (port 22 only)
+  ansible.builtin.assert:
+    that:
+      - (ovpn_ssh_port | default(22) | int) == 22
+      - (ovpn_firewall_ssh_port | default(22) | int) == 22
+      - (ovpn_firewall_additional_ssh_ports | default([]) | length) == 0
+      - not (ovpn_disable_default_ssh_port | default(false) | bool)
+      - not (ovpn_confirm_disable_default_ssh_port | default(false) | bool)
+    fail_msg: "SSH port migration is removed from this project. Keep SSH on port 22."
+
+- name: Configure unattended security upgrades (optional)
+  when: ovpn_enable_unattended_upgrades | bool
+  block:
+    - name: Enable unattended upgrades package config
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Enable unattended-upgrades service
+      ansible.builtin.service:
+        name: unattended-upgrades
+        state: started
+        enabled: true
+
+- name: Purge legacy nginx packages (optional)
+  when: ovpn_purge_legacy_nginx | bool
+  block:
+    - name: Stop and disable nginx service
+      ansible.builtin.service:
+        name: nginx
+        state: stopped
+        enabled: false
+      failed_when: false
+
+    - name: Purge nginx packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - nginx-common
+          - nginx-core
+          - nginx-full
+          - nginx-light
+          - nginx-extras
+        state: absent
+        purge: true
+        autoremove: true
+
+- name: Configure journald disk limits
+  block:
+    - name: Ensure journald drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/systemd/journald.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install ovpn journald limits
+      ansible.builtin.template:
+        src: journald-ovpn.conf.j2
+        dest: /etc/systemd/journald.conf.d/60-ovpn.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart systemd-journald
+
+    - name: Vacuum journald archives by size target
+      ansible.builtin.command: "journalctl --vacuum-size={{ ovpn_journald_system_max_use }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+- name: Manage swapfile (optional)
+  when: ovpn_enable_swapfile | bool
+  block:
+    - name: Check if swapfile already exists
+      ansible.builtin.stat:
+        path: "{{ ovpn_swapfile_path }}"
+      register: security_swapfile_stat
+
+    - name: Create swapfile
+      ansible.builtin.shell: |
+        set -eu
+        fallocate -l {{ ovpn_swapfile_size_mb | int }}M {{ ovpn_swapfile_path }} || dd if=/dev/zero of={{ ovpn_swapfile_path }} bs=1M count={{ ovpn_swapfile_size_mb | int }}
+      args:
+        creates: "{{ ovpn_swapfile_path }}"
+      when: not security_swapfile_stat.stat.exists and not ansible_check_mode
+
+    - name: Set swapfile permissions
+      ansible.builtin.file:
+        path: "{{ ovpn_swapfile_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      when: security_swapfile_stat.stat.exists or not ansible_check_mode
+
+    - name: Check swap signature
+      ansible.builtin.command: "blkid -o value -s TYPE {{ ovpn_swapfile_path }}"
+      register: security_swapfile_blkid
+      failed_when: false
+      changed_when: false
+      when: security_swapfile_stat.stat.exists
+
+    - name: Initialize swap signature
+      ansible.builtin.command: "mkswap {{ ovpn_swapfile_path }}"
+      when:
+        - not ansible_check_mode
+        - not security_swapfile_stat.stat.exists or (security_swapfile_blkid.stdout | default('') | trim) != "swap"
+
+    - name: Ensure swapfile entry in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "{{ ovpn_swapfile_path }} none swap sw 0 0"
+        state: present
+
+    - name: Read active swap devices
+      ansible.builtin.command: swapon --show=NAME --noheadings
+      register: security_swap_active
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Enable swapfile
+      ansible.builtin.command: "swapon {{ ovpn_swapfile_path }}"
+      when:
+        - not ansible_check_mode
+        - ovpn_swapfile_path not in (security_swap_active.stdout_lines | default([]))
+
+    - name: Ensure vm.swappiness persists across reboots
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.d/99-ovpn-swap.conf
+        regexp: '^vm\.swappiness='
+        line: "vm.swappiness={{ ovpn_swapfile_swappiness | int }}"
+        create: true
+        mode: "0644"
+
+    - name: Read current vm.swappiness
+      ansible.builtin.command: sysctl -n vm.swappiness
+      register: security_vm_swappiness_current
+      changed_when: false
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: Apply vm.swappiness at runtime
+      ansible.builtin.command: "sysctl -w vm.swappiness={{ ovpn_swapfile_swappiness | int }}"
+      when:
+        - not ansible_check_mode
+        - (security_vm_swappiness_current.stdout | default('') | trim) != (ovpn_swapfile_swappiness | int | string)
+
+- name: Configure UFW firewall (optional)
+  when: ovpn_manage_firewall | bool
+  block:
+    - name: Keep UFW forwarding compatible with Docker bridge networking
+      ansible.builtin.lineinfile:
+        path: /etc/default/ufw
+        regexp: '^DEFAULT_FORWARD_POLICY='
+        line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+        create: false
+      notify: Reload ufw
+
+    - name: Set UFW default deny incoming
+      ansible.builtin.command: ufw --force default deny incoming
+      register: security_ufw_default_in
+      changed_when: "'Default incoming policy changed' in security_ufw_default_in.stdout"
+
+    - name: Set UFW default allow outgoing
+      ansible.builtin.command: ufw --force default allow outgoing
+      register: security_ufw_default_out
+      changed_when: "'Default outgoing policy changed' in security_ufw_default_out.stdout"
+
+    - name: Allow effective TCP ports
+      ansible.builtin.command: "ufw allow {{ item }}/tcp"
+      loop: "{{ security_firewall_effective_tcp_ports }}"
+      loop_control:
+        label: "{{ item }}/tcp"
+      register: security_ufw_allow_tcp
+      changed_when: "'Skipping' not in (security_ufw_allow_tcp.stdout | default(''))"
+
+    - name: Allow effective UDP ports
+      ansible.builtin.command: "ufw allow {{ item }}/udp"
+      loop: "{{ security_firewall_effective_udp_ports }}"
+      loop_control:
+        label: "{{ item }}/udp"
+      register: security_ufw_allow_udp
+      changed_when: "'Skipping' not in (security_ufw_allow_udp.stdout | default(''))"
+
+    - name: Enable UFW firewall
+      ansible.builtin.command: ufw --force enable
+      register: security_ufw_enable
+      changed_when: false
+
+- name: Configure SSH hardening drop-in
+  when: ovpn_harden_ssh | bool
+  block:
+    - name: Ensure sshd config drop-in directory exists
+      ansible.builtin.file:
+        path: /etc/ssh/sshd_config.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Determine PermitRootLogin mode
+      ansible.builtin.set_fact:
+        security_ssh_permit_root_login_mode: >-
+          {{
+            'no'
+            if not (ovpn_ssh_permit_root_login | bool)
+            else (
+              'prohibit-password'
+              if (ovpn_ssh_pubkey_auth_only | bool)
+              else 'yes'
+            )
+          }}
+
+    - name: Install ovpn sshd hardening drop-in
+      ansible.builtin.template:
+        src: sshd-ovpn-hardening.conf.j2
+        dest: /etc/ssh/sshd_config.d/50-ovpn-hardening.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload sshd
+
+    - name: Validate SSH daemon config
+      ansible.builtin.command: sshd -t
+      changed_when: false
+
+    - name: Flush handlers before connectivity checks
+      ansible.builtin.meta: flush_handlers
+
+    - name: Validate SSH ports are reachable from controller
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host | default(inventory_hostname) }}"
+        port: "{{ item }}"
+        state: started
+        timeout: 20
+        connect_timeout: 3
+      loop: "{{ security_ssh_effective_ports }}"
+      when: ovpn_validate_ssh_ports | bool
+      delegate_to: localhost
+      become: false
+
+- name: Install and configure fail2ban (optional)
+  when: ovpn_use_fail2ban | bool
+  block:
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: fail2ban
+        state: present
+        update_cache: true
+
+    - name: Deploy ovpn fail2ban jail configuration
+      ansible.builtin.template:
+        src: jail-ovpn.local.j2
+        dest: /etc/fail2ban/jail.d/ovpn.local
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart fail2ban
+
+    - name: Ensure fail2ban service is running
+      ansible.builtin.service:
+        name: fail2ban
+        state: started
+        enabled: true
+
+- name: Enable Tor exit blocking profile (optional)
+  when: ovpn_block_tor_exit_nodes | bool
+  block:
+    - name: Install Tor exit blocking dependencies
+      ansible.builtin.apt:
+        name:
+          - ipset
+        state: present
+        update_cache: true
+
+    - name: Install Tor exit updater script
+      ansible.builtin.template:
+        src: ovpn-tor-exit-update.sh.j2
+        dest: /usr/local/sbin/ovpn-tor-exit-update.sh
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install Tor exit updater service unit
+      ansible.builtin.template:
+        src: ovpn-tor-exit-update.service.j2
+        dest: /etc/systemd/system/ovpn-tor-exit-update.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload systemd daemon
+
+    - name: Install Tor exit updater timer unit
+      ansible.builtin.template:
+        src: ovpn-tor-exit-update.timer.j2
+        dest: /etc/systemd/system/ovpn-tor-exit-update.timer
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload systemd daemon
+
+    - name: Flush handlers before systemd operations
+      ansible.builtin.meta: flush_handlers
+
+    - name: Run Tor exit updater now (fail-open)
+      ansible.builtin.command: /usr/local/sbin/ovpn-tor-exit-update.sh
+      when: not ansible_check_mode
+      changed_when: false
+
+    - name: Enable and start Tor exit updater timer
+      ansible.builtin.systemd:
+        name: ovpn-tor-exit-update.timer
+        enabled: true
+        state: started
+      when: not ansible_check_mode
+
+- name: Disable Tor exit blocking profile when turned off
+  when: not (ovpn_block_tor_exit_nodes | bool)
+  block:
+    - name: Stop Tor exit updater timer
+      ansible.builtin.systemd:
+        name: ovpn-tor-exit-update.timer
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Stop Tor exit updater service
+      ansible.builtin.systemd:
+        name: ovpn-tor-exit-update.service
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove Tor exit iptables drop rule
+      ansible.builtin.command: >-
+        iptables -D INPUT -p tcp --dport {{ ovpn_tor_exit_block_port | int }}
+        -m set --match-set ovpn_tor_exit src -j DROP
+      register: security_tor_rule_remove
+      failed_when: security_tor_rule_remove.rc not in [0, 1, 127]
+      changed_when: security_tor_rule_remove.rc == 0
+
+    - name: Remove Tor exit ipset
+      ansible.builtin.command: ipset destroy ovpn_tor_exit
+      register: security_tor_set_remove
+      failed_when: security_tor_set_remove.rc not in [0, 1, 127]
+      changed_when: security_tor_set_remove.rc == 0
+
+    - name: Remove temporary Tor exit ipset
+      ansible.builtin.command: ipset destroy ovpn_tor_exit_tmp
+      register: security_tor_tmp_set_remove
+      failed_when: security_tor_tmp_set_remove.rc not in [0, 1, 127]
+      changed_when: security_tor_tmp_set_remove.rc == 0
+
+    - name: Remove Tor exit updater script
+      ansible.builtin.file:
+        path: /usr/local/sbin/ovpn-tor-exit-update.sh
+        state: absent
+
+    - name: Remove Tor exit updater service unit
+      ansible.builtin.file:
+        path: /etc/systemd/system/ovpn-tor-exit-update.service
+        state: absent
+      notify: Reload systemd daemon
+
+    - name: Remove Tor exit updater timer unit
+      ansible.builtin.file:
+        path: /etc/systemd/system/ovpn-tor-exit-update.timer
+        state: absent
+      notify: Reload systemd daemon

@@ -1,0 +1,12 @@
+route:
+  receiver: telegram-webhook
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: telegram-webhook
+    webhook_configs:
+      - url: "http://ovpn-telegram-bot:8080/alertmanager"
+        send_resolved: true

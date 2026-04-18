@@ -1,0 +1,44 @@
+Attribution-NonCommercial Source License 1.0 (ovpn)
+
+Copyright (c) 2026 ovpn contributors
+
+Permission is granted to any person obtaining a copy of this software and associated
+files (the "Software") to use, copy, modify, and redistribute the Software, in source
+or binary form, solely for non-commercial purposes and subject to the conditions below.
+
+1. Attribution.
+   Any redistribution or public use of the Software, modified or unmodified, must keep:
+   - this license text,
+   - existing copyright notices, and
+   - a visible attribution to the original project: "ovpn".
+
+2. Non-commercial use only.
+   You may not sell, sublicense, host as a paid service, bundle into a paid offering,
+   provide paid support for, or otherwise use the Software for commercial advantage or
+   monetary compensation without prior written permission from the copyright holder.
+
+3. Modifications.
+   You may create and distribute modified versions for non-commercial purposes only.
+   Modified versions must clearly state that changes were made.
+
+4. No trademark license.
+   This license does not grant any right to use project names, logos, or marks except as
+   reasonably required for the attribution described above.
+
+5. Termination.
+   Any use of the Software outside the scope of this license automatically terminates the
+   rights granted by this license.
+
+6. Warranty disclaimer.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+   INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+   PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+7. Limitation of liability.
+   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES,
+   OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+For commercial licensing or other permissions beyond this license, contact the project
+maintainers through the repository discussions or another maintainer-designated channel.

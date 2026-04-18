@@ -1,0 +1,20 @@
+title: "[Announcement] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for release notes, maintenance notices, roadmap updates, or policy changes.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: Release 1.1.0 is now available
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Provide the announcement body.
+    validations:
+      required: true
