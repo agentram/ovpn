@@ -1,0 +1,262 @@
+groups:
+  - name: ovpn-host
+    rules:
+      - alert: OVPNNodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node exporter is down"
+          description: "Host metrics are unavailable for more than 2 minutes."
+
+      - alert: OVPNHostHighCPU
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{job="node_exporter",mode="idle"}[5m])) * 100) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on host"
+          description: "CPU usage is above 90% for 10 minutes."
+
+      - alert: OVPNHostHighMemory
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on host"
+          description: "Memory usage is above 90% for 10 minutes."
+
+      - alert: OVPNHostMemoryCritical
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage on host"
+          description: "Memory usage is above 95% for 5 minutes."
+
+      - alert: OVPNHostLowMemAvailable
+        expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 157286400
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low available memory on host"
+          description: "MemAvailable is below 150 MiB for 10 minutes."
+
+      - alert: OVPNHostDiskLowWarning
+        expr: node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on root filesystem"
+          description: "Root filesystem has less than 15% free space."
+
+      - alert: OVPNHostDiskLowCritical
+        expr: node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.08
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical low disk space on root filesystem"
+          description: "Root filesystem has less than 8% free space."
+
+      - alert: OVPNRootDiskWillFillSoon
+        expr: predict_linear(node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"}[6h], 24 * 3600) < 0 and (node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.20) and node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 5368709120
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem projected to fill within 24h"
+          description: "Available bytes trend predicts root filesystem exhaustion in less than a day while free space is already below 20% and below 5 GiB."
+
+      - alert: OVPNHostInodeLowWarning
+        expr: node_filesystem_files_free{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_files{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low inode availability on root filesystem"
+          description: "Root filesystem has less than 15% free inodes."
+
+      - alert: OVPNHostInodeLowCritical
+        expr: node_filesystem_files_free{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_files{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.08
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical inode exhaustion risk on root filesystem"
+          description: "Root filesystem has less than 8% free inodes."
+
+  - name: ovpn-containers
+    rules:
+      - alert: OVPNCAdvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cAdvisor is down"
+          description: "Container metrics are unavailable for more than 2 minutes."
+
+      - alert: OVPNXrayContainerMissing
+        expr: absent(container_last_seen{job="cadvisor",container_label_com_docker_compose_service="xray"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "xray container missing"
+          description: "cAdvisor cannot see the xray container."
+
+      - alert: OVPNAgentContainerMissing
+        expr: absent(container_last_seen{job="cadvisor",container_label_com_docker_compose_service="ovpn-agent"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ovpn-agent container missing"
+          description: "cAdvisor cannot see the ovpn-agent container."
+
+      - alert: OVPNContainerRestartBurst
+        expr: changes(container_start_time_seconds{job="cadvisor",container_label_com_docker_compose_service=~"xray|ovpn-agent"}[15m]) > 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restart burst detected"
+          description: "One or more ovpn containers restarted more than twice in 15 minutes."
+
+      - alert: OVPNXrayHighCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="xray"}[5m])) * 100 > 70
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Xray CPU usage is high"
+          description: "xray container CPU usage is above 70% for 15 minutes."
+
+      - alert: OVPNPrometheusHighMemory
+        expr: container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="prometheus"} > 268435456
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus memory usage is high"
+          description: "prometheus container memory working set is above 256 MiB for 15 minutes."
+
+      - alert: OVPNGrafanaHighMemory
+        expr: container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="grafana"} > 268435456
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Grafana memory usage is high"
+          description: "grafana container memory working set is above 256 MiB for 15 minutes."
+
+  - name: ovpn-agent
+    rules:
+      - alert: OVPNAgentDown
+        expr: up{job="ovpn_agent"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ovpn-agent metrics endpoint is down"
+          description: "Prometheus cannot scrape ovpn-agent /metrics for more than 2 minutes."
+
+      - alert: OVPNXrayAPIUnreachable
+        expr: ovpn_agent_xray_api_reachable == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Xray API unreachable from ovpn-agent"
+          description: "ovpn-agent reports that Xray API is not reachable."
+
+      - alert: OVPNCollectorStalled
+        expr: time() - ovpn_agent_collector_last_success_timestamp_seconds > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stats collector is stalled"
+          description: "No successful stats collection for more than 5 minutes."
+
+      - alert: OVPNCollectorErrors
+        expr: increase(ovpn_agent_collector_runs_total{result="error"}[10m]) >= 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Collector errors threshold exceeded"
+          description: "ovpn-agent collector reported at least 2 errors in the last 10 minutes."
+
+      - alert: OVPNRuntimeOperationErrors
+        expr: increase(ovpn_agent_runtime_operations_total{result="error"}[15m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Runtime API operation errors detected"
+          description: "ovpn-agent runtime add/remove operations had errors in the last 15 minutes."
+
+      - alert: OVPNUserExpirySoon
+        expr: ovpn_agent_user_effective_enabled > 0 and ovpn_agent_user_days_until_expiry >= 0 and ovpn_agent_user_days_until_expiry <= 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "User expires within 2 days"
+          description: "User {{ $labels.email }} expires on {{ $labels.expiry_date }} (UTC end-of-day semantics)."
+
+  - name: ovpn-telegram-bot
+    rules:
+      - alert: OVPNTelegramBotDown
+        expr: up{job="ovpn_telegram_bot"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ovpn-telegram-bot metrics endpoint is down"
+          description: "Prometheus cannot scrape ovpn-telegram-bot /metrics for more than 2 minutes."
+
+      - alert: OVPNTelegramBotPollingStale
+        expr: ovpn_telegram_bot_watchdog_unhealthy > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ovpn-telegram-bot polling is stale"
+          description: "Telegram getUpdates polling is stale past the watchdog threshold."
+
+      - alert: OVPNTelegramBotSendFailures
+        expr: ovpn_telegram_bot_send_failures_consecutive >= 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ovpn-telegram-bot outbound send failures are repeating"
+          description: "Telegram send failures have accumulated for at least 10 minutes."
+
+  - name: ovpn-certs
+    rules:
+      - alert: OVPNCertExpirySoon
+        expr: ovpn_agent_cert_days_until_expiry >= 0 and ovpn_agent_cert_days_until_expiry < 14
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificate expires soon"
+          description: "Configured certificate has less than 14 days before expiry."
+
+      - alert: OVPNCertExpired
+        expr: ovpn_agent_cert_days_until_expiry < 0 and ovpn_agent_cert_days_until_expiry > -365
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Certificate already expired"
+          description: "Configured certificate appears expired."

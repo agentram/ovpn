@@ -1,0 +1,167 @@
+services:
+  prometheus:
+    image: ${PROMETHEUS_IMAGE}
+    container_name: ovpn-prometheus
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=10d
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - ovpn-prometheus-data:/prometheus
+    expose:
+      - "9090"
+    depends_on:
+      - alertmanager
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  alertmanager:
+    image: ${ALERTMANAGER_IMAGE}
+    container_name: ovpn-alertmanager
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --web.external-url=http://alertmanager:9093
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    expose:
+      - "9093"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  ovpn-telegram-bot:
+    image: ${OVPN_TELEGRAM_BOT_IMAGE}
+    container_name: ovpn-telegram-bot
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - /usr/local/bin/ovpn-telegram-bot
+      - --listen=:8080
+      - --agent-url=http://ovpn-agent:9090
+      - --prometheus-url=http://prometheus:9090
+      - --alertmanager-url=http://alertmanager:9093
+      - --grafana-url=http://grafana:3000
+      - --node-exporter-url=http://node-exporter:9100
+      - --cadvisor-url=http://cadvisor:8080
+      - --telegram-token-file=/run/secrets/telegram_bot_token
+      - --admin-token-file=/run/secrets/telegram_admin_token
+      - --notify-chat-ids=${OVPN_TELEGRAM_NOTIFY_CHAT_IDS}
+      - --owner-user-id=${OVPN_TELEGRAM_OWNER_USER_ID}
+      - --clients-pdf-path=${OVPN_TELEGRAM_CLIENTS_PDF_PATH}
+      - --link-config-file=/opt/ovpn-telegram-bot/link-config.json
+      - --telegram-api-fallback-ips=${OVPN_TELEGRAM_API_FALLBACK_IPS:-149.154.167.220}
+    ports:
+      - "127.0.0.1:${OVPN_TELEGRAM_BOT_HOST_PORT:-19001}:8080"
+    volumes:
+      - ./monitoring/telegram-bot/ovpn-telegram-bot:/usr/local/bin/ovpn-telegram-bot:ro
+      - ./monitoring/telegram-bot/assets:/opt/ovpn-telegram-bot/assets:ro
+      - ./monitoring/telegram-bot/link-config.json:/opt/ovpn-telegram-bot/link-config.json:ro
+      - ./monitoring/secrets/telegram_bot_token:/run/secrets/telegram_bot_token:ro
+      - ./monitoring/secrets/telegram_admin_token:/run/secrets/telegram_admin_token:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  grafana:
+    image: ${GRAFANA_IMAGE}
+    container_name: ovpn-grafana
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-ovpn}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-now}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ovpn-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  node-exporter:
+    image: ${NODE_EXPORTER_IMAGE}
+    container_name: ovpn-node-exporter
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro,rslave
+    expose:
+      - "9100"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  cadvisor:
+    image: ${CADVISOR_IMAGE}
+    container_name: ovpn-cadvisor
+    restart: unless-stopped
+    profiles: ["monitoring"]
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --max_housekeeping_interval=2m
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+volumes:
+  ovpn-prometheus-data:
+  ovpn-grafana-data:
+
+networks:
+  ovpn-net:
+    driver: bridge

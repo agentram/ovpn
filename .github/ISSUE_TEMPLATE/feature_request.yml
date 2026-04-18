@@ -1,0 +1,46 @@
+name: Feature request
+description: Propose an improvement to ovpn.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for concrete feature proposals. For open-ended questions, use Discussions.
+  - type: input
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What operator pain or limitation are you trying to solve?
+      placeholder: Managing multi-server rollout is too manual because ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or competing approaches did you evaluate?
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact and tradeoffs
+      description: Who benefits, what changes, and what risks or complexity do you expect?
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: This request does not contain secrets, private infrastructure details, or personal data.
+          required: true

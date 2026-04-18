@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: ovpn-dashboards
+    orgId: 1
+    folder: ovpn
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,67 @@
+---
+- name: Ensure ovpn directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ ovpn_deploy_root }}"
+      mode: "0750"
+    - path: "{{ ovpn_backup_root }}"
+      mode: "0750"
+    - path: "{{ ovpn_deploy_root }}/xray"
+      mode: "0750"
+    - path: "{{ ovpn_deploy_root }}/agent"
+      mode: "0750"
+
+- name: Deploy base .env scaffold
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ ovpn_deploy_root }}/.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0640"
+
+- name: Deploy placeholder Xray config scaffold
+  ansible.builtin.template:
+    src: xray-config.placeholder.json.j2
+    dest: "{{ ovpn_xray_config_path }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0640"
+
+- name: Deploy base docker compose scaffold
+  ansible.builtin.template:
+    src: docker-compose.base.yml.j2
+    dest: "{{ ovpn_deploy_root }}/{{ ovpn_base_stack_compose_filename }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0644"
+
+- name: Optionally copy external ovpn bundle into deploy root
+  ansible.builtin.copy:
+    src: "{{ ovpn_base_bundle_src }}/"
+    dest: "{{ ovpn_deploy_root }}/"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: preserve
+  when: ovpn_base_bundle_src | length > 0
+
+- name: Validate REALITY private key before optional base stack deploy
+  ansible.builtin.assert:
+    that:
+      - ovpn_reality_private_key | length > 0
+    fail_msg: "ovpn_reality_private_key is required when ovpn_prepare_base_stack=true"
+  when: ovpn_prepare_base_stack | bool
+
+- name: Optionally deploy base stack scaffold
+  ansible.builtin.command: >-
+    docker compose
+    --project-name {{ ovpn_compose_project_name }}-base
+    --env-file {{ ovpn_deploy_root }}/.env
+    -f {{ ovpn_deploy_root }}/{{ ovpn_base_stack_compose_filename }}
+    up -d
+  when: ovpn_prepare_base_stack | bool
+  changed_when: true

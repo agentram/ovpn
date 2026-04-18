@@ -1,0 +1,281 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go-quality:
+    name: Go Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Repository hygiene gate
+        id: repo_hygiene
+        run: ./scripts/repo_hygiene_check.sh
+
+      - name: Validate VERSION and CHANGELOG
+        id: version_files
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must be plain semver, got: ${version}" >&2
+            exit 1
+          fi
+          changelog_version="$(grep -E '^## [0-9]+\.[0-9]+\.[0-9]+$' CHANGELOG.md | head -n1 | awk '{print $2}')"
+          if [ -z "${changelog_version}" ]; then
+            echo "CHANGELOG.md top version heading not found" >&2
+            exit 1
+          fi
+          if [ "${changelog_version}" != "${version}" ]; then
+            echo "CHANGELOG.md top version ${changelog_version} does not match VERSION ${version}" >&2
+            exit 1
+          fi
+
+      - name: Validate GitHub community templates
+        id: templates
+        run: ./scripts/validate_github_templates.sh
+
+      - name: Setup Go
+        # actions/setup-go v6.4.0
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install actionlint
+        id: install_actionlint
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      - name: Run actionlint
+        id: actionlint
+        run: actionlint -color
+
+      - name: Check gofmt
+        id: gofmt
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l $(git ls-files '*.go'))"
+          if [ -n "$files" ]; then
+            echo "The following files are not gofmt-formatted:" >&2
+            echo "$files" >&2
+            exit 1
+          fi
+
+      - name: Go vet
+        id: govet
+        run: go vet ./...
+
+      - name: Go test with coverage
+        id: gotest
+        run: |
+          set -euo pipefail
+          go test -json -covermode=atomic -coverprofile=coverage.out ./... | tee test-report.jsonl
+
+      - name: Coverage and test counters
+        id: coverage
+        run: |
+          set -euo pipefail
+          coverage_report="$(go tool cover -func=coverage.out)"
+          echo "$coverage_report"
+
+          total="$(printf '%s\n' "$coverage_report" | awk '/^total:/{print $3}')"
+          packages_passed="$(jq -r 'select(.Action=="pass" and .Package!=null) | .Package' test-report.jsonl | sort -u | wc -l | tr -d ' ')"
+          tests_passed="$(jq -s '[.[] | select(.Action=="pass" and .Test!=null)] | length' test-report.jsonl)"
+          tests_failed="$(jq -s '[.[] | select(.Action=="fail" and .Test!=null)] | length' test-report.jsonl)"
+
+          echo "total=${total}" >> "$GITHUB_OUTPUT"
+          echo "packages_passed=${packages_passed}" >> "$GITHUB_OUTPUT"
+          echo "tests_passed=${tests_passed}" >> "$GITHUB_OUTPUT"
+          echo "tests_failed=${tests_failed}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload test artifacts
+        if: always()
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: go-test-artifacts
+          path: |
+            coverage.out
+            test-report.jsonl
+          if-no-files-found: error
+
+      - name: GolangCI-Lint
+        id: golangci
+        # golangci/golangci-lint-action v9.2.0
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
+        with:
+          version: v2.11.4
+          args: --timeout=5m
+
+      - name: Install gosec
+        id: install_gosec
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.25.0
+
+      - name: Gosec gate (high confidence/high severity)
+        id: gosec_gate
+        run: gosec -severity high -confidence high ./...
+
+      - name: Validate example JSON config
+        id: json_validate
+        run: jq empty examples/xray-config.example.json
+
+      - name: Validate Docker Compose files
+        id: compose_validate
+        run: |
+          cp .env.example .env
+          docker compose --env-file .env -f docker-compose.yml config -q
+          docker compose --env-file .env -f docker-compose.monitoring.yml config -q
+          docker compose --env-file .env -f deploy/compose/docker-compose.yml.tmpl config -q
+          docker compose --env-file .env -f deploy/compose/docker-compose.monitoring.yml.tmpl config -q
+
+      - name: CI job summary
+        if: always()
+        env:
+          REPO_HYGIENE_OUTCOME: ${{ steps.repo_hygiene.outcome }}
+          VERSION_FILES_OUTCOME: ${{ steps.version_files.outcome }}
+          TEMPLATE_OUTCOME: ${{ steps.templates.outcome }}
+          ACTIONLINT_OUTCOME: ${{ steps.actionlint.outcome }}
+          GOFMT_OUTCOME: ${{ steps.gofmt.outcome }}
+          GOVET_OUTCOME: ${{ steps.govet.outcome }}
+          GOTEST_OUTCOME: ${{ steps.gotest.outcome }}
+          GOLANGCI_OUTCOME: ${{ steps.golangci.outcome }}
+          GOSEC_GATE_OUTCOME: ${{ steps.gosec_gate.outcome }}
+          JSON_VALIDATE_OUTCOME: ${{ steps.json_validate.outcome }}
+          COMPOSE_VALIDATE_OUTCOME: ${{ steps.compose_validate.outcome }}
+          COVERAGE_TOTAL: ${{ steps.coverage.outputs.total }}
+          PACKAGES_PASSED: ${{ steps.coverage.outputs.packages_passed }}
+          TESTS_PASSED: ${{ steps.coverage.outputs.tests_passed }}
+          TESTS_FAILED: ${{ steps.coverage.outputs.tests_failed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          status_icon() {
+            case "$1" in
+              success) echo "PASS" ;;
+              skipped) echo "SKIP" ;;
+              *) echo "FAIL" ;;
+            esac
+          }
+
+          go_version="n/a"
+          if command -v go >/dev/null 2>&1; then
+            go_version="$(go version)"
+          fi
+
+          {
+            echo "## CI Summary"
+            echo
+            printf -- "- Go: \`%s\`\n" "${go_version}"
+            printf -- "- Packages passed: \`%s\`\n" "${PACKAGES_PASSED:-n/a}"
+            printf -- "- Tests passed: \`%s\`\n" "${TESTS_PASSED:-n/a}"
+            printf -- "- Tests failed: \`%s\`\n" "${TESTS_FAILED:-n/a}"
+            printf -- "- Total coverage: \`%s\`\n" "${COVERAGE_TOTAL:-n/a}"
+            printf -- "- Test artifacts: \`go-test-artifacts\` ([run artifacts](%s))\n" "${RUN_URL}"
+            echo
+            echo "### Checks"
+            echo "- $(status_icon \"${REPO_HYGIENE_OUTCOME}\") repository hygiene"
+            echo "- $(status_icon \"${VERSION_FILES_OUTCOME}\") VERSION/CHANGELOG validation"
+            echo "- $(status_icon \"${TEMPLATE_OUTCOME}\") GitHub template validation"
+            echo "- $(status_icon \"${ACTIONLINT_OUTCOME}\") actionlint"
+            echo "- $(status_icon \"${GOFMT_OUTCOME}\") gofmt"
+            echo "- $(status_icon \"${GOVET_OUTCOME}\") go vet"
+            echo "- $(status_icon \"${GOTEST_OUTCOME}\") go test"
+            echo "- $(status_icon \"${GOLANGCI_OUTCOME}\") golangci-lint"
+            echo "- $(status_icon \"${GOSEC_GATE_OUTCOME}\") gosec gate (high/high)"
+            echo "- $(status_icon \"${JSON_VALIDATE_OUTCOME}\") JSON example validation"
+            echo "- $(status_icon \"${COMPOSE_VALIDATE_OUTCOME}\") docker compose validation"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ansible-quality:
+    name: Ansible Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        # actions/setup-python v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements-ansible.txt
+
+      - name: Install Ansible tooling
+        id: ansible_install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .github/requirements-ansible.txt
+
+      - name: Ansible Lint
+        id: ansible_lint
+        env:
+          ANSIBLE_CONFIG: ansible/ansible.cfg
+        run: ansible-lint -c .ansible-lint ansible
+
+      - name: Ansible syntax checks
+        id: ansible_syntax
+        env:
+          ANSIBLE_CONFIG: ansible/ansible.cfg
+        run: |
+          ansible-playbook -i ansible/inventories/example/hosts.yml ansible/playbooks/bootstrap.yml --syntax-check
+          ansible-playbook -i ansible/inventories/example/hosts.yml ansible/playbooks/deploy.yml --syntax-check
+          ansible-playbook -i ansible/inventories/example/hosts.yml ansible/playbooks/security.yml --syntax-check
+
+      - name: Ansible job summary
+        if: always()
+        env:
+          INSTALL_OUTCOME: ${{ steps.ansible_install.outcome }}
+          LINT_OUTCOME: ${{ steps.ansible_lint.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.ansible_syntax.outcome }}
+        run: |
+          set -euo pipefail
+
+          status_icon() {
+            case "$1" in
+              success) echo "PASS" ;;
+              skipped) echo "SKIP" ;;
+              *) echo "FAIL" ;;
+            esac
+          }
+
+          {
+            echo "## Ansible Summary"
+            echo
+            echo "- $(status_icon \"${INSTALL_OUTCOME}\") tooling installation"
+            echo "- $(status_icon \"${LINT_OUTCOME}\") ansible-lint"
+            echo "- $(status_icon \"${SYNTAX_OUTCOME}\") playbook syntax checks"
+            echo "- Playbooks checked: bootstrap, deploy, security"
+          } >> "$GITHUB_STEP_SUMMARY"

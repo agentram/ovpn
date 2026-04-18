@@ -1,0 +1,23 @@
+# Managed by Ansible (ovpn security role)
+# Keep root SSH login enabled by default for bootstrap compatibility.
+
+{% for p in security_ssh_effective_ports %}
+Port {{ p }}
+{% endfor %}
+
+PermitRootLogin {{ security_ssh_permit_root_login_mode }}
+PasswordAuthentication {{ 'yes' if (ovpn_ssh_password_auth | bool) else 'no' }}
+PubkeyAuthentication yes
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+AuthenticationMethods {{ 'publickey' if (ovpn_ssh_pubkey_auth_only | bool) else 'any' }}
+
+LoginGraceTime {{ ovpn_ssh_login_grace_time }}
+MaxAuthTries {{ ovpn_ssh_max_auth_tries }}
+ClientAliveInterval {{ ovpn_ssh_client_alive_interval }}
+ClientAliveCountMax {{ ovpn_ssh_client_alive_count_max }}
+
+AllowTcpForwarding {{ 'yes' if (ovpn_ssh_allow_tcp_forwarding | bool) else 'no' }}
+X11Forwarding {{ 'yes' if (ovpn_ssh_x11_forwarding | bool) else 'no' }}
+PermitTunnel no
+AllowAgentForwarding yes

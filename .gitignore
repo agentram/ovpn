@@ -1,0 +1,58 @@
+# Go
+bin/
+*.exe
+*.out
+
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.envrc
+.direnv/
+
+# Python/Node local state
+.venv/
+.pytest_cache/
+node_modules/
+
+# Local state
+*.db
+*.sqlite
+*.db-*
+*.sqlite-*
+*.log
+tmp/
+cache/
+.cache/
+.gha-tmp/
+.ovpn/
+~/.ovpn/*
+coverage.out
+test-report.jsonl
+trivy-results.sarif
+*.sarif
+
+# Secrets / configs
+.env
+*.pem
+*.key
+*.crt
+monitoring/secrets/*
+!monitoring/secrets/.gitkeep
+!monitoring/secrets/README.md
+ansible/inventories/production/*
+!ansible/inventories/production/.gitkeep
+!ansible/inventories/production/README.md
+
+# Generated docs / build artifacts
+docs/*.pdf
+dist/
+build/
+/ovpn
+*.tgz
+backups/
+backup-artifact/

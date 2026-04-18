@@ -1,0 +1,201 @@
+name: Security
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '20 3 * * 1'
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks-tree:
+    name: Gitleaks Tree Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        # actions/setup-go v6.4.0
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install gitleaks
+        run: |
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          go install github.com/gitleaks/gitleaks/v8@v8.30.1
+
+      - name: Run gitleaks against working tree
+        run: gitleaks dir . --redact --no-banner
+
+  trivy-fs:
+    name: Trivy FS Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    env:
+      TRIVY_VERSION: v0.70.0
+      TRIVY_CACHE_DIR: .cache/trivy
+      DOCKER_CONFIG: /tmp/trivy-docker-config
+
+    steps:
+      - name: Checkout
+        # actions/checkout v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Build Trivy cache key
+        id: trivy_cache_key
+        run: echo "date=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Trivy DB
+        # actions/cache v5.0.5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        with:
+          path: .cache/trivy
+          key: trivy-db-${{ runner.os }}-${{ env.TRIVY_VERSION }}-${{ steps.trivy_cache_key.outputs.date }}
+          restore-keys: |
+            trivy-db-${{ runner.os }}-${{ env.TRIVY_VERSION }}-
+
+      - name: Prepare clean docker config for Trivy DB pulls
+        run: |
+          mkdir -p "$DOCKER_CONFIG"
+          printf '{"auths":{}}' > "$DOCKER_CONFIG/config.json"
+
+      - name: Install Trivy CLI
+        run: |
+          set -euo pipefail
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b "$HOME/.local/bin" "$TRIVY_VERSION"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run Trivy filesystem scan (SARIF)
+        id: trivy_scan
+        run: |
+          set -euo pipefail
+          trivy fs \
+            --cache-dir "$TRIVY_CACHE_DIR" \
+            --scanners vuln,misconfig,secret \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --format sarif \
+            --output trivy-results.sarif \
+            .
+
+      - name: Count Trivy findings
+        id: trivy_findings
+        if: always()
+        run: |
+          set -euo pipefail
+          count=0
+          if [ -f trivy-results.sarif ]; then
+            count="$(jq '[.runs[].results[]?] | length' trivy-results.sarif)"
+          fi
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Trivy SARIF artifact
+        if: always()
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: trivy-sarif
+          path: trivy-results.sarif
+          if-no-files-found: warn
+
+      - name: Determine SARIF upload policy
+        id: sarif_policy
+        env:
+          CODE_SCANNING_ENABLED: ${{ vars.CODE_SCANNING_ENABLED || '' }}
+        run: |
+          set -euo pipefail
+          allowed=false
+          reason="code scanning upload disabled by policy (set repository variable CODE_SCANNING_ENABLED=true to enable)"
+          if [ "${CODE_SCANNING_ENABLED}" = "true" ]; then
+            allowed=true
+            reason="enabled by repository policy variable CODE_SCANNING_ENABLED=true"
+          fi
+          echo "allowed=${allowed}" >> "$GITHUB_OUTPUT"
+          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Trivy SARIF to code scanning
+        id: upload_trivy_sarif
+        if: ${{ always() && steps.sarif_policy.outputs.allowed == 'true' }}
+        continue-on-error: true
+        # github/codeql-action v4
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Trivy finding gate
+        id: trivy_gate
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.trivy_scan.outcome }}" != "success" ]; then
+            echo "Trivy scan step failed before producing a valid report" >&2
+            exit 1
+          fi
+          findings="${{ steps.trivy_findings.outputs.count }}"
+          if [ "$findings" -gt 0 ]; then
+            echo "Trivy detected ${findings} HIGH/CRITICAL findings" >&2
+            exit 1
+          fi
+
+      - name: Security job summary
+        if: always()
+        env:
+          TRIVY_SCAN_OUTCOME: ${{ steps.trivy_scan.outcome }}
+          TRIVY_FINDING_COUNT: ${{ steps.trivy_findings.outputs.count }}
+          SARIF_ALLOWED: ${{ steps.sarif_policy.outputs.allowed }}
+          SARIF_REASON: ${{ steps.sarif_policy.outputs.reason }}
+          SARIF_UPLOAD_OUTCOME: ${{ steps.upload_trivy_sarif.outcome }}
+          GATE_OUTCOME: ${{ steps.trivy_gate.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          status_icon() {
+            case "$1" in
+              success) echo "PASS" ;;
+              skipped) echo "SKIP" ;;
+              *) echo "FAIL" ;;
+            esac
+          }
+
+          {
+            echo "## Security Summary"
+            echo
+            echo "- Trivy version: \`${TRIVY_VERSION}\`"
+            echo "- Findings (HIGH/CRITICAL): \`${TRIVY_FINDING_COUNT:-0}\`"
+            echo
+            echo "### Checks"
+            echo "- $(status_icon \"${TRIVY_SCAN_OUTCOME}\") trivy fs scan"
+            echo "- $(status_icon \"${GATE_OUTCOME}\") trivy finding gate"
+            echo
+            echo "### SARIF"
+            echo "- Upload allowed: \`${SARIF_ALLOWED:-false}\`"
+            echo "- Policy note: ${SARIF_REASON:-n/a}"
+            echo "- Upload step: \`${SARIF_UPLOAD_OUTCOME:-skipped}\`"
+            echo "- SARIF artifact: \`trivy-sarif\` ([run artifacts](${RUN_URL}))"
+          } >> "$GITHUB_STEP_SUMMARY"

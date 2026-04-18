@@ -1,0 +1,95 @@
+---
+# Global host/bootstrap defaults
+ovpn_timezone: "UTC"
+ovpn_deploy_root: "/opt/ovpn"
+ovpn_backup_root: "/opt/ovpn-backups"
+ovpn_compose_project_name: "ovpn"
+
+# Host security hardening toggles
+ovpn_harden_ssh: true
+ovpn_use_fail2ban: true
+
+# SSH hardening defaults (root access preserved for bootstrap compatibility)
+ovpn_ssh_permit_root_login: true
+ovpn_ssh_password_auth: false
+ovpn_ssh_pubkey_auth_only: true
+ovpn_ssh_login_grace_time: "30s"
+ovpn_ssh_max_auth_tries: 3
+ovpn_ssh_allow_tcp_forwarding: false
+ovpn_ssh_x11_forwarding: false
+ovpn_ssh_client_alive_interval: 300
+ovpn_ssh_client_alive_count_max: 2
+ovpn_validate_ssh_ports: true
+
+# Firewall management is enabled by default for clean ovpn-only hosts.
+ovpn_manage_firewall: true
+ovpn_firewall_allow_http: false
+ovpn_firewall_allow_https: true
+ovpn_firewall_extra_tcp_ports: []
+ovpn_firewall_extra_udp_ports: []
+
+# Fail2ban defaults
+ovpn_fail2ban_bantime: "1h"
+ovpn_fail2ban_findtime: "10m"
+ovpn_fail2ban_maxretry: 5
+ovpn_fail2ban_sshd_enabled: true
+ovpn_fail2ban_ignoreip:
+  - "127.0.0.1/8"
+  - "::1"
+ovpn_fail2ban_destemail: ""
+ovpn_fail2ban_sender: "fail2ban@{{ ovpn_domain | default(inventory_hostname) }}"
+ovpn_fail2ban_action: "%(action_)s"
+ovpn_fail2ban_banaction: "{{ 'ufw' if (ovpn_manage_firewall | bool) else 'iptables-multiport' }}"
+
+# Optional Tor exit-node blocking for Xray public port (disabled by default)
+ovpn_block_tor_exit_nodes: false
+ovpn_tor_exit_block_port: 443
+ovpn_tor_exit_list_url: "https://check.torproject.org/torbulkexitlist"
+ovpn_tor_update_schedule: "daily"
+
+# Optional unattended security updates (low-risk baseline)
+ovpn_enable_unattended_upgrades: true
+
+# Clean-server optimization defaults
+ovpn_purge_legacy_nginx: true
+ovpn_enable_swapfile: true
+ovpn_swapfile_path: "/swapfile"
+ovpn_swapfile_size_mb: 1024
+ovpn_swapfile_swappiness: 10
+ovpn_journald_system_max_use: "200M"
+ovpn_journald_runtime_max_use: "100M"
+
+# Optional initial stack deployment scaffolding
+ovpn_prepare_base_stack: false
+ovpn_base_stack_compose_filename: "docker-compose.base.yml"
+ovpn_base_bundle_src: ""
+ovpn_agent_image: "alpine:3.23.4"
+ovpn_agent_log_level: "info"
+
+# Xray/runtime defaults (kept in all.yml so bootstrap has required vars even
+# when no dedicated xray inventory group is used)
+ovpn_xray_version: "26.3.27"
+ovpn_xray_image: "ghcr.io/xtls/xray-core:{{ ovpn_xray_version }}"
+ovpn_xray_config_path: "{{ ovpn_deploy_root }}/xray/config.json"
+ovpn_xray_api_port: 10085
+ovpn_xray_inbound_port: 443
+
+# REALITY defaults; override per-host and keep private key in ansible-vault.
+ovpn_reality_private_key: ""
+ovpn_reality_server_name: "www.microsoft.com"
+ovpn_reality_target: "www.microsoft.com:443"
+ovpn_reality_short_id: "0123456789abcdef"
+ovpn_xray_bootstrap_uuid: "11111111-1111-1111-1111-111111111111"
+ovpn_xray_bootstrap_email: "bootstrap@example.com"
+
+# Common packages
+ovpn_common_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - jq
+  - unzip
+  - rsync
+  - ufw
+  - unattended-upgrades
+  - apt-listchanges

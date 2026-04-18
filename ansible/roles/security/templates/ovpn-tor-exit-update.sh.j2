@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SET_NAME="ovpn_tor_exit"
+TMP_SET="${SET_NAME}_tmp"
+LIST_URL="{{ ovpn_tor_exit_list_url }}"
+BLOCK_PORT="{{ ovpn_tor_exit_block_port | int }}"
+TMP_RAW="$(mktemp /tmp/ovpn-tor-exit-raw.XXXXXX)"
+TMP_IPS="$(mktemp /tmp/ovpn-tor-exit-ips.XXXXXX)"
+
+cleanup() {
+  rm -f "$TMP_RAW" "$TMP_IPS"
+}
+trap cleanup EXIT
+
+curl -fsSL --connect-timeout 10 --max-time 60 "$LIST_URL" -o "$TMP_RAW"
+
+awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/{print $1}' "$TMP_RAW" | sort -u > "$TMP_IPS"
+
+if [[ ! -s "$TMP_IPS" ]]; then
+  echo "tor exit list is empty after parsing; refusing update" >&2
+  exit 1
+fi
+
+ipset create "$TMP_SET" hash:ip family inet -exist
+ipset flush "$TMP_SET"
+while IFS= read -r ip; do
+  [[ -n "$ip" ]] || continue
+  ipset add "$TMP_SET" "$ip" -exist
+done < "$TMP_IPS"
+
+ipset create "$SET_NAME" hash:ip family inet -exist
+ipset swap "$SET_NAME" "$TMP_SET"
+ipset destroy "$TMP_SET" || true
+
+iptables -C INPUT -p tcp --dport "$BLOCK_PORT" -m set --match-set "$SET_NAME" src -j DROP 2>/dev/null \
+  || iptables -I INPUT -p tcp --dport "$BLOCK_PORT" -m set --match-set "$SET_NAME" src -j DROP
+
+entries="$(wc -l < "$TMP_IPS" | tr -d ' ')"
+echo "ovpn tor exit set updated: ${entries} entries"

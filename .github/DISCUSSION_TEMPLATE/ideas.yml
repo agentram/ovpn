@@ -1,0 +1,27 @@
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for workflow improvements, roadmap ideas, or design proposals.
+  - type: input
+    id: problem
+    attributes:
+      label: What problem are you solving?
+      placeholder: Operators need a cleaner way to ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed idea
+      description: Describe the change and why it helps.
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Tradeoffs and risks
+      description: Mention compatibility, complexity, or security tradeoffs.
+    validations:
+      required: false

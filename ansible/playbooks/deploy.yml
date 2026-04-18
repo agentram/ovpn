@@ -1,0 +1,8 @@
+---
+- name: Prepare ovpn deployment scaffolding and optionally deploy base compose
+  hosts: vpn_servers
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: ovpn_host
