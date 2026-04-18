@@ -71,7 +71,7 @@ jobs:
           case "${EVENT_NAME}" in
             push)
               base_sha="${BEFORE_SHA}"
-              if [ -z "${base_sha}" ] || [ "${base_sha}" = "0000000000000000000000000000000000000000" ]; then
+              if [ -z "${base_sha}" ] || [ "${base_sha}" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
                 base_sha="$(git rev-list --max-parents=0 HEAD)"
               fi
               changed_files="$(git diff --name-only "${base_sha}" "${GITHUB_SHA}")"
