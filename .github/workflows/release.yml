@@ -223,14 +223,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.resolve.outputs.version }}
           MODE: ${{ needs.resolve.outputs.mode }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
           release_files=(dist/*.tar.gz dist/checksums.txt)
           if [ "$MODE" = "create" ]; then
-            if git ls-remote --exit-code --tags origin "refs/tags/${VERSION}" >/dev/null 2>&1; then
-              git push --force origin "${GITHUB_SHA}:refs/tags/${VERSION}"
+            if gh api "repos/${REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${REPOSITORY}/git/refs/tags/${VERSION}" \
+                -f sha="${GITHUB_SHA}" \
+                -F force=true >/dev/null
             else
-              git push origin "${GITHUB_SHA}:refs/tags/${VERSION}"
+              gh api --method POST "repos/${REPOSITORY}/git/refs" \
+                -f ref="refs/tags/${VERSION}" \
+                -f sha="${GITHUB_SHA}" >/dev/null
             fi
             gh release create "$VERSION" "${release_files[@]}" \
               --verify-tag \
