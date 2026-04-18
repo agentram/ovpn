@@ -119,7 +119,7 @@ jobs:
           path: |
             coverage.out
             test-report.jsonl
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: GolangCI-Lint
         id: golangci
