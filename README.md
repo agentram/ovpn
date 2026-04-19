@@ -326,9 +326,22 @@ End-user setup instructions (RU, step-by-step for iOS/Android/Windows/macOS). Ge
 3. Merge to `main`.
 4. GitHub Actions validates both files, creates the plain semver tag if needed, and publishes the release automatically.
 
+## Support
+
+This repository includes an optional sponsor button and a public donation page:
+
+- sponsor button config: [`.github/FUNDING.yml`](.github/FUNDING.yml)
+- donation page source: [`docs/donate/index.html`](docs/donate/index.html)
+- default project page URL: `https://agentram.github.io/ovpn/donate/`
+
+Before enabling it publicly:
+
+1. Replace all placeholder wallet addresses.
+2. Replace the QR placeholders with real images or image paths.
+3. Use project-dedicated donation wallets only.
+4. If you later move the page to a custom domain, update [`.github/FUNDING.yml`](.github/FUNDING.yml) to the final URL.
+
 ## License
 
 This repository is source-available under the `Attribution-NonCommercial Source License 1.0 (ovpn)`.
 You may use, modify, and share it for non-commercial purposes with attribution. Commercial use requires separate permission.
-
-See [docs/public-release.md](docs/public-release.md) for the public GitHub release checklist.
