@@ -326,6 +326,19 @@ End-user setup instructions (RU, step-by-step for iOS/Android/Windows/macOS). Ge
 3. Merge to `main`.
 4. GitHub Actions validates both files, creates the plain semver tag if needed, and publishes the release automatically.
 
+## Protected main
+
+The public repository protects `main` with pull requests and required checks.
+
+Required checks:
+
+- `Go Quality`
+- `Ansible Quality`
+- `Gitleaks Tree Scan`
+- `Trivy FS Scan`
+
+Release tags matching `*.*.*` are protected from update and deletion.
+
 ## Support
 
 This repository includes an optional sponsor button and a public donation page:

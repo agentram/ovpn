@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Questions and operator help
+    url: https://github.com/agentram/ovpn/discussions/categories/q-a
+    about: Use Discussions for setup help, troubleshooting, and usage questions.
+  - name: Security reports
+    url: https://github.com/agentram/ovpn/security/policy
+    about: Use private vulnerability reporting for suspected security issues.

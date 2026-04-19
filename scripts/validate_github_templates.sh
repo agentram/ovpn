@@ -95,16 +95,34 @@ if !File.exist?(pr_template) || File.read(pr_template).strip.empty?
   errors << "#{pr_template}: file is missing or empty"
 end
 
-Dir['.github/**/*'].grep_v(%r{\.png$}).each do |path|
-  next unless File.file?(path)
-  text = File.read(path)
-  if text.include?('agentram/ovpn')
-    errors << "#{path}: contains repository-specific placeholder URL"
+config_path = '.github/ISSUE_TEMPLATE/config.yml'
+if File.exist?(config_path)
+  doc = parse.call(config_path)
+  if doc.is_a?(Hash) && doc.key?('contact_links')
+    links = doc['contact_links']
+    unless links.is_a?(Array) && !links.empty?
+      errors << "#{config_path}: contact_links must be a non-empty array when present"
+    end
   end
 end
 
-if File.exist?('.github/FUNDING.yml')
-  errors << '.github/FUNDING.yml should not exist in the public repository yet'
+funding_path = '.github/FUNDING.yml'
+if File.exist?(funding_path)
+  doc = parse.call(funding_path)
+  unless doc.is_a?(Hash)
+    errors << "#{funding_path}: top-level document must be a mapping"
+  else
+    custom = doc['custom']
+    unless custom.is_a?(Array) && !custom.empty?
+      errors << "#{funding_path}: custom must be a non-empty array"
+    else
+      custom.each_with_index do |value, idx|
+        unless value.to_s.match?(%r{\Ahttps://agentram\.github\.io/ovpn/})
+          errors << "#{funding_path}: custom[#{idx}] must point to the project Pages site"
+        end
+      end
+    end
+  end
 end
 
 if errors.empty?

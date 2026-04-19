@@ -55,8 +55,13 @@ Recommended repository settings:
 - enable Dependabot alerts and security updates
 - enable private vulnerability reporting
 - enable code scanning only if you want SARIF uploads from `security.yml`
-- protect `main` with required pull requests and required checks
+- protect `main` with required pull requests and required checks:
+  - `Go Quality`
+  - `Ansible Quality`
+  - `Gitleaks Tree Scan`
+  - `Trivy FS Scan`
 - keep default GitHub Actions permissions read-only
+- protect semver release tags (`*.*.*`) from update and deletion
 
 ## Local parity checks
 
