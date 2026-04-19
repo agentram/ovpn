@@ -43,7 +43,7 @@ func TestUsersSyncPersistsPolicies(t *testing.T) {
 	t.Parallel()
 
 	store, mux := newTestAgentMux(t)
-	expiry, err := model.ParseExpiryDate("2026-04-18")
+	expiry, err := model.ParseExpiryDate("2099-04-18")
 	if err != nil {
 		t.Fatalf("parse expiry: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestUsersSyncPersistsPolicies(t *testing.T) {
 	if len(policies) != 1 {
 		t.Fatalf("unexpected policies len=%d", len(policies))
 	}
-	if policies[0].Email != "alice@global" || model.ExpiryDateString(policies[0].ExpiryAt) != "2026-04-18" {
+	if policies[0].Email != "alice@global" || model.ExpiryDateString(policies[0].ExpiryAt) != "2099-04-18" {
 		t.Fatalf("unexpected policy: %+v", policies[0])
 	}
 }
@@ -86,7 +86,7 @@ func TestUsersStatusReturnsExpiryFields(t *testing.T) {
 
 	store, mux := newTestAgentMux(t)
 	ctx := context.Background()
-	expiry, err := model.ParseExpiryDate("2026-04-18")
+	expiry, err := model.ParseExpiryDate("2099-04-18")
 	if err != nil {
 		t.Fatalf("parse expiry: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestUsersStatusReturnsExpiryFields(t *testing.T) {
 	if len(resp.Users) != 1 {
 		t.Fatalf("unexpected user count: %d", len(resp.Users))
 	}
-	if resp.Users[0].ExpiryDate != "2026-04-18" || !resp.Users[0].EffectiveEnabled || resp.Users[0].Expired {
+	if resp.Users[0].ExpiryDate != "2099-04-18" || !resp.Users[0].EffectiveEnabled || resp.Users[0].Expired {
 		t.Fatalf("unexpected user status: %+v", resp.Users[0])
 	}
 }
