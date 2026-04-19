@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Support ovpn</title>
+    <meta
+      name="description"
+      content="Support ovpn development. Replace the placeholder wallet addresses and QR images before publishing."
+    >
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --panel: #fffdf8;
+        --ink: #1e2b22;
+        --muted: #5f6b63;
+        --accent: #1f6b4f;
+        --accent-soft: #d8ebe1;
+        --border: #d9d2c3;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, #efe5d3 0, transparent 26rem),
+          linear-gradient(180deg, #f7f3eb 0%, var(--bg) 100%);
+      }
+
+      .wrap {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 64px;
+      }
+
+      .hero {
+        padding: 28px;
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(216, 235, 225, 0.85), rgba(255, 253, 248, 0.98));
+        box-shadow: 0 20px 60px rgba(35, 42, 38, 0.08);
+      }
+
+      h1, h2, h3 {
+        margin: 0;
+        line-height: 1.1;
+      }
+
+      h1 {
+        font-size: clamp(2.2rem, 4vw, 4rem);
+        margin-bottom: 12px;
+      }
+
+      .lede {
+        max-width: 52rem;
+        margin: 0;
+        font-size: 1.05rem;
+        color: var(--muted);
+      }
+
+      .callout {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        border-radius: 10px;
+        background: rgba(255, 253, 248, 0.9);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: var(--panel);
+        box-shadow: 0 12px 34px rgba(35, 42, 38, 0.06);
+      }
+
+      .chain {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .card h2 {
+        margin-top: 14px;
+        font-size: 1.45rem;
+      }
+
+      .card p { color: var(--muted); }
+
+      .qr {
+        display: grid;
+        place-items: center;
+        min-height: 240px;
+        margin-top: 16px;
+        border: 2px dashed var(--border);
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(216, 235, 225, 0.55), rgba(255, 253, 248, 0.95));
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .label {
+        display: block;
+        margin-top: 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      code {
+        display: block;
+        margin-top: 8px;
+        padding: 12px 14px;
+        overflow-wrap: anywhere;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #f7f3ec;
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        font-size: 0.93rem;
+        color: var(--ink);
+      }
+
+      .notes {
+        margin-top: 30px;
+        padding: 22px;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: rgba(255, 253, 248, 0.92);
+      }
+
+      .notes ul {
+        margin: 14px 0 0 20px;
+        padding: 0;
+      }
+
+      .notes li + li { margin-top: 8px; }
+
+      .footer {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 640px) {
+        .wrap {
+          width: min(100% - 20px, 1080px);
+          padding-top: 20px;
+        }
+
+        .hero, .card, .notes { border-radius: 18px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <h1>Support ovpn</h1>
+        <p class="lede">
+          Donations help fund maintenance, bug fixes, documentation, release work, and operator tooling.
+          This page is intentionally checked in with placeholders only. Replace the addresses and QR images
+          with project-dedicated donation wallets before publishing.
+        </p>
+        <div class="callout">
+          Replace every value marked <strong>PLACEHOLDER</strong>. Do not publish personal, operational, or reused wallet addresses here.
+        </div>
+      </section>
+
+      <section class="grid" aria-label="Donation methods">
+        <article class="card">
+          <span class="chain">Bitcoin</span>
+          <h2>BTC</h2>
+          <p>Use a dedicated donation wallet only.</p>
+          <div class="qr">QR placeholder<br>Replace with <code>btc-qr.png</code></div>
+          <span class="label">Address</span>
+          <code>btc_PLACEHOLDER_REPLACE_ME</code>
+        </article>
+
+        <article class="card">
+          <span class="chain">Ethereum</span>
+          <h2>ETH</h2>
+          <p>Use a public donation address, not an exchange deposit address.</p>
+          <div class="qr">QR placeholder<br>Replace with <code>eth-qr.png</code></div>
+          <span class="label">Address</span>
+          <code>0xPLACEHOLDER_REPLACE_ME</code>
+        </article>
+
+        <article class="card">
+          <span class="chain">Tether</span>
+          <h2>USDT</h2>
+          <p>Publish the exact network alongside the address, for example TRC20 or ERC20.</p>
+          <div class="qr">QR placeholder<br>Replace with <code>usdt-qr.png</code></div>
+          <span class="label">Network</span>
+          <code>USDT_NETWORK_PLACEHOLDER</code>
+          <span class="label">Address</span>
+          <code>usdt_PLACEHOLDER_REPLACE_ME</code>
+        </article>
+
+        <article class="card">
+          <span class="chain">TON</span>
+          <h2>TON</h2>
+          <p>Use a separate donation wallet if you want public traceability isolated.</p>
+          <div class="qr">QR placeholder<br>Replace with <code>ton-qr.png</code></div>
+          <span class="label">Address</span>
+          <code>ton_PLACEHOLDER_REPLACE_ME</code>
+        </article>
+      </section>
+
+      <section class="notes">
+        <h2>Before you publish this page</h2>
+        <ul>
+          <li>Replace all placeholder addresses with project-dedicated donation wallets.</li>
+          <li>Add real QR images under <code>docs/donate/assets/</code> or replace the placeholder blocks with your preferred image paths.</li>
+          <li>State the USDT network explicitly so donors do not send funds to the wrong chain.</li>
+          <li>If you use a custom GitHub Pages domain, verify it in GitHub to reduce domain takeover risk.</li>
+          <li>Keep donation wallets separate from infrastructure, personal finances, or exchange accounts.</li>
+        </ul>
+      </section>
+
+      <p class="footer">
+        Sponsor button target: <code>https://agentram.github.io/ovpn/donate/</code>.
+        Update <code>.github/FUNDING.yml</code> if you later move this page to a custom domain.
+      </p>
+    </main>
+  </body>
+</html>

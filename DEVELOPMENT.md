@@ -48,7 +48,6 @@ ansible/
 docs/
   ci.md
   monitoring.md
-  public-release.md
   security.md
   testing.md
   upgrades.md
@@ -111,6 +110,5 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml pla
 - security model: `docs/security.md`
 - monitoring: `docs/monitoring.md`
 - public CI/release automation: `docs/ci.md`
-- public release process: `docs/public-release.md`
 - testing strategy: `docs/testing.md`
 - upgrades and cleanup: `docs/upgrades.md`
