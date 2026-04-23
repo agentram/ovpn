@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -62,4 +63,13 @@ func trimmedLines(raw string) []string {
 func shellQuote(v string) string {
 	v = strings.ReplaceAll(v, `'`, `'"'"'`)
 	return "'" + v + "'"
+}
+
+// withRemoteTimeout wraps a remote shell snippet with the `timeout` utility when available.
+func withRemoteTimeout(seconds int, cmd string) string {
+	if seconds <= 0 {
+		seconds = 10
+	}
+	quoted := shellQuote(cmd)
+	return fmt.Sprintf("if command -v timeout >/dev/null 2>&1; then timeout %d sh -c %s; else sh -c %s; fi", seconds, quoted, quoted)
 }

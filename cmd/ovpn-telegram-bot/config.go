@@ -27,6 +27,7 @@ func loadConfig() (config, error) {
 	flag.StringVar(&cfg.grafanaURL, "grafana-url", envOr("OVPN_TELEGRAM_GRAFANA_URL", "http://grafana:3000"), "Grafana base URL")
 	flag.StringVar(&cfg.nodeExporterURL, "node-exporter-url", envOr("OVPN_TELEGRAM_NODE_EXPORTER_URL", "http://node-exporter:9100"), "node_exporter base URL")
 	flag.StringVar(&cfg.cadvisorURL, "cadvisor-url", envOr("OVPN_TELEGRAM_CADVISOR_URL", "http://cadvisor:8080"), "cAdvisor base URL")
+	flag.StringVar(&cfg.haproxyURL, "haproxy-url", envOr("OVPN_TELEGRAM_HAPROXY_URL", ""), "Optional HAProxy metrics URL for proxy nodes")
 	flag.StringVar(&cfg.selfURL, "self-url", envOr("OVPN_TELEGRAM_SELF_URL", "http://127.0.0.1:8080/health"), "ovpn-telegram-bot self health URL")
 	flag.StringVar(&cfg.tokenFile, "telegram-token-file", envOr("OVPN_TELEGRAM_BOT_TOKEN_FILE", "/run/secrets/telegram_bot_token"), "Telegram token file path")
 	flag.StringVar(&cfg.adminTokenFile, "admin-token-file", envOr("OVPN_TELEGRAM_ADMIN_TOKEN_FILE", "/run/secrets/telegram_admin_token"), "Optional admin token file path for mutating owner actions")

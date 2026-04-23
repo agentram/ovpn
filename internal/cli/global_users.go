@@ -65,11 +65,16 @@ func (a *App) canonicalUsersFromServers(servers []model.Server) (map[string]mode
 
 // ensureRealityParity verifies that cluster-critical REALITY parameters are equal on all registered servers.
 func (a *App) ensureRealityParity() error {
-	servers, err := a.listEnabledServers()
-	if err != nil {
-		return err
+	for _, role := range []string{model.ServerRoleVPN, model.ServerRoleProxy} {
+		servers, err := a.listEnabledServersByRole(role)
+		if err != nil {
+			return err
+		}
+		if err := ensureRealityParityForServers(servers); err != nil {
+			return err
+		}
 	}
-	return ensureRealityParityForServers(servers)
+	return nil
 }
 
 // ensureRealityParityForServers verifies REALITY parity for provided servers.
@@ -80,22 +85,7 @@ func ensureRealityParityForServers(servers []model.Server) error {
 	base := servers[0]
 	var issues []string
 	for _, srv := range servers[1:] {
-		var diff []string
-		if strings.TrimSpace(srv.RealityPrivateKey) != strings.TrimSpace(base.RealityPrivateKey) {
-			diff = append(diff, "reality_private_key")
-		}
-		if strings.TrimSpace(srv.RealityPublicKey) != strings.TrimSpace(base.RealityPublicKey) {
-			diff = append(diff, "reality_public_key")
-		}
-		if strings.TrimSpace(srv.RealityShortIDs) != strings.TrimSpace(base.RealityShortIDs) {
-			diff = append(diff, "reality_short_ids")
-		}
-		if strings.TrimSpace(srv.RealityServerName) != strings.TrimSpace(base.RealityServerName) {
-			diff = append(diff, "reality_server_name")
-		}
-		if strings.TrimSpace(srv.RealityTarget) != strings.TrimSpace(base.RealityTarget) {
-			diff = append(diff, "reality_target")
-		}
+		diff := realityParityDiff(base, srv, false)
 		if len(diff) == 0 {
 			continue
 		}
@@ -106,6 +96,29 @@ func ensureRealityParityForServers(servers []model.Server) error {
 		return fmt.Errorf("REALITY parity check failed:\n- %s", strings.Join(issues, "\n- "))
 	}
 	return nil
+}
+
+func realityParityDiff(base model.Server, srv model.Server, includeProxyServiceUUID bool) []string {
+	var diff []string
+	if strings.TrimSpace(srv.RealityPrivateKey) != strings.TrimSpace(base.RealityPrivateKey) {
+		diff = append(diff, "reality_private_key")
+	}
+	if strings.TrimSpace(srv.RealityPublicKey) != strings.TrimSpace(base.RealityPublicKey) {
+		diff = append(diff, "reality_public_key")
+	}
+	if strings.TrimSpace(srv.RealityShortIDs) != strings.TrimSpace(base.RealityShortIDs) {
+		diff = append(diff, "reality_short_ids")
+	}
+	if strings.TrimSpace(srv.RealityServerName) != strings.TrimSpace(base.RealityServerName) {
+		diff = append(diff, "reality_server_name")
+	}
+	if strings.TrimSpace(srv.RealityTarget) != strings.TrimSpace(base.RealityTarget) {
+		diff = append(diff, "reality_target")
+	}
+	if includeProxyServiceUUID && strings.TrimSpace(srv.ProxyServiceUUID) != strings.TrimSpace(base.ProxyServiceUUID) {
+		diff = append(diff, "proxy_service_uuid")
+	}
+	return diff
 }
 
 // resolveUserMutationServers resolves target servers for mutating user operations.
@@ -144,6 +157,24 @@ func (a *App) listEnabledServers() ([]model.Server, error) {
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Name < out[j].Name
 	})
+	return out, nil
+}
+
+// listEnabledServersByRole returns enabled servers for the requested role.
+func (a *App) listEnabledServersByRole(role string) ([]model.Server, error) {
+	servers, err := a.listEnabledServers()
+	if err != nil {
+		return nil, err
+	}
+	if role == "" {
+		return servers, nil
+	}
+	out := make([]model.Server, 0, len(servers))
+	for _, srv := range servers {
+		if srv.NormalizedRole() == role {
+			out = append(out, srv)
+		}
+	}
 	return out, nil
 }
 

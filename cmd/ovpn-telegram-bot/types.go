@@ -30,6 +30,7 @@ type config struct {
 	grafanaURL      string
 	nodeExporterURL string
 	cadvisorURL     string
+	haproxyURL      string
 	selfURL         string
 	tokenFile       string
 	adminTokenFile  string

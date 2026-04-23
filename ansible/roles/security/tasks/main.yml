@@ -367,19 +367,27 @@
         iptables -D INPUT -p tcp --dport {{ ovpn_tor_exit_block_port | int }}
         -m set --match-set ovpn_tor_exit src -j DROP
       register: security_tor_rule_remove
-      failed_when: security_tor_rule_remove.rc not in [0, 1, 127]
+      failed_when: security_tor_rule_remove.rc not in [0, 1, 2, 127]
       changed_when: security_tor_rule_remove.rc == 0
 
     - name: Remove Tor exit ipset
-      ansible.builtin.command: ipset destroy ovpn_tor_exit
+      ansible.builtin.shell: |
+        if ! command -v ipset >/dev/null 2>&1; then
+          exit 0
+        fi
+        ipset destroy ovpn_tor_exit
       register: security_tor_set_remove
-      failed_when: security_tor_set_remove.rc not in [0, 1, 127]
+      failed_when: security_tor_set_remove.rc not in [0, 1]
       changed_when: security_tor_set_remove.rc == 0
 
     - name: Remove temporary Tor exit ipset
-      ansible.builtin.command: ipset destroy ovpn_tor_exit_tmp
+      ansible.builtin.shell: |
+        if ! command -v ipset >/dev/null 2>&1; then
+          exit 0
+        fi
+        ipset destroy ovpn_tor_exit_tmp
       register: security_tor_tmp_set_remove
-      failed_when: security_tor_tmp_set_remove.rc not in [0, 1, 127]
+      failed_when: security_tor_tmp_set_remove.rc not in [0, 1]
       changed_when: security_tor_tmp_set_remove.rc == 0
 
     - name: Remove Tor exit updater script

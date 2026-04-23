@@ -89,6 +89,22 @@ func TestMenuActionFromText(t *testing.T) {
 	}
 }
 
+func TestServicesInlineKeyboardIncludesHAProxyOnlyWhenConfigured(t *testing.T) {
+	t.Parallel()
+
+	without := servicesInlineKeyboard(true, false)
+	with := servicesInlineKeyboard(true, true)
+	rawWithout, _ := json.Marshal(without)
+	rawWith, _ := json.Marshal(with)
+
+	if strings.Contains(string(rawWithout), "haproxy") {
+		t.Fatalf("did not expect haproxy controls without proxy support: %s", string(rawWithout))
+	}
+	if !strings.Contains(string(rawWith), "services:detail:haproxy") || !strings.Contains(string(rawWith), "services:restart:haproxy") {
+		t.Fatalf("expected haproxy controls in proxy keyboard: %s", string(rawWith))
+	}
+}
+
 func TestFindPolicyForQuery(t *testing.T) {
 	t.Parallel()
 

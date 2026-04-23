@@ -231,6 +231,158 @@ func TestRenderServerJSONIncludesFallbackRateLimitsWhenProvided(t *testing.T) {
 	}
 }
 
+func TestRenderServerJSONProxyRoutesForeignTrafficThroughRelay(t *testing.T) {
+	t.Parallel()
+
+	raw, err := RenderServerJSON(Spec{
+		Role:              model.ServerRoleProxy,
+		ProxyPreset:       model.ProxyPresetRU,
+		RealityPrivateKey: "priv",
+		RealityPublicKey:  "backend-pub",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd1234"},
+		ThreatDNSServers:  []string{"1.1.1.2"},
+		Users:             []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "client@example.com", Enabled: true}},
+		ServiceUsers:      []ServiceUser{{UUID: "22222222-2222-2222-2222-222222222222", Email: "proxy-service@cluster"}},
+		ProxyRelay: &ProxyRelay{
+			Address:     "haproxy",
+			Port:        15443,
+			ServiceUUID: "22222222-2222-2222-2222-222222222222",
+			ServerName:  "backend.example.com",
+			PublicKey:   "backend-pub",
+			ShortID:     "beefcafe",
+		},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		t.Fatalf("unmarshal rendered config: %v", err)
+	}
+
+	inbounds, _ := obj["inbounds"].([]any)
+	if len(inbounds) < 2 {
+		t.Fatalf("expected api and client inbound, got %d", len(inbounds))
+	}
+	clientInbound, _ := inbounds[1].(map[string]any)
+	settings, _ := clientInbound["settings"].(map[string]any)
+	clients, _ := settings["clients"].([]any)
+	if len(clients) != 2 {
+		t.Fatalf("expected user and service client, got %d", len(clients))
+	}
+
+	outbounds, _ := obj["outbounds"].([]any)
+	foundForeignPool := false
+	for _, outbound := range outbounds {
+		entry, _ := outbound.(map[string]any)
+		if entry["tag"] == "foreign-pool" {
+			foundForeignPool = true
+			break
+		}
+	}
+	if !foundForeignPool {
+		t.Fatalf("expected foreign-pool outbound in proxy config")
+	}
+
+	routing, _ := obj["routing"].(map[string]any)
+	rules, _ := routing["rules"].([]any)
+	var foundRUDirect bool
+	var foundForeignDefault bool
+	for _, rawRule := range rules {
+		rule, _ := rawRule.(map[string]any)
+		if rule["outboundTag"] == "direct" {
+			if domains, ok := rule["domain"].([]any); ok {
+				all := strings.Join(toStrings(domains), ",")
+				if strings.Contains(all, "geosite:ru-available-only-inside") {
+					foundRUDirect = true
+				}
+			}
+		}
+		if rule["outboundTag"] == "foreign-pool" {
+			if inboundTags, ok := rule["inboundTag"].([]any); ok && strings.Contains(strings.Join(toStrings(inboundTags), ","), "vless-reality") {
+				foundForeignDefault = true
+			}
+		}
+	}
+	if !foundRUDirect {
+		t.Fatalf("expected Russian direct routing rule in proxy config")
+	}
+	if !foundForeignDefault {
+		t.Fatalf("expected default foreign routing rule in proxy config")
+	}
+}
+
+func TestValidateSpecRejectsUnknownProxyPreset(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateSpec(Spec{
+		Role:              model.ServerRoleProxy,
+		ProxyPreset:       "de",
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ThreatDNSServers:  []string{"1.1.1.2"},
+		ShortIDs:          []string{"abcd1234"},
+		ProxyRelay: &ProxyRelay{
+			Address:     "haproxy",
+			Port:        15443,
+			ServiceUUID: "22222222-2222-2222-2222-222222222222",
+			ServerName:  "backend.example.com",
+			PublicKey:   "backend-pub",
+			ShortID:     "beefcafe",
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "proxy preset") {
+		t.Fatalf("expected proxy preset validation error, got %v", err)
+	}
+}
+
+func TestRenderServerJSONVPNIncludesProxyServiceUser(t *testing.T) {
+	t.Parallel()
+
+	raw, err := RenderServerJSON(Spec{
+		Role:              model.ServerRoleVPN,
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd1234"},
+		Users:             []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "client@example.com", Enabled: true}},
+		ServiceUsers:      []ServiceUser{{UUID: "22222222-2222-2222-2222-222222222222", Email: "proxy-service@cluster"}},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		t.Fatalf("unmarshal rendered config: %v", err)
+	}
+	inbounds, _ := obj["inbounds"].([]any)
+	if len(inbounds) < 2 {
+		t.Fatalf("expected api and client inbound, got %d", len(inbounds))
+	}
+	clientInbound, _ := inbounds[1].(map[string]any)
+	settings, _ := clientInbound["settings"].(map[string]any)
+	clients, _ := settings["clients"].([]any)
+	if len(clients) != 2 {
+		t.Fatalf("expected end-user and proxy service user, got %d", len(clients))
+	}
+	var foundServiceUser bool
+	for _, rawClient := range clients {
+		client, _ := rawClient.(map[string]any)
+		if client["email"] == "proxy-service@cluster" && client["id"] == "22222222-2222-2222-2222-222222222222" {
+			foundServiceUser = true
+			break
+		}
+	}
+	if !foundServiceUser {
+		t.Fatalf("expected proxy service user in vpn inbound clients: %#v", clients)
+	}
+}
+
 func TestValidateSpecRejectsNegativeFallbackRateLimits(t *testing.T) {
 	t.Parallel()
 

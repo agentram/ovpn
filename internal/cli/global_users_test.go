@@ -175,9 +175,11 @@ func TestEnsureRealityParityForServers(t *testing.T) {
 		RealityShortIDs:   "id",
 		RealityServerName: "www.microsoft.com",
 		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "svc-a",
 	}
 	other := base
 	other.Name = "b"
+	other.ProxyServiceUUID = "svc-b"
 	if err := ensureRealityParityForServers([]model.Server{base, other}); err != nil {
 		t.Fatalf("expected parity success, got %v", err)
 	}
@@ -284,6 +286,56 @@ func TestServerAddIgnoresDisabledServersAsBaseline(t *testing.T) {
 	}
 }
 
+func TestServerAddDefaultsProxyPresetForProxyRole(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "base")
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{
+		"add",
+		"--name", "proxy-ru",
+		"--role", model.ServerRoleProxy,
+		"--host", "10.0.0.20",
+		"--domain", "proxy.example.com",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("server add proxy failed: %v", err)
+	}
+
+	got, err := app.store.GetServerByName(app.ctx, "proxy-ru")
+	if err != nil {
+		t.Fatalf("load proxy server: %v", err)
+	}
+	if got.NormalizedProxyPreset() != model.ProxyPresetRU {
+		t.Fatalf("expected proxy preset %q, got %q", model.ProxyPresetRU, got.NormalizedProxyPreset())
+	}
+}
+
+func TestServerAddRejectsProxyPresetForVPNRole(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "base")
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{
+		"add",
+		"--name", "bad-vpn",
+		"--host", "10.0.0.21",
+		"--domain", "bad-vpn.example.com",
+		"--proxy-preset", model.ProxyPresetRU,
+	})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected proxy-preset validation error for vpn role")
+	}
+	if !strings.Contains(err.Error(), "proxy_preset is only supported for proxy role") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func newGlobalUsersTestApp(t *testing.T) *App {
 	t.Helper()
 	ctx := context.Background()
@@ -309,6 +361,7 @@ func addGlobalUsersTestServer(t *testing.T, st *local.Store, name string) *model
 		RealityShortIDs:   "abcd1234",
 		RealityServerName: "www.microsoft.com",
 		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "11111111-1111-1111-1111-111111111111",
 		Enabled:           true,
 	}
 	if err := st.AddServer(context.Background(), s); err != nil {
