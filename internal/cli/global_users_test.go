@@ -286,6 +286,56 @@ func TestServerAddIgnoresDisabledServersAsBaseline(t *testing.T) {
 	}
 }
 
+func TestServerAddDefaultsProxyPresetForProxyRole(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "base")
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{
+		"add",
+		"--name", "proxy-ru",
+		"--role", model.ServerRoleProxy,
+		"--host", "10.0.0.20",
+		"--domain", "proxy.example.com",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("server add proxy failed: %v", err)
+	}
+
+	got, err := app.store.GetServerByName(app.ctx, "proxy-ru")
+	if err != nil {
+		t.Fatalf("load proxy server: %v", err)
+	}
+	if got.NormalizedProxyPreset() != model.ProxyPresetRU {
+		t.Fatalf("expected proxy preset %q, got %q", model.ProxyPresetRU, got.NormalizedProxyPreset())
+	}
+}
+
+func TestServerAddRejectsProxyPresetForVPNRole(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "base")
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{
+		"add",
+		"--name", "bad-vpn",
+		"--host", "10.0.0.21",
+		"--domain", "bad-vpn.example.com",
+		"--proxy-preset", model.ProxyPresetRU,
+	})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected proxy-preset validation error for vpn role")
+	}
+	if !strings.Contains(err.Error(), "proxy_preset is only supported for proxy role") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func newGlobalUsersTestApp(t *testing.T) *App {
 	t.Helper()
 	ctx := context.Background()

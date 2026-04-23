@@ -172,6 +172,7 @@ export OVPN_THREAT_DNS_SERVERS=9.9.9.9,149.112.112.112
 
 Use this only when adding a preset-driven `proxy` in front of existing foreign `vpn` servers.
 Today the built-in preset is `ru`, which keeps Russian destinations local to the proxy and relays everything else through foreign backends.
+If `--proxy-preset` is omitted for a proxy server, it defaults to `ru` for backward compatibility.
 This does not modify the current direct path for existing users.
 
 ```bash

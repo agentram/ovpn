@@ -18,8 +18,6 @@ func normalizeServerForStorage(srv *model.Server) {
 	}
 	if srv.Role == model.ServerRoleProxy {
 		srv.ProxyPreset = model.NormalizeProxyPreset(srv.ProxyPreset)
-	} else {
-		srv.ProxyPreset = ""
 	}
 }
 

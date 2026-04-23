@@ -103,6 +103,7 @@ It is not sent directly from the proxy country.
 ## Proxy presets
 
 Proxy behavior is selected by `proxy_preset`.
+If it is omitted, `ovpn` defaults proxy nodes to `ru` for backward compatibility with the first HA implementation.
 
 Current built-in preset:
 
