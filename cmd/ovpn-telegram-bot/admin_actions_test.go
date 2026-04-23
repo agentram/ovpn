@@ -57,3 +57,12 @@ func TestBeginRestartConfirmSetsPending(t *testing.T) {
 		t.Fatalf("unexpected pending state: %+v", st)
 	}
 }
+
+func TestNewDockerServiceOperatorIncludesHAProxy(t *testing.T) {
+	t.Parallel()
+
+	op := newDockerServiceOperator("/var/run/docker.sock")
+	if got := op.containers["haproxy"]; got != "ovpn-haproxy" {
+		t.Fatalf("unexpected haproxy container mapping: %q", got)
+	}
+}

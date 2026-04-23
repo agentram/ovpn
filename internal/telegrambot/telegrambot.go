@@ -145,6 +145,9 @@ func RenderNotifyMessage(ev NotifyEvent) string {
 func RenderAlertmanagerMessage(in AlertmanagerWebhook) string {
 	status := strings.ToUpper(defaultText(in.Status, "firing"))
 	name := firstNonEmpty(in.CommonLabels["alertname"], in.GroupLabels["alertname"], "alert")
+	if text, ok := renderFriendlyAlertmanagerMessage(name, status, in); ok {
+		return text
+	}
 	severity := defaultText(in.CommonLabels["severity"], "unknown")
 	count := len(in.Alerts)
 	summary := defaultText(in.CommonAnnotations["summary"], "")
@@ -166,6 +169,56 @@ func RenderAlertmanagerMessage(in AlertmanagerWebhook) string {
 		lines = append(lines, "alertmanager: "+renderAlertmanagerURL(in.ExternalURL))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func renderFriendlyAlertmanagerMessage(name, status string, in AlertmanagerWebhook) (string, bool) {
+	switch name {
+	case "OVPNUserExpirySoon":
+		email := firstNonEmpty(in.CommonLabels["email"], firstAlertLabel(in, "email"))
+		expiryDate := firstNonEmpty(in.CommonLabels["expiry_date"], firstAlertLabel(in, "expiry_date"))
+		username, server := splitUserIdentity(email)
+		header := "User Expiry Reminder"
+		if status != "FIRING" {
+			header = "User Expiry Update"
+		}
+		lines := []string{header}
+		if username != "" {
+			lines = append(lines, "User: "+username)
+		}
+		if server != "" {
+			lines = append(lines, "Server: "+server)
+		}
+		if email != "" {
+			lines = append(lines, "Identity: "+email)
+		}
+		if expiryDate != "" {
+			lines = append(lines, "Expires on: "+expiryDate+" UTC")
+			lines = append(lines, "Access remains active until the end of that day.")
+		}
+		lines = append(lines, "Action: extend the expiry date if this user should keep access.")
+		return strings.Join(lines, "\n"), true
+	default:
+		return "", false
+	}
+}
+
+func firstAlertLabel(in AlertmanagerWebhook, key string) string {
+	if len(in.Alerts) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(in.Alerts[0].Labels[key])
+}
+
+func splitUserIdentity(email string) (string, string) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "", ""
+	}
+	parts := strings.SplitN(email, "@", 2)
+	if len(parts) != 2 {
+		return email, ""
+	}
+	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 }
 
 // alertSource builds compact source details from first alert labels.

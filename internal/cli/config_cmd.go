@@ -78,7 +78,18 @@ func (a *App) configCmd() *cobra.Command {
 			}
 			if _, err := exec.LookPath("docker"); err == nil {
 				a.log().Debug("running docker-based xray config validation", "server", srv.Name, "xray_image", xrayImage)
-				if err := deploy.ValidateConfigWithDocker(a.ctx, xrayImage, configFile); err != nil {
+				var extraMounts []string
+				if srv.IsProxy() {
+					geositePath, geoipPath, err := a.ensureProxyGeodataAssets(*srv)
+					if err != nil {
+						return err
+					}
+					extraMounts = append(extraMounts,
+						"-v", fmt.Sprintf("%s:/usr/local/share/xray/geosite.dat:ro", geositePath),
+						"-v", fmt.Sprintf("%s:/usr/local/share/xray/geoip.dat:ro", geoipPath),
+					)
+				}
+				if err := deploy.ValidateConfigWithDockerAndMounts(a.ctx, xrayImage, configFile, extraMounts); err != nil {
 					return err
 				}
 			}

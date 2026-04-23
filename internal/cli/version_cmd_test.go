@@ -29,7 +29,7 @@ func TestVersionCommandPrintsPinnedVersion(t *testing.T) {
 		t.Fatalf("read output: %v", err)
 	}
 	got := strings.TrimSpace(buf.String())
-	if got != "1.1.0" {
-		t.Fatalf("version output = %q, want %q", got, "1.1.0")
+	if got != "1.2.0" {
+		t.Fatalf("version output = %q, want %q", got, "1.2.0")
 	}
 }

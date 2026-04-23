@@ -73,13 +73,16 @@ func quotaInlineKeyboard() map[string]any {
 }
 
 // servicesInlineKeyboard builds the keyboard layout for services actions.
-func servicesInlineKeyboard(adminEnabled bool) map[string]any {
+func servicesInlineKeyboard(adminEnabled bool, includeHAProxy bool) map[string]any {
 	rows := [][]map[string]string{
 		{{"text": "Overview", "callback_data": "services:overview"}, {"text": "Doctor", "callback_data": "services:doctor"}},
 		{{"text": "Agent", "callback_data": "services:detail:ovpn-agent"}, {"text": "Xray", "callback_data": "services:detail:xray-via-agent"}},
 		{{"text": "Prometheus", "callback_data": "services:detail:prometheus"}, {"text": "Alertmanager", "callback_data": "services:detail:alertmanager"}},
 		{{"text": "Grafana", "callback_data": "services:detail:grafana"}, {"text": "Node Exporter", "callback_data": "services:detail:node-exporter"}},
 		{{"text": "cAdvisor", "callback_data": "services:detail:cadvisor"}, {"text": "Bot Self", "callback_data": "services:detail:ovpn-telegram-bot"}},
+	}
+	if includeHAProxy {
+		rows = append(rows, []map[string]string{{"text": "HAProxy", "callback_data": "services:detail:haproxy"}})
 	}
 	if adminEnabled {
 		rows = append(rows,
@@ -89,6 +92,9 @@ func servicesInlineKeyboard(adminEnabled bool) map[string]any {
 			[]map[string]string{{"text": "Restart Grafana", "callback_data": "services:restart:grafana"}, {"text": "Restart Node", "callback_data": "services:restart:node-exporter"}},
 			[]map[string]string{{"text": "Restart cAdvisor", "callback_data": "services:restart:cadvisor"}},
 		)
+		if includeHAProxy {
+			rows = append(rows, []map[string]string{{"text": "Restart HAProxy", "callback_data": "services:restart:haproxy"}})
+		}
 	}
 	rows = append(rows, []map[string]string{{"text": "Back", "callback_data": "services:back"}})
 	return map[string]any{"inline_keyboard": rows}

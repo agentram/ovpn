@@ -1,6 +1,6 @@
 ---
 - name: Apply ovpn host security hardening
-  hosts: vpn_servers
+  hosts: vpn_servers:proxy_servers
   become: true
   gather_facts: true
 

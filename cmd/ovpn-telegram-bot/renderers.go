@@ -50,7 +50,7 @@ func (b *bot) sendHelp(ctx context.Context, chatID int64) error {
 		"/heal - owner auto-fix unhealthy services",
 		"/guide - send VPN client PDF guide",
 		"/cancel - cancel active prompt or pending confirmation",
-		"Restart services: " + restartableServicesHelp(),
+		"Restart services: " + restartableServicesHelp(b.hasHAProxy()),
 	}, "\n")
 	return b.sendPlainMessage(ctx, chatID, msg, mainReplyKeyboard())
 }

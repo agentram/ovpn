@@ -88,9 +88,11 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	}
 	defer deploy.CleanupBundle(bundle)
 	a.log().Debug("bundle rendered", "server", srv.Name, "bundle_dir", bundle.Dir, "config_bytes", len(bundle.ConfigRaw))
+	a.log().Info("uploading rendered bundle", "server", srv.Name, "host", srv.Host)
 	if err := deploy.UploadBundle(a.ctx, runner, sshCfg, bundle.Dir); err != nil {
 		return fmt.Errorf("upload bundle to %s for server %s: %w", srv.Host, srv.Name, err)
 	}
+	a.log().Info("applying staged bundle on remote host", "server", srv.Name, "host", srv.Host)
 	if err := deploy.DeployRemote(a.ctx, runner, sshCfg); err != nil {
 		return fmt.Errorf("deploy remote stack on %s for server %s: %w", srv.Host, srv.Name, err)
 	}
@@ -148,7 +150,7 @@ func (a *App) buildDeployInput(
 	if strings.TrimSpace(envOr("OVPN_TELEGRAM_OWNER_USER_ID", "")) == "" && ownerUserID != "" {
 		a.log().Info("OVPN_TELEGRAM_OWNER_USER_ID is empty; using first notify chat id as owner fallback", "owner_user_id", ownerUserID)
 	}
-	return deploy.Input{
+	input := deploy.Input{
 		Server:                       srv,
 		Users:                        users,
 		SecurityProfile:              securityProfile,
@@ -160,6 +162,7 @@ func (a *App) buildDeployInput(
 		XrayImage:                    defaults.DefaultXrayImage(normalizeXrayVersionTag(srv.XrayVersion)),
 		AgentImage:                   defaults.DefaultAgentImage,
 		TelegramBotImage:             envOr("OVPN_TELEGRAM_BOT_IMAGE", defaults.DefaultTelegramBotImage),
+		HAProxyImage:                 envOr("OVPN_HAPROXY_IMAGE", defaults.DefaultHAProxyImage),
 		AgentLogLevel:                a.agentLogLevel(),
 		AgentHostPort:                a.agentHostPort(),
 		TelegramBotHostPort:          a.telegramBotHostPort(),
@@ -184,7 +187,29 @@ func (a *App) buildDeployInput(
 		TelegramLinkServerName:       strings.TrimSpace(srv.RealityServerName),
 		TelegramLinkPublicKey:        strings.TrimSpace(srv.RealityPublicKey),
 		TelegramLinkShortID:          firstShortID(srv.RealityShortIDs),
-	}, nil
+	}
+	serviceUsers, err := a.vpnServiceUsers(srv)
+	if err != nil {
+		return deploy.Input{}, err
+	}
+	if len(serviceUsers) > 0 {
+		input.ServiceUsers = serviceUsers
+	}
+	if srv.IsProxy() {
+		relay, backends, err := a.buildProxyRelay(srv)
+		if err != nil {
+			return deploy.Input{}, err
+		}
+		geositePath, geoipPath, err := a.ensureProxyGeodataAssets(srv)
+		if err != nil {
+			return deploy.Input{}, err
+		}
+		input.ProxyRelay = relay
+		input.BackendServers = backends
+		input.ProxyGeoSitePath = geositePath
+		input.ProxyGeoIPPath = geoipPath
+	}
+	return input, nil
 }
 
 // normalizeTelegramDeployIDs validates and normalizes telegram IDs used in runtime env.

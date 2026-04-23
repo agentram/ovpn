@@ -31,6 +31,7 @@ func newDockerServiceOperator(socketPath string) *dockerServiceOperator {
 		http: &http.Client{Timeout: 12 * time.Second, Transport: transport},
 		containers: map[string]string{
 			"xray":          "ovpn-xray",
+			"haproxy":       "ovpn-haproxy",
 			"ovpn-agent":    "ovpn-agent",
 			"prometheus":    "ovpn-prometheus",
 			"alertmanager":  "ovpn-alertmanager",

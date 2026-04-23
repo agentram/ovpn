@@ -1,0 +1,24 @@
+# Example proxy host inventory. Keep your real production inventory private and untracked.
+ansible_host: "198.51.100.20"
+ansible_user: "root"
+ansible_port: 22
+
+ovpn_domain: "proxy-1.example.com"
+ovpn_public_ip: "198.51.100.20"
+ovpn_timezone: "UTC"
+
+ovpn_harden_ssh: true
+ovpn_ssh_permit_root_login: true
+ovpn_ssh_password_auth: false
+ovpn_ssh_allow_tcp_forwarding: true
+
+ovpn_manage_firewall: true
+ovpn_use_fail2ban: true
+ovpn_firewall_extra_tcp_ports: []
+
+# The proxy host is still prepared with the same host baseline.
+# Runtime role-specific behavior is configured later with `ovpn server add --role proxy`.
+ovpn_xray_version: "26.3.27"
+
+ovpn_block_tor_exit_nodes: false
+ovpn_tor_exit_block_port: 443

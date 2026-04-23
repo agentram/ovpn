@@ -127,10 +127,10 @@ func validateComposeService(svc string) (string, error) {
 		return "", nil
 	}
 	switch svc {
-	case "xray", "ovpn-agent", "prometheus", "alertmanager", "grafana", "node-exporter", "cadvisor", "ovpn-telegram-bot":
+	case "xray", "haproxy", "ovpn-agent", "prometheus", "alertmanager", "grafana", "node-exporter", "cadvisor", "ovpn-telegram-bot":
 		return " " + svc, nil
 	default:
-		return "", fmt.Errorf("unsupported --service %q (allowed: xray, ovpn-agent, prometheus, alertmanager, grafana, node-exporter, cadvisor, ovpn-telegram-bot)", svc)
+		return "", fmt.Errorf("unsupported --service %q (allowed: xray, haproxy, ovpn-agent, prometheus, alertmanager, grafana, node-exporter, cadvisor, ovpn-telegram-bot)", svc)
 	}
 }
 

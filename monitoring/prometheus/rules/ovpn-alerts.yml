@@ -209,8 +209,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "User expires within 2 days"
-          description: "User {{ $labels.email }} expires on {{ $labels.expiry_date }} (UTC end-of-day semantics)."
+          summary: "User access expires soon"
+          description: "{{ $labels.email }} expires on {{ $labels.expiry_date }} UTC. Access remains active until the end of that day."
 
   - name: ovpn-telegram-bot
     rules:

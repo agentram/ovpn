@@ -7,6 +7,7 @@ const (
 	DefaultXrayImageRepo     = "ghcr.io/xtls/xray-core"
 	DefaultAgentImage        = "alpine:3.23.4"
 	DefaultTelegramBotImage  = "alpine:3.23.4"
+	DefaultHAProxyImage      = "haproxy:3.2.15-alpine3.23"
 	DefaultPrometheusImage   = "prom/prometheus:v3.11.2"
 	DefaultAlertmanagerImage = "prom/alertmanager:v0.32.0"
 	DefaultGrafanaImage      = "grafana/grafana:12.4.3"

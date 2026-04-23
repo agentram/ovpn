@@ -22,6 +22,10 @@ Default Grafana folder `ovpn` includes:
 - `ovpn Agent Overview`
 - `ovpn User Statistics (Local Server)` (per-user traffic and quota state for the current server)
 
+Proxy nodes add one extra dashboard:
+
+- `ovpn Proxy HA Overview`
+
 `ovpn Host Overview` and `ovpn Containers Overview` include capacity-oriented panels:
 
 - memory available and inode usage
@@ -73,6 +77,13 @@ Default alerts cover:
   - `OVPNTelegramBotPollingStale`
   - `OVPNTelegramBotSendFailures`
 
+Proxy nodes add:
+
+- HAProxy metrics scrape
+- HAProxy container presence alert
+- foreign backend pool down alert
+- backend health flapping alert
+
 Bot metrics exported by `ovpn-telegram-bot`:
 
 - `ovpn_telegram_bot_poll_last_success_timestamp_seconds`
@@ -97,7 +108,7 @@ Bot metrics exported by `ovpn-telegram-bot`:
   - Default mode is read-only audit (`Status`, `Services`, `Doctor`, `Users`, `Traffic`, `Quota`)
   - Optional owner-only mutating actions (`/restart`, `/heal`) are enabled only when `monitoring/secrets/telegram_admin_token` is non-empty
   - Mutating actions use Docker socket access from bot container and require two-step confirmation in chat
-  - Bot reads only internal endpoints (`ovpn-agent`, `prometheus`, `alertmanager`, `grafana`, `node-exporter`, `cadvisor`)
+  - Bot reads only internal endpoints (`ovpn-agent`, `prometheus`, `alertmanager`, `grafana`, `node-exporter`, `cadvisor`, optional `haproxy`)
   - No public Telegram webhook endpoint is exposed
   - Bot surfaces local server traffic/quota view; global user identity mirroring is handled by CLI/state layer
   - `/users` shows expiry date and state (`no-exp`, `expiring`, `expired`)
@@ -114,6 +125,7 @@ Telegram <-> ovpn-telegram-bot (long polling)
                   +-> Grafana (/api/health)
                   +-> node_exporter (/metrics)
                   +-> cAdvisor (/healthz)
+                  +-> optional HAProxy (/metrics on proxy nodes)
                   +-> Docker API (/var/run/docker.sock, optional)
                   +-> local clients.pdf (Guide PDF sendDocument, generated from docs/clients.md)
 ```
@@ -125,6 +137,8 @@ Telegram <-> ovpn-telegram-bot (long polling)
 ./ovpn server monitor up <server>
 ./ovpn server monitor status <server>
 ```
+
+If a fresh host cannot pull the monitoring images because of public-registry rate limits, preload the required images from an existing ovpn host or redeploy with explicit image overrides before running `ovpn server monitor up`.
 
 Monitoring runtime defaults:
 
@@ -210,7 +224,7 @@ Inline submenus:
 - Services:
   - `Overview`
   - `Doctor`
-  - per-service drilldowns (`Agent`, `Xray`, `Prometheus`, `Alertmanager`, `Grafana`, `Node Exporter`, `cAdvisor`, `Bot Self`)
+  - per-service drilldowns (`Agent`, `Xray`, `Prometheus`, `Alertmanager`, `Grafana`, `Node Exporter`, `cAdvisor`, `Bot Self`, optional `HAProxy`)
   - owner recovery buttons (`Heal Unhealthy`, `Restart ...`) when admin token is configured
 - Users:
   - `Refresh`

@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,17 @@ const (
 	SnapshotRetentionCount = 7
 )
 
+var (
+	uploadCopyTimeout            = 2 * time.Minute
+	uploadExtractTimeout         = 30 * time.Second
+	deployBackupTimeout          = 30 * time.Second
+	deployComposeValidateTimeout = 30 * time.Second
+	deployXrayValidateTimeout    = 60 * time.Second
+	deployApplyTimeout           = 30 * time.Second
+	deployUpTimeout              = 5 * time.Minute
+	deployStatusTimeout          = 30 * time.Second
+)
+
 // Runner is the minimal remote transport used by deploy operations.
 // CLI code provides an SSH-backed implementation; tests use fakes.
 type Runner interface {
@@ -38,12 +50,20 @@ type CleanupOptions struct {
 
 // ValidateConfigWithDocker executes config with docker flow and returns the first error.
 func ValidateConfigWithDocker(ctx context.Context, xrayImage string, configPath string) error {
+	return ValidateConfigWithDockerAndMounts(ctx, xrayImage, configPath, nil)
+}
+
+// ValidateConfigWithDockerAndMounts executes config validation with additional bind mounts.
+func ValidateConfigWithDockerAndMounts(ctx context.Context, xrayImage string, configPath string, extraMounts []string) error {
 	if xrayImage == "" {
 		return fmt.Errorf("xray image is required")
 	}
 	// ghcr.io/xtls/xray-core images use /usr/local/bin/xray as ENTRYPOINT, so the command
 	// passed to `docker run` must not include a second leading `xray` token.
-	cmd := exec.CommandContext(ctx, "docker", "run", "--rm", "-v", fmt.Sprintf("%s:/etc/xray/config.json:ro", configPath), xrayImage, "run", "-test", "-config", "/etc/xray/config.json")
+	args := []string{"run", "--rm", "-v", fmt.Sprintf("%s:/etc/xray/config.json:ro", configPath)}
+	args = append(args, extraMounts...)
+	args = append(args, xrayImage, "run", "-test", "-config", "/etc/xray/config.json")
+	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if isLikelyXrayGeositeResourceError(string(out)) {
@@ -81,6 +101,20 @@ func buildExtractCommand(remoteTar string) string {
 	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar -xzf %[2]s -C %[1]s; rm -f %[2]s", RemoteStageDir, remoteTar)
 }
 
+func shellQuote(v string) string {
+	v = strings.ReplaceAll(v, `'`, `'"'"'`)
+	return "'" + v + "'"
+}
+
+func withRemoteTimeout(timeout time.Duration, cmd string) string {
+	seconds := int(math.Ceil(timeout.Seconds()))
+	if seconds <= 0 {
+		seconds = 1
+	}
+	quoted := shellQuote(cmd)
+	return fmt.Sprintf("if command -v timeout >/dev/null 2>&1; then timeout %d sh -c %s; else sh -c %s; fi", seconds, quoted, quoted)
+}
+
 // UploadBundle executes bundle on the remote host in a fixed order.
 func UploadBundle(ctx context.Context, runner Runner, cfg ssh.Config, bundleDir string) error {
 	tarPath := filepath.Join(os.TempDir(), fmt.Sprintf("ovpn-%d.tar.gz", time.Now().UnixNano()))
@@ -89,11 +123,15 @@ func UploadBundle(ctx context.Context, runner Runner, cfg ssh.Config, bundleDir 
 		return fmt.Errorf("create bundle archive: %w", err)
 	}
 	remoteTar := filepath.Join("/tmp", filepath.Base(tarPath))
-	if err := runner.CopyFile(ctx, cfg, tarPath, remoteTar); err != nil {
+	copyCtx, cancelCopy := ssh.TimeoutCtx(ctx, uploadCopyTimeout)
+	defer cancelCopy()
+	if err := runner.CopyFile(copyCtx, cfg, tarPath, remoteTar); err != nil {
 		return fmt.Errorf("copy bundle to %s:%s: %w", cfg.Host, remoteTar, err)
 	}
 	extractCmd := buildExtractCommand(remoteTar)
-	_, err := runner.Exec(ctx, cfg, extractCmd)
+	extractCtx, cancelExtract := ssh.TimeoutCtx(ctx, uploadExtractTimeout)
+	defer cancelExtract()
+	_, err := runner.Exec(extractCtx, cfg, withRemoteTimeout(uploadExtractTimeout, extractCmd))
 	if err != nil {
 		return fmt.Errorf("extract bundle on %s: %w", cfg.Host, err)
 	}
@@ -113,7 +151,7 @@ func buildDeployComposeValidateCommand(dir string) string {
 // buildDeployXrayTestCommand builds deploy xray test command from the current inputs and defaults.
 func buildDeployXrayTestCommand(dir string) string {
 	// Validate config in the target image before compose up to catch incompatible syntax early.
-	return fmt.Sprintf("set -e; cd %s; . ./.env; sudo docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $XRAY_IMAGE run -test -config /etc/xray/config.json", dir, dir)
+	return fmt.Sprintf("set -e; cd %s; . ./.env; extra_mounts=''; if [ -f %s/geodata/geosite.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro\"; fi; if [ -f %s/geodata/geoip.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro\"; fi; eval sudo docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", dir, dir, dir, dir, dir, dir)
 }
 
 // isLikelyXrayVersionTagError reports whether likely xray version tag error.
@@ -146,8 +184,12 @@ func buildDeployApplyCommand() string {
 // buildDeployUpCommand builds deploy up command from the current inputs and defaults.
 func buildDeployUpCommand() string {
 	// Force recreate so updated binaries/config mounts are guaranteed to be picked up
-	// by running containers on every deploy.
-	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml up -d --force-recreate --remove-orphans", RemoteDir)
+	// by running containers on every deploy. Preserve an already-enabled monitoring stack
+	// by including the monitoring compose file only when monitoring containers already exist.
+	return fmt.Sprintf(
+		"set -e; cd %[1]s; monitor_files=''; monitor_services='ovpn-prometheus|ovpn-alertmanager|ovpn-grafana|ovpn-node-exporter|ovpn-cadvisor|ovpn-telegram-bot'; if [ -f docker-compose.monitoring.yml ] && sudo docker ps -a --format '{{.Names}}' | grep -Eq \"^($monitor_services)$\"; then monitor_files='-f docker-compose.monitoring.yml --profile monitoring'; fi; if [ -n \"$monitor_files\" ] && [ ! -s monitoring/secrets/telegram_bot_token ]; then eval sudo docker compose --env-file .env -f docker-compose.yml $monitor_files up -d --force-recreate --remove-orphans --scale ovpn-telegram-bot=0; else eval sudo docker compose --env-file .env -f docker-compose.yml $monitor_files up -d --force-recreate --remove-orphans; fi",
+		RemoteDir,
+	)
 }
 
 // buildDeployStatusCommand builds deploy status command from the current inputs and defaults.
@@ -202,15 +244,21 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	// with a syntactically broken configuration.
 	backupStamp := time.Now().UTC().Format("20060102T150405")
 	backupCmd := buildDeployBackupCommand(backupStamp)
-	if _, err := runner.Exec(ctx, cfg, backupCmd); err != nil {
+	backupCtx, cancelBackup := ssh.TimeoutCtx(ctx, deployBackupTimeout)
+	defer cancelBackup()
+	if _, err := runner.Exec(backupCtx, cfg, withRemoteTimeout(deployBackupTimeout, backupCmd)); err != nil {
 		return fmt.Errorf("create pre-deploy backup on %s: %w", cfg.Host, err)
 	}
 	validateCmd := buildDeployComposeValidateCommand(RemoteStageDir)
-	if _, err := runner.Exec(ctx, cfg, validateCmd); err != nil {
+	validateCtx, cancelValidate := ssh.TimeoutCtx(ctx, deployComposeValidateTimeout)
+	defer cancelValidate()
+	if _, err := runner.Exec(validateCtx, cfg, withRemoteTimeout(deployComposeValidateTimeout, validateCmd)); err != nil {
 		return fmt.Errorf("validate compose config on %s: %w", cfg.Host, err)
 	}
 	xrayTestCmd := buildDeployXrayTestCommand(RemoteStageDir)
-	if _, err := runner.Exec(ctx, cfg, xrayTestCmd); err != nil {
+	xrayCtx, cancelXray := ssh.TimeoutCtx(ctx, deployXrayValidateTimeout)
+	defer cancelXray()
+	if _, err := runner.Exec(xrayCtx, cfg, withRemoteTimeout(deployXrayValidateTimeout, xrayTestCmd)); err != nil {
 		if isLikelyXrayVersionTagError(err.Error()) {
 			return fmt.Errorf("validate xray config in container on %s: %w; hint: use xray version without 'v' prefix (example: 26.3.27)", cfg.Host, err)
 		}
@@ -220,15 +268,21 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 		return fmt.Errorf("validate xray config in container on %s: %w", cfg.Host, err)
 	}
 	applyCmd := buildDeployApplyCommand()
-	if _, err := runner.Exec(ctx, cfg, applyCmd); err != nil {
+	applyCtx, cancelApply := ssh.TimeoutCtx(ctx, deployApplyTimeout)
+	defer cancelApply()
+	if _, err := runner.Exec(applyCtx, cfg, withRemoteTimeout(deployApplyTimeout, applyCmd)); err != nil {
 		return fmt.Errorf("apply validated bundle on %s: %w", cfg.Host, err)
 	}
 	upCmd := buildDeployUpCommand()
-	if _, err := runner.Exec(ctx, cfg, upCmd); err != nil {
+	upCtx, cancelUp := ssh.TimeoutCtx(ctx, deployUpTimeout)
+	defer cancelUp()
+	if _, err := runner.Exec(upCtx, cfg, withRemoteTimeout(deployUpTimeout, upCmd)); err != nil {
 		return fmt.Errorf("compose up on %s: %w", cfg.Host, err)
 	}
 	statusCmd := buildDeployStatusCommand()
-	_, err := runner.Exec(ctx, cfg, statusCmd)
+	statusCtx, cancelStatus := ssh.TimeoutCtx(ctx, deployStatusTimeout)
+	defer cancelStatus()
+	_, err := runner.Exec(statusCtx, cfg, withRemoteTimeout(deployStatusTimeout, statusCmd))
 	if err != nil {
 		return fmt.Errorf("read post-deploy status on %s: %w", cfg.Host, err)
 	}

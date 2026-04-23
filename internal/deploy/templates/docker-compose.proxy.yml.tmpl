@@ -1,0 +1,69 @@
+services:
+  xray:
+    image: ${XRAY_IMAGE}
+    container_name: ovpn-xray
+    restart: unless-stopped
+    command: ["run", "-config", "/etc/xray/config.json"]
+    ports:
+      - "443:443/tcp"
+    expose:
+      - "10085"
+    volumes:
+      - ./xray/config.json:/etc/xray/config.json:ro
+      - ./geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro
+      - ./geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro
+    depends_on:
+      - haproxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  haproxy:
+    image: ${HAPROXY_IMAGE}
+    container_name: ovpn-haproxy
+    restart: unless-stopped
+    command: ["haproxy", "-W", "-db", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+    expose:
+      - "15443"
+      - "8404"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+  ovpn-agent:
+    image: ${OVPN_AGENT_IMAGE}
+    container_name: ovpn-agent
+    restart: unless-stopped
+    command: ["/usr/local/bin/ovpn-agent", "--listen", ":9090", "--xray-api", "xray:10085", "--db-path", "/var/lib/ovpn-agent", "--poll-interval", "30s", "--log-level", "${OVPN_AGENT_LOG_LEVEL:-info}", "--cert-file", "${OVPN_AGENT_CERT_FILE:-}"]
+    ports:
+      - "127.0.0.1:${OVPN_AGENT_HOST_PORT:-19000}:9090"
+    volumes:
+      - ./agent/ovpn-agent:/usr/local/bin/ovpn-agent:ro
+      - ovpn-agent-data:/var/lib/ovpn-agent
+      - ${OVPN_CERT_FULLCHAIN_PATH:-/dev/null}:${OVPN_AGENT_CERT_FILE:-/tmp/ovpn-agent-cert.pem}:ro
+    depends_on:
+      - xray
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - ovpn-net
+
+volumes:
+  ovpn-agent-data:
+
+networks:
+  ovpn-net:
+    driver: bridge

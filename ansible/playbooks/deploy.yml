@@ -1,6 +1,6 @@
 ---
 - name: Prepare ovpn deployment scaffolding and optionally deploy base compose
-  hosts: vpn_servers
+  hosts: vpn_servers:proxy_servers
   become: true
   gather_facts: true
 

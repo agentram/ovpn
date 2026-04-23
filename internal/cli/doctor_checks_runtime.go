@@ -196,6 +196,9 @@ func buildDoctorDiskCommand() string {
 // collectDoctorLogs executes doctor logs flow and returns the first error.
 func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	services := []string{"xray", "ovpn-agent"}
+	if srv.IsProxy() {
+		services = append(services, "haproxy")
+	}
 	out := map[string]string{}
 	runner := a.newRunner("doctor.logs")
 	cfg := sshFromServer(srv)
@@ -204,7 +207,7 @@ func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 		if err != nil {
 			continue
 		}
-		cmd := fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml logs --tail %d%s 2>&1", deploy.RemoteDir, tail, serviceArg)
+		cmd := withRemoteTimeout(15, fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml logs --tail %d%s 2>&1", deploy.RemoteDir, tail, serviceArg))
 		res, runErr := a.execRemote(runner, cfg, 30*time.Second, cmd)
 		if runErr != nil {
 			out[svc] = "failed to fetch logs: " + runErr.Error()

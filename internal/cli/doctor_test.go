@@ -45,6 +45,18 @@ func TestBuildDoctorDiskCommandUsesStatementSeparators(t *testing.T) {
 	}
 }
 
+func TestWithRemoteTimeoutWrapsCommand(t *testing.T) {
+	t.Parallel()
+
+	got := withRemoteTimeout(7, "echo ok")
+	if !strings.Contains(got, "timeout 7 sh -c") {
+		t.Fatalf("expected timeout wrapper, got %q", got)
+	}
+	if !strings.Contains(got, "echo ok") {
+		t.Fatalf("expected wrapped command contents, got %q", got)
+	}
+}
+
 func TestSplitRealityTargetHostPort(t *testing.T) {
 	t.Parallel()
 

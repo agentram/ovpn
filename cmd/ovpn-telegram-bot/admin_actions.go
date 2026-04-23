@@ -25,11 +25,11 @@ func (b *bot) adminDisabledReason() string {
 
 func (b *bot) beginRestartConfirm(ctx context.Context, chatID int64, service string) error {
 	if !b.adminActionsEnabled() {
-		return b.sendPlainMessage(ctx, chatID, b.adminDisabledReason(), servicesInlineKeyboard(false))
+		return b.sendPlainMessage(ctx, chatID, b.adminDisabledReason(), servicesInlineKeyboard(false, b.hasHAProxy()))
 	}
 	normalized, ok := normalizeServiceName(service)
 	if !ok {
-		return b.sendPlainMessage(ctx, chatID, "Unknown service. Allowed: "+restartableServicesHelp(), servicesInlineKeyboard(true))
+		return b.sendPlainMessage(ctx, chatID, "Unknown service. Allowed: "+restartableServicesHelp(b.hasHAProxy()), servicesInlineKeyboard(true, b.hasHAProxy()))
 	}
 	b.setConfirm(chatID, "restart", []string{normalized})
 	text := fmt.Sprintf("Confirm restart for `%s`?\nTTL: %s", normalized, confirmTTL.String())
@@ -38,7 +38,7 @@ func (b *bot) beginRestartConfirm(ctx context.Context, chatID int64, service str
 
 func (b *bot) beginHealConfirm(ctx context.Context, chatID int64) error {
 	if !b.adminActionsEnabled() {
-		return b.sendPlainMessage(ctx, chatID, b.adminDisabledReason(), servicesInlineKeyboard(false))
+		return b.sendPlainMessage(ctx, chatID, b.adminDisabledReason(), servicesInlineKeyboard(false, b.hasHAProxy()))
 	}
 	b.setConfirm(chatID, "heal", nil)
 	text := fmt.Sprintf("Confirm `/heal`?\nIt will restart only unhealthy restartable services.\nTTL: %s", confirmTTL.String())
@@ -48,22 +48,22 @@ func (b *bot) beginHealConfirm(ctx context.Context, chatID int64) error {
 func (b *bot) executeConfirm(ctx context.Context, chatID int64) error {
 	st, ok := b.getConfirm(chatID)
 	if !ok {
-		return b.sendPlainMessage(ctx, chatID, "No pending action or confirmation expired.", servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, "No pending action or confirmation expired.", servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	}
 	b.clearConfirm(chatID)
 
 	switch st.Kind {
 	case "restart":
 		if len(st.Services) == 0 {
-			return b.sendPlainMessage(ctx, chatID, "No services queued for restart.", servicesInlineKeyboard(b.adminActionsEnabled()))
+			return b.sendPlainMessage(ctx, chatID, "No services queued for restart.", servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 		}
 		text := b.restartServicesWithVerification(ctx, st.Services)
-		return b.sendPlainMessage(ctx, chatID, text, servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, text, servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "heal":
 		text := b.healUnhealthyServices(ctx)
-		return b.sendPlainMessage(ctx, chatID, text, servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, text, servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	default:
-		return b.sendPlainMessage(ctx, chatID, "Unknown pending action. Use /services.", servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, "Unknown pending action. Use /services.", servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	}
 }
 

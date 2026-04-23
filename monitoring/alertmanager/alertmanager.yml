@@ -4,9 +4,21 @@ route:
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 4h
+  routes:
+    - receiver: telegram-webhook-expiry
+      matchers:
+        - alertname="OVPNUserExpirySoon"
+      group_by: ["alertname", "email", "expiry_date"]
+      group_wait: 15s
+      group_interval: 24h
+      repeat_interval: 168h
 
 receivers:
   - name: telegram-webhook
     webhook_configs:
       - url: "http://ovpn-telegram-bot:8080/alertmanager"
         send_resolved: true
+  - name: telegram-webhook-expiry
+    webhook_configs:
+      - url: "http://ovpn-telegram-bot:8080/alertmanager"
+        send_resolved: false
