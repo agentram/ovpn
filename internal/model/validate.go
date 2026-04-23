@@ -63,6 +63,13 @@ func (s Server) Validate() error {
 	if strings.TrimSpace(s.RealityTarget) == "" {
 		errs = append(errs, "reality_target is required")
 	}
+	if role == ServerRoleProxy {
+		if NormalizeProxyPreset(s.ProxyPreset) == "" {
+			errs = append(errs, "proxy_preset must be one of: ru")
+		}
+	} else if strings.TrimSpace(s.ProxyPreset) != "" {
+		errs = append(errs, "proxy_preset is only supported for proxy role")
+	}
 	if len(errs) == 0 {
 		return nil
 	}

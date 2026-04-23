@@ -19,6 +19,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	var add struct {
 		name         string
 		role         string
+		proxyPreset  string
 		host         string
 		domain       string
 		sshUser      string
@@ -111,6 +112,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 			srv := &model.Server{
 				Name:              add.name,
 				Role:              add.role,
+				ProxyPreset:       add.proxyPreset,
 				Host:              add.host,
 				Domain:            add.domain,
 				SSHUser:           add.sshUser,
@@ -134,6 +136,9 @@ func (a *App) newServerAddCmd() *cobra.Command {
 			}
 			a.log().Info("server registered", "server", srv.Name, "host", srv.Host, "domain", srv.Domain, "xray_version", srv.XrayVersion)
 			fmt.Printf("server added: %s (id=%d role=%s)\n", srv.Name, srv.ID, srv.NormalizedRole())
+			if srv.IsProxy() {
+				fmt.Printf("proxy preset: %s\n", srv.NormalizedProxyPreset())
+			}
 			fmt.Printf("reality public key: %s\n", srv.RealityPublicKey)
 			fmt.Printf("reality short id: %s\n", srv.RealityShortIDs)
 			if srv.ProxyServiceUUID != "" {
@@ -144,6 +149,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	}
 	addCmd.Flags().StringVar(&add.name, "name", "", "server name")
 	addCmd.Flags().StringVar(&add.role, "role", model.ServerRoleVPN, "Server role: vpn|proxy")
+	addCmd.Flags().StringVar(&add.proxyPreset, "proxy-preset", "", "Proxy routing preset for role=proxy (default: ru)")
 	addCmd.Flags().StringVar(&add.host, "host", "", "server IP or hostname")
 	addCmd.Flags().StringVar(&add.domain, "domain", "", "server domain for clients")
 	addCmd.Flags().StringVar(&add.sshUser, "ssh-user", os.Getenv("USER"), "SSH user")

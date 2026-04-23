@@ -12,6 +12,7 @@ import (
 
 func TestEnsureProxyGeodataAssetsRequiresPairedOverrides(t *testing.T) {
 	app := newGlobalUsersTestApp(t)
+	proxy := addServerBackendTestServer(t, app, "proxy-ru", model.ServerRoleProxy, "proxy-pub", "")
 	geositePath := filepath.Join(t.TempDir(), "geosite.dat")
 	if err := os.WriteFile(geositePath, []byte("geosite"), 0o644); err != nil {
 		t.Fatalf("write geosite: %v", err)
@@ -19,7 +20,7 @@ func TestEnsureProxyGeodataAssetsRequiresPairedOverrides(t *testing.T) {
 	t.Setenv("OVPN_PROXY_GEOSITE_PATH", geositePath)
 	t.Setenv("OVPN_PROXY_GEOIP_PATH", "")
 
-	_, _, err := app.ensureProxyGeodataAssets()
+	_, _, err := app.ensureProxyGeodataAssets(*proxy)
 	if err == nil || !strings.Contains(err.Error(), "OVPN_PROXY_GEOIP_PATH is required") {
 		t.Fatalf("expected paired override error, got %v", err)
 	}
@@ -27,6 +28,7 @@ func TestEnsureProxyGeodataAssetsRequiresPairedOverrides(t *testing.T) {
 
 func TestEnsureProxyGeodataAssetsUsesExplicitOverrides(t *testing.T) {
 	app := newGlobalUsersTestApp(t)
+	proxy := addServerBackendTestServer(t, app, "proxy-ru", model.ServerRoleProxy, "proxy-pub", "")
 	dir := t.TempDir()
 	geositePath := filepath.Join(dir, "geosite.dat")
 	geoipPath := filepath.Join(dir, "geoip.dat")
@@ -39,12 +41,30 @@ func TestEnsureProxyGeodataAssetsUsesExplicitOverrides(t *testing.T) {
 	t.Setenv("OVPN_PROXY_GEOSITE_PATH", geositePath)
 	t.Setenv("OVPN_PROXY_GEOIP_PATH", geoipPath)
 
-	gotGeosite, gotGeoip, err := app.ensureProxyGeodataAssets()
+	gotGeosite, gotGeoip, err := app.ensureProxyGeodataAssets(*proxy)
 	if err != nil {
 		t.Fatalf("ensureProxyGeodataAssets: %v", err)
 	}
 	if gotGeosite != geositePath || gotGeoip != geoipPath {
 		t.Fatalf("unexpected override paths: geosite=%q geoip=%q", gotGeosite, gotGeoip)
+	}
+}
+
+func TestProxyGeodataPathsDefaultToPresetSpecificCacheNames(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	proxy := addServerBackendTestServer(t, app, "proxy-ru", model.ServerRoleProxy, "proxy-pub", "")
+
+	geositePath, geoipPath, err := app.proxyGeodataPaths(*proxy)
+	if err != nil {
+		t.Fatalf("proxyGeodataPaths: %v", err)
+	}
+	if !strings.HasSuffix(geositePath, "proxy-ru-geosite.dat") {
+		t.Fatalf("unexpected geosite cache path: %q", geositePath)
+	}
+	if !strings.HasSuffix(geoipPath, "proxy-ru-geoip.dat") {
+		t.Fatalf("unexpected geoip cache path: %q", geoipPath)
 	}
 }
 
@@ -146,6 +166,9 @@ func TestBuildXraySpecProxyIncludesRelayFromAttachedBackends(t *testing.T) {
 	}
 	if spec.ProxyRelay == nil {
 		t.Fatalf("expected proxy relay in proxy spec")
+	}
+	if spec.ProxyPreset != model.ProxyPresetRU {
+		t.Fatalf("expected default proxy preset %q, got %q", model.ProxyPresetRU, spec.ProxyPreset)
 	}
 	if spec.ProxyRelay.Address != proxyHAProxyAddress || spec.ProxyRelay.Port != proxyHAProxyListenPort {
 		t.Fatalf("unexpected proxy relay address: %+v", spec.ProxyRelay)

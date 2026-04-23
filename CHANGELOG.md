@@ -8,6 +8,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ### Added
 - Additive HA proxy topology with a new `proxy` server role, backend attachment commands, proxy-aware Xray rendering, and local HAProxy failover.
+- Country-specific proxy presets for HA, with `ru` as the first built-in preset and future presets extensible on the same `proxy` role.
 - Proxy-specific observability surfaces including Prometheus scrape config, HAProxy alerts, Grafana HA dashboard, and Telegram bot service awareness.
 - Proxy rollout and operations documentation for Ansible bootstrap, deployment order, monitoring, troubleshooting, and failure model.
 

@@ -31,6 +31,7 @@ func (a *App) buildXraySpec(srv model.Server, users []model.User) (xraycfg.Spec,
 	}
 	spec := xraycfg.Spec{
 		Role:                  srv.NormalizedRole(),
+		ProxyPreset:           srv.NormalizedProxyPreset(),
 		Domain:                srv.Domain,
 		RealityPrivateKey:     srv.RealityPrivateKey,
 		RealityPublicKey:      srv.RealityPublicKey,

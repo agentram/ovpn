@@ -113,6 +113,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 
 	spec := xraycfg.Spec{
 		Role:                  in.Server.NormalizedRole(),
+		ProxyPreset:           in.Server.NormalizedProxyPreset(),
 		Domain:                in.Server.Domain,
 		RealityPrivateKey:     in.Server.RealityPrivateKey,
 		RealityPublicKey:      in.Server.RealityPublicKey,

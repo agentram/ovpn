@@ -236,6 +236,7 @@ func TestRenderServerJSONProxyRoutesForeignTrafficThroughRelay(t *testing.T) {
 
 	raw, err := RenderServerJSON(Spec{
 		Role:              model.ServerRoleProxy,
+		ProxyPreset:       model.ProxyPresetRU,
 		RealityPrivateKey: "priv",
 		RealityPublicKey:  "backend-pub",
 		RealityServerName: "www.microsoft.com",
@@ -311,6 +312,31 @@ func TestRenderServerJSONProxyRoutesForeignTrafficThroughRelay(t *testing.T) {
 	}
 	if !foundForeignDefault {
 		t.Fatalf("expected default foreign routing rule in proxy config")
+	}
+}
+
+func TestValidateSpecRejectsUnknownProxyPreset(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateSpec(Spec{
+		Role:              model.ServerRoleProxy,
+		ProxyPreset:       "de",
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ThreatDNSServers:  []string{"1.1.1.2"},
+		ShortIDs:          []string{"abcd1234"},
+		ProxyRelay: &ProxyRelay{
+			Address:     "haproxy",
+			Port:        15443,
+			ServiceUUID: "22222222-2222-2222-2222-222222222222",
+			ServerName:  "backend.example.com",
+			PublicKey:   "backend-pub",
+			ShortID:     "beefcafe",
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "proxy preset") {
+		t.Fatalf("expected proxy preset validation error, got %v", err)
 	}
 }
 

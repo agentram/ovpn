@@ -27,6 +27,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			reality_short_ids TEXT NOT NULL,
 			reality_server_name TEXT NOT NULL,
 			reality_target TEXT NOT NULL,
+			proxy_preset TEXT NOT NULL DEFAULT '',
 			proxy_service_uuid TEXT NOT NULL DEFAULT '',
 			enabled INTEGER NOT NULL DEFAULT 1,
 			created_at TEXT NOT NULL,
@@ -116,6 +117,7 @@ func (s *Store) migrate(ctx context.Context) error {
 		`ALTER TABLE users ADD COLUMN quota_blocked INTEGER NOT NULL DEFAULT 0;`,
 		`ALTER TABLE users ADD COLUMN quota_blocked_at TEXT;`,
 		`ALTER TABLE servers ADD COLUMN role TEXT NOT NULL DEFAULT 'vpn';`,
+		`ALTER TABLE servers ADD COLUMN proxy_preset TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE servers ADD COLUMN proxy_service_uuid TEXT NOT NULL DEFAULT '';`,
 	}
 	for _, stmt := range optionalMigrations {
@@ -124,6 +126,9 @@ func (s *Store) migrate(ctx context.Context) error {
 		}
 	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET role='vpn' WHERE TRIM(COALESCE(role, ''))=''`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET proxy_preset='ru' WHERE role='proxy' AND TRIM(COALESCE(proxy_preset, ''))=''`); err != nil {
 		return err
 	}
 	return nil

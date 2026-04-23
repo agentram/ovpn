@@ -16,6 +16,11 @@ func normalizeServerForStorage(srv *model.Server) {
 	if srv.Role == "" {
 		srv.Role = model.ServerRoleVPN
 	}
+	if srv.Role == model.ServerRoleProxy {
+		srv.ProxyPreset = model.NormalizeProxyPreset(srv.ProxyPreset)
+	} else {
+		srv.ProxyPreset = ""
+	}
 }
 
 // AddServer writes server changes to the local database.
@@ -33,11 +38,11 @@ func (s *Store) AddServer(ctx context.Context, srv *model.Server) error {
 		INSERT INTO servers (
 			name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
 			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key,
-			reality_short_ids, reality_server_name, reality_target, proxy_service_uuid, enabled, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			reality_short_ids, reality_server_name, reality_target, proxy_preset, proxy_service_uuid, enabled, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, srv.Name, srv.Role, srv.Host, srv.Domain, srv.SSHUser, srv.SSHPort, srv.SSHIdentityFile, srv.SSHKnownHostsFile,
 		boolToInt(srv.SSHStrictHostKey), srv.XrayVersion, realityPrivateKey, srv.RealityPublicKey,
-		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, now)
+		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.ProxyPreset, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, now)
 	if err != nil {
 		return err
 	}
@@ -64,11 +69,11 @@ func (s *Store) UpdateServer(ctx context.Context, srv *model.Server) error {
 		UPDATE servers SET
 			role=?, host=?, domain=?, ssh_user=?, ssh_port=?, ssh_identity_file=?, ssh_known_hosts_file=?,
 			ssh_strict_host_key=?, xray_version=?, reality_private_key=?, reality_public_key=?,
-			reality_short_ids=?, reality_server_name=?, reality_target=?, proxy_service_uuid=?, enabled=?, updated_at=?
+			reality_short_ids=?, reality_server_name=?, reality_target=?, proxy_preset=?, proxy_service_uuid=?, enabled=?, updated_at=?
 		WHERE id=?
 	`, srv.Role, srv.Host, srv.Domain, srv.SSHUser, srv.SSHPort, srv.SSHIdentityFile, srv.SSHKnownHostsFile,
 		boolToInt(srv.SSHStrictHostKey), srv.XrayVersion, realityPrivateKey, srv.RealityPublicKey,
-		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, srv.ID)
+		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.ProxyPreset, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, srv.ID)
 	return err
 }
 
@@ -84,7 +89,7 @@ func (s *Store) GetServerByName(ctx context.Context, name string) (*model.Server
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
 			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
+			reality_server_name, reality_target, proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers WHERE name=?
 	`, name)
 	return scanServer(row)
@@ -95,7 +100,7 @@ func (s *Store) GetServerByID(ctx context.Context, id int64) (*model.Server, err
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
 			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
+			reality_server_name, reality_target, proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers WHERE id=?
 	`, id)
 	return scanServer(row)
@@ -106,7 +111,7 @@ func (s *Store) ListServers(ctx context.Context) ([]model.Server, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
 			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
+			reality_server_name, reality_target, proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers ORDER BY id
 	`)
 	if err != nil {

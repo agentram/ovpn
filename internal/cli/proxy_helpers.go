@@ -22,12 +22,39 @@ const (
 	proxyHAProxyStatsPort  = 8404
 	proxyHAProxyAddress    = "haproxy"
 
-	defaultProxyGeoSiteURL = "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat"
-	defaultProxyGeoIPURL   = "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat"
-
 	proxyGeodataRefreshInterval = 24 * time.Hour
 	proxyGeodataWarnAfter       = 72 * time.Hour
 )
+
+type proxyPresetConfig struct {
+	Key              string
+	DirectDomainSets []string
+	DirectIPSets     []string
+	GeoSiteURL       string
+	GeoIPURL         string
+	GeoSiteCacheName string
+	GeoIPCacheName   string
+}
+
+func proxyPresetConfigForServer(srv model.Server) (proxyPresetConfig, error) {
+	if !srv.IsProxy() {
+		return proxyPresetConfig{}, fmt.Errorf("server %s is role %s, expected proxy", srv.Name, srv.NormalizedRole())
+	}
+	switch srv.NormalizedProxyPreset() {
+	case model.ProxyPresetRU:
+		return proxyPresetConfig{
+			Key:              model.ProxyPresetRU,
+			DirectDomainSets: []string{"geosite:ru-available-only-inside", "regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.xn--p1ai$"},
+			DirectIPSets:     []string{"geoip:ru", "geoip:private"},
+			GeoSiteURL:       "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geosite/release/geosite.dat",
+			GeoIPURL:         "https://raw.githubusercontent.com/runetfreedom/russia-blocked-geoip/release/geoip.dat",
+			GeoSiteCacheName: "proxy-ru-geosite.dat",
+			GeoIPCacheName:   "proxy-ru-geoip.dat",
+		}, nil
+	default:
+		return proxyPresetConfig{}, fmt.Errorf("unsupported proxy preset %q", strings.TrimSpace(srv.ProxyPreset))
+	}
+}
 
 func proxyServiceEmail() string {
 	return "proxy-service@cluster"
@@ -155,8 +182,12 @@ func (a *App) buildProxyRelay(proxy model.Server) (*xraycfg.ProxyRelay, []model.
 	}, backends, nil
 }
 
-func (a *App) ensureProxyGeodataAssets() (string, string, error) {
-	geositePath, geoipPath, err := a.proxyGeodataPaths()
+func (a *App) ensureProxyGeodataAssets(srv model.Server) (string, string, error) {
+	preset, err := proxyPresetConfigForServer(srv)
+	if err != nil {
+		return "", "", err
+	}
+	geositePath, geoipPath, err := a.proxyGeodataPaths(srv)
 	if err != nil {
 		return "", "", err
 	}
@@ -167,16 +198,16 @@ func (a *App) ensureProxyGeodataAssets() (string, string, error) {
 	if err := util.EnsureDir(cacheDir); err != nil {
 		return "", "", err
 	}
-	if err := a.ensureDownloadedAsset(a.ctx, envOr("OVPN_PROXY_GEOSITE_URL", defaultProxyGeoSiteURL), geositePath, proxyGeodataRefreshInterval); err != nil {
+	if err := a.ensureDownloadedAsset(a.ctx, envOr("OVPN_PROXY_GEOSITE_URL", preset.GeoSiteURL), geositePath, proxyGeodataRefreshInterval); err != nil {
 		return "", "", err
 	}
-	if err := a.ensureDownloadedAsset(a.ctx, envOr("OVPN_PROXY_GEOIP_URL", defaultProxyGeoIPURL), geoipPath, proxyGeodataRefreshInterval); err != nil {
+	if err := a.ensureDownloadedAsset(a.ctx, envOr("OVPN_PROXY_GEOIP_URL", preset.GeoIPURL), geoipPath, proxyGeodataRefreshInterval); err != nil {
 		return "", "", err
 	}
 	return geositePath, geoipPath, nil
 }
 
-func (a *App) proxyGeodataPaths() (string, string, error) {
+func (a *App) proxyGeodataPaths(srv model.Server) (string, string, error) {
 	if geosite := strings.TrimSpace(envOr("OVPN_PROXY_GEOSITE_PATH", "")); geosite != "" {
 		geoip := strings.TrimSpace(envOr("OVPN_PROXY_GEOIP_PATH", ""))
 		if geoip == "" {
@@ -190,12 +221,20 @@ func (a *App) proxyGeodataPaths() (string, string, error) {
 		}
 		return geosite, geoip, nil
 	}
+	preset, err := proxyPresetConfigForServer(srv)
+	if err != nil {
+		return "", "", err
+	}
 	cacheDir := filepath.Join(a.dataDir, "geodata")
-	return filepath.Join(cacheDir, "runetfreedom-geosite.dat"), filepath.Join(cacheDir, "runetfreedom-geoip.dat"), nil
+	return filepath.Join(cacheDir, preset.GeoSiteCacheName), filepath.Join(cacheDir, preset.GeoIPCacheName), nil
 }
 
-func (a *App) proxyGeodataState() ([]string, bool, error) {
-	geositePath, geoipPath, err := a.proxyGeodataPaths()
+func (a *App) proxyGeodataState(srv model.Server) ([]string, bool, error) {
+	geositePath, geoipPath, err := a.proxyGeodataPaths(srv)
+	if err != nil {
+		return nil, false, err
+	}
+	preset, err := proxyPresetConfigForServer(srv)
 	if err != nil {
 		return nil, false, err
 	}
@@ -222,6 +261,7 @@ func (a *App) proxyGeodataState() ([]string, bool, error) {
 			stale = true
 		}
 	}
+	details = append(details, "proxy_preset="+preset.Key)
 	return details, stale, nil
 }
 

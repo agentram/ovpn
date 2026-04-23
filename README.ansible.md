@@ -8,7 +8,8 @@ This document covers host-layer automation only.
 - `ovpn` CLI: VPN runtime, users, monitoring, and backup/restore commands
 
 This split also applies to `proxy` hosts used for HA.
-The Russia proxy host is prepared by Ansible the same way as a regular VPN host, then configured as `--role proxy` by `ovpn`.
+The proxy host is prepared by Ansible the same way as a regular VPN host, then configured as `--role proxy` by `ovpn`.
+The first built-in proxy preset is `ru`.
 
 ## Supported targets
 
@@ -122,7 +123,7 @@ After host bootstrap:
 Proxy host handoff:
 
 ```bash
-./ovpn server add --name <proxy> --role proxy --host <proxy-ip> --domain <proxy-domain> --ssh-user root --ssh-port 22
+./ovpn server add --name <proxy> --role proxy --proxy-preset ru --host <proxy-ip> --domain <proxy-domain> --ssh-user root --ssh-port 22
 ./ovpn server init <proxy>
 ./ovpn server backend attach --proxy <proxy> --backend <vpn-backend>
 ./ovpn deploy <vpn-backend>

@@ -158,9 +158,10 @@ func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
 	}
 	check.Details = []string{
 		"role=proxy",
+		"proxy_preset=" + srv.NormalizedProxyPreset(),
 		fmt.Sprintf("backends=%s", strings.Join(names, ",")),
 	}
-	geodataDetails, geodataStale, err := a.proxyGeodataState()
+	geodataDetails, geodataStale, err := a.proxyGeodataState(srv)
 	if err != nil {
 		check.Status = doctor.StatusFail
 		check.Message = "proxy geodata assets are missing or unreadable"

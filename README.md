@@ -25,6 +25,7 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 - Optional monitoring stack (Prometheus, Alertmanager, Grafana, Telegram bot relay)
 - Built-in Grafana user analytics dashboard (`ovpn User Statistics`)
 - Additive HA proxy topology with split routing and backend failover
+- Country-specific proxy presets for HA, with Russia (`ru`) as the first built-in preset
 - Built-in backup and restore commands
 - Safe runtime cleanup/decommission command
 
@@ -169,13 +170,15 @@ export OVPN_THREAT_DNS_SERVERS=9.9.9.9,149.112.112.112
 
 ### 4a. Additive HA proxy rollout
 
-Use this only when adding a Russia-based proxy in front of existing foreign `vpn` servers.
+Use this only when adding a preset-driven `proxy` in front of existing foreign `vpn` servers.
+Today the built-in preset is `ru`, which keeps Russian destinations local to the proxy and relays everything else through foreign backends.
 This does not modify the current direct path for existing users.
 
 ```bash
 ./ovpn server add \
   --name proxy-ru \
   --role proxy \
+  --proxy-preset ru \
   --host <proxy-ip> \
   --domain <proxy-domain> \
   --ssh-user root \

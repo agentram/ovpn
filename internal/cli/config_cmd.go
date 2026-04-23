@@ -80,7 +80,7 @@ func (a *App) configCmd() *cobra.Command {
 				a.log().Debug("running docker-based xray config validation", "server", srv.Name, "xray_image", xrayImage)
 				var extraMounts []string
 				if srv.IsProxy() {
-					geositePath, geoipPath, err := a.ensureProxyGeodataAssets()
+					geositePath, geoipPath, err := a.ensureProxyGeodataAssets(*srv)
 					if err != nil {
 						return err
 					}

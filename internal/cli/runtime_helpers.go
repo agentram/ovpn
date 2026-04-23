@@ -200,7 +200,7 @@ func (a *App) buildDeployInput(
 		if err != nil {
 			return deploy.Input{}, err
 		}
-		geositePath, geoipPath, err := a.ensureProxyGeodataAssets()
+		geositePath, geoipPath, err := a.ensureProxyGeodataAssets(srv)
 		if err != nil {
 			return deploy.Input{}, err
 		}

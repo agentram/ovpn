@@ -4,14 +4,15 @@ This document describes the additive HA extension for `ovpn`.
 
 ## Goal
 
-Add a Russia-based `proxy` entrypoint in front of existing foreign `vpn` servers without breaking current direct users.
+Add a preset-driven `proxy` entrypoint in front of existing foreign `vpn` servers without breaking current direct users.
+The first built-in preset is Russia (`ru`).
 
 Resulting behavior:
 
 - current direct users on existing `vpn` servers keep working unchanged
 - new or migrated users can receive one proxy link
-- Russian destinations exit directly from the Russia proxy
-- non-Russian destinations are relayed through foreign backend `vpn` servers
+- destinations matched by the active proxy preset exit directly from the proxy
+- all other destinations are relayed through foreign backend `vpn` servers
 - backend failure is handled by local HAProxy failover on the proxy node
 
 ## What the proxy host is
@@ -19,6 +20,7 @@ Resulting behavior:
 The proxy host is a normal `ovpn` server record with:
 
 - `role=proxy`
+- `proxy_preset=<country-preset>`
 - one public domain for client entry
 - one or more attached backend `vpn` servers
 
@@ -48,7 +50,7 @@ Recommended bootstrap order:
 
 1. Add the proxy host to Ansible inventory under `proxy_servers`.
 2. Run Ansible bootstrap and security playbooks.
-3. Register the host in local `ovpn` state with `--role proxy`.
+3. Register the host in local `ovpn` state with `--role proxy --proxy-preset <preset>`.
 4. Initialize and deploy it with `ovpn`.
 5. Attach foreign backends.
 6. Redeploy and validate.
@@ -60,8 +62,8 @@ After `ovpn deploy <proxy>`, the proxy host runs:
 - `xray`
   - public client inbound on `443/tcp`
   - split routing logic
-  - direct egress for Russian routes
-  - `foreign-pool` relay outbound for non-Russian routes
+  - direct egress for preset-local routes
+  - `foreign-pool` relay outbound for all non-local routes
 - `haproxy`
   - local TCP failover layer for foreign backends
   - Prometheus metrics on `:8404/metrics`
@@ -83,22 +85,35 @@ Additional proxy-only runtime files:
 
 ## Traffic flow
 
-### Russian traffic
+### Preset-local traffic
 
 Client -> proxy Xray -> `direct`
 
-Russian traffic does not traverse foreign backends.
+Traffic matched by the active proxy preset does not traverse foreign backends.
 
-### Non-Russian traffic
+### Foreign traffic
 
 Client -> proxy Xray -> `foreign-pool` -> local HAProxy -> selected foreign backend -> remote internet
 
 If one backend fails, HAProxy routes new connections to another healthy backend.
 
-If all foreign backends fail, non-Russian traffic fails closed.
-It is not sent directly from Russia.
+If all foreign backends fail, foreign traffic fails closed.
+It is not sent directly from the proxy country.
 
-## How Russian destinations are determined
+## Proxy presets
+
+Proxy behavior is selected by `proxy_preset`.
+
+Current built-in preset:
+
+- `ru`
+  - direct domains: `geosite:ru-available-only-inside`, `.ru`, `.su`, `.xn--p1ai`
+  - direct IPs: `geoip:ru`, `geoip:private`
+  - geodata defaults: runetfreedom geosite/geoip feeds
+
+Future presets can be added without changing the `proxy` role model itself.
+
+## How the current `ru` preset determines local destinations
 
 The proxy uses Xray split-routing rules in this order:
 
@@ -107,17 +122,17 @@ The proxy uses Xray split-routing rules in this order:
 - `geoip:ru`
 - `geoip:private`
 
-Anything matched by those rules is sent to `direct` on the Russia proxy.
+Anything matched by those rules is sent to `direct` on the proxy.
 All remaining user traffic is sent to `foreign-pool`, which is the local HAProxy-backed relay to foreign VPN servers.
 
 This means routing is based on a mix of:
 
-- Xray geosite data for known Russian-only services
+- Xray geosite data for known Russia-only services
 - explicit Russian domain suffixes
 - Russian IP geo matches
 - local/private address ranges
 
-If a destination does not match those rules, it is treated as non-Russian.
+If a destination does not match those rules, it is treated as foreign.
 
 ## Existing users and compatibility
 
@@ -136,7 +151,7 @@ Operationally this means:
 
 ## Step-by-step rollout
 
-1. Prepare the Russia host with Ansible:
+1. Prepare the proxy host with Ansible:
 
 ```bash
 cd ansible
@@ -150,6 +165,7 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml 
 ./ovpn server add \
   --name proxy-ru \
   --role proxy \
+  --proxy-preset ru \
   --host <proxy-ip> \
   --domain <proxy-domain> \
   --ssh-user root \
@@ -205,8 +221,8 @@ The HA design does not require Docker Hub specifically; it only requires that th
 - Prometheus scrapes `haproxy`
 - Grafana shows `ovpn Proxy HA Overview`
 - Telegram bot shows `haproxy` in Services on the proxy
-- Russian routes exit directly
-- non-Russian routes use the attached backend
+- preset-local routes exit directly
+- foreign routes use the attached backend
 
 9. Attach additional backends one by one:
 
@@ -235,7 +251,7 @@ Proxy monitoring now adds:
 
 This phase covers backend HA only.
 
-The Russia proxy itself is still a single point of failure.
+The proxy host itself is still a single point of failure.
 
 If the proxy host dies:
 

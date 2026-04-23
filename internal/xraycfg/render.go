@@ -12,6 +12,7 @@ import (
 
 type Spec struct {
 	Role                  string
+	ProxyPreset           string
 	Domain                string
 	RealityPrivateKey     string
 	RealityServerName     string
@@ -200,15 +201,19 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 		)
 	}
 	if spec.Role == model.ServerRoleProxy {
+		proxyPreset, err := resolveProxyPreset(spec.ProxyPreset)
+		if err != nil {
+			return nil, err
+		}
 		cfg.Routing.(map[string]any)["rules"] = append(cfg.Routing.(map[string]any)["rules"].([]any),
 			map[string]any{
 				"type":        "field",
-				"domain":      []string{"geosite:ru-available-only-inside", "regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.xn--p1ai$"},
+				"domain":      proxyPreset.DirectDomains,
 				"outboundTag": "direct",
 			},
 			map[string]any{
 				"type":        "field",
-				"ip":          []string{"geoip:ru", "geoip:private"},
+				"ip":          proxyPreset.DirectIPs,
 				"outboundTag": "direct",
 			},
 			map[string]any{
@@ -342,6 +347,23 @@ func normalizeSecurityProfile(raw string) string {
 	}
 }
 
+type proxyPreset struct {
+	DirectDomains []string
+	DirectIPs     []string
+}
+
+func resolveProxyPreset(raw string) (proxyPreset, error) {
+	switch model.NormalizeProxyPreset(raw) {
+	case model.ProxyPresetRU:
+		return proxyPreset{
+			DirectDomains: []string{"geosite:ru-available-only-inside", "regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.xn--p1ai$"},
+			DirectIPs:     []string{"geoip:ru", "geoip:private"},
+		}, nil
+	default:
+		return proxyPreset{}, fmt.Errorf("proxy preset must be %q", model.ProxyPresetRU)
+	}
+}
+
 // ValidateSpec executes spec flow and returns the first error.
 func ValidateSpec(spec Spec) error {
 	if spec.SecurityProfile == "" {
@@ -409,6 +431,9 @@ func ValidateSpec(spec Spec) error {
 		}
 	}
 	if spec.Role == model.ServerRoleProxy {
+		if _, err := resolveProxyPreset(spec.ProxyPreset); err != nil {
+			return err
+		}
 		if spec.ProxyRelay == nil {
 			return fmt.Errorf("proxy relay is required for proxy role")
 		}

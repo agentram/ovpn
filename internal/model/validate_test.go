@@ -25,6 +25,12 @@ func TestServerValidate(t *testing.T) {
 		t.Fatalf("expected valid server, got error: %v", err)
 	}
 
+	validProxy := valid
+	validProxy.Role = ServerRoleProxy
+	if err := validProxy.Validate(); err != nil {
+		t.Fatalf("expected valid proxy server with default preset, got error: %v", err)
+	}
+
 	invalid := valid
 	invalid.Name = ""
 	invalid.Host = ""
@@ -39,6 +45,18 @@ func TestServerValidate(t *testing.T) {
 				t.Fatalf("expected error to contain %q, got %q", want, err.Error())
 			}
 		}
+	}
+
+	invalidProxyPreset := validProxy
+	invalidProxyPreset.ProxyPreset = "de"
+	if err := invalidProxyPreset.Validate(); err == nil || !strings.Contains(err.Error(), "proxy_preset") {
+		t.Fatalf("expected proxy preset validation error, got %v", err)
+	}
+
+	invalidVPNPreset := valid
+	invalidVPNPreset.ProxyPreset = "ru"
+	if err := invalidVPNPreset.Validate(); err == nil || !strings.Contains(err.Error(), "only supported for proxy role") {
+		t.Fatalf("expected vpn proxy_preset validation error, got %v", err)
 	}
 }
 

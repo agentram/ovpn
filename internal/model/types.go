@@ -33,6 +33,7 @@ type Server struct {
 	RealityShortIDs   string     `json:"reality_short_ids"`
 	RealityServerName string     `json:"reality_server_name"`
 	RealityTarget     string     `json:"reality_target"`
+	ProxyPreset       string     `json:"proxy_preset"`
 	ProxyServiceUUID  string     `json:"proxy_service_uuid"`
 	Enabled           bool       `json:"enabled"`
 	CreatedAt         time.Time  `json:"created_at"`

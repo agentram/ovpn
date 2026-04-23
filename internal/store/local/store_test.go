@@ -282,6 +282,9 @@ func TestListAttachedBackendServers(t *testing.T) {
 	if len(attached) != 1 || attached[0].Name != backendA.Name {
 		t.Fatalf("expected only enabled backend-a to be returned, got %+v", attached)
 	}
+	if proxy.NormalizedProxyPreset() != model.ProxyPresetRU {
+		t.Fatalf("expected proxy preset %q, got %q", model.ProxyPresetRU, proxy.NormalizedProxyPreset())
+	}
 	hasProxy, err := store.BackendHasAttachedProxy(ctx, backendA.ID)
 	if err != nil {
 		t.Fatalf("backend has attached proxy for backend-a: %v", err)
