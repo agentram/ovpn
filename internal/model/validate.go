@@ -6,9 +6,26 @@ import (
 	"strings"
 )
 
+// NormalizeServerRole normalizes role and applies fallback defaults.
+func NormalizeServerRole(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", ServerRoleVPN:
+		return ServerRoleVPN
+	case ServerRoleProxy:
+		return ServerRoleProxy
+	default:
+		return ""
+	}
+}
+
 // Validate executes validate flow and returns the first error.
 func (s Server) Validate() error {
 	var errs []string
+
+	role := NormalizeServerRole(s.Role)
+	if role == "" {
+		errs = append(errs, "role must be \"vpn\" or \"proxy\"")
+	}
 
 	if strings.TrimSpace(s.Name) == "" {
 		errs = append(errs, "name is required")
@@ -46,7 +63,6 @@ func (s Server) Validate() error {
 	if strings.TrimSpace(s.RealityTarget) == "" {
 		errs = append(errs, "reality_target is required")
 	}
-
 	if len(errs) == 0 {
 		return nil
 	}

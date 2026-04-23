@@ -111,6 +111,15 @@ groups:
           summary: "xray container missing"
           description: "cAdvisor cannot see the xray container."
 
+      - alert: OVPNHAProxyContainerMissing
+        expr: absent(container_last_seen{job="cadvisor",container_label_com_docker_compose_service="haproxy"})
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "haproxy container missing"
+          description: "cAdvisor cannot see the haproxy container on the proxy node."
+
       - alert: OVPNAgentContainerMissing
         expr: absent(container_last_seen{job="cadvisor",container_label_com_docker_compose_service="ovpn-agent"})
         for: 3m
@@ -121,7 +130,7 @@ groups:
           description: "cAdvisor cannot see the ovpn-agent container."
 
       - alert: OVPNContainerRestartBurst
-        expr: changes(container_start_time_seconds{job="cadvisor",container_label_com_docker_compose_service=~"xray|ovpn-agent"}[15m]) > 2
+        expr: changes(container_start_time_seconds{job="cadvisor",container_label_com_docker_compose_service=~"xray|haproxy|ovpn-agent"}[15m]) > 2
         for: 2m
         labels:
           severity: warning
@@ -137,6 +146,15 @@ groups:
         annotations:
           summary: "Xray CPU usage is high"
           description: "xray container CPU usage is above 70% for 15 minutes."
+
+      - alert: OVPNHAProxyHighCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="haproxy"}[5m])) * 100 > 70
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HAProxy CPU usage is high"
+          description: "haproxy container CPU usage is above 70% for 15 minutes."
 
       - alert: OVPNPrometheusHighMemory
         expr: container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service="prometheus"} > 268435456
@@ -211,6 +229,35 @@ groups:
         annotations:
           summary: "User access expires soon"
           description: "{{ $labels.email }} expires on {{ $labels.expiry_date }} UTC. Access remains active until the end of that day."
+
+  - name: ovpn-proxy
+    rules:
+      - alert: OVPNHAProxyMetricsDown
+        expr: up{job="haproxy"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HAProxy metrics endpoint is down"
+          description: "Prometheus cannot scrape haproxy /metrics on the proxy node."
+
+      - alert: OVPNForeignBackendPoolDown
+        expr: sum(haproxy_backend_status{proxy="foreign_backends",state="UP"}) < 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Foreign backend pool is down"
+          description: "HAProxy reports no healthy foreign backends for outbound failover."
+
+      - alert: OVPNForeignBackendStateFlapping
+        expr: increase(haproxy_backend_check_up_down_total{proxy="foreign_backends"}[15m]) >= 2
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Foreign backend health is flapping"
+          description: "HAProxy observed repeated backend UP/DOWN transitions in the last 15 minutes."
 
   - name: ovpn-telegram-bot
     rules:

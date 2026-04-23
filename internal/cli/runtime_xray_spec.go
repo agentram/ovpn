@@ -29,9 +29,11 @@ func (a *App) buildXraySpec(srv model.Server, users []model.User) (xraycfg.Spec,
 			return xraycfg.Spec{}, err
 		}
 	}
-	return xraycfg.Spec{
+	spec := xraycfg.Spec{
+		Role:                  srv.NormalizedRole(),
 		Domain:                srv.Domain,
 		RealityPrivateKey:     srv.RealityPrivateKey,
+		RealityPublicKey:      srv.RealityPublicKey,
 		RealityServerName:     srv.RealityServerName,
 		RealityTarget:         srv.RealityTarget,
 		SecurityProfile:       securityProfile,
@@ -43,7 +45,22 @@ func (a *App) buildXraySpec(srv model.Server, users []model.User) (xraycfg.Spec,
 		APIPort:               10085,
 		LogLevel:              a.xrayLogLevel(),
 		Users:                 users,
-	}, nil
+	}
+	serviceUsers, err := a.vpnServiceUsers(srv)
+	if err != nil {
+		return xraycfg.Spec{}, err
+	}
+	if len(serviceUsers) > 0 {
+		spec.ServiceUsers = serviceUsers
+	}
+	if srv.IsProxy() {
+		relay, _, err := a.buildProxyRelay(srv)
+		if err != nil {
+			return xraycfg.Spec{}, err
+		}
+		spec.ProxyRelay = relay
+	}
+	return spec, nil
 }
 
 // realityFallbackRateLimits returns reality fallback rate limits.

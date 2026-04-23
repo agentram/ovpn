@@ -7,6 +7,7 @@ func (a *App) serverCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "server", Short: "Manage servers"}
 	cmd.AddCommand(
 		a.newServerAddCmd(),
+		a.newServerBackendCmd(),
 		a.newServerInitCmd(),
 		a.newServerListCmd(),
 		a.newServerSetXrayVersionCmd(),

@@ -7,6 +7,9 @@ This document covers host-layer automation only.
 - Ansible: host bootstrap and security baseline
 - `ovpn` CLI: VPN runtime, users, monitoring, and backup/restore commands
 
+This split also applies to `proxy` hosts used for HA.
+The Russia proxy host is prepared by Ansible the same way as a regular VPN host, then configured as `--role proxy` by `ovpn`.
+
 ## Supported targets
 
 - Debian `12+` (including `13+`)
@@ -29,11 +32,19 @@ Example `ansible/inventories/example/hosts.yml` (copy it privately to `ansible/i
 
 ```yaml
 all:
-  hosts:
-    <host-fqdn>:
-      ansible_host: <server-ip>
-      ansible_user: root
-      ansible_port: 22
+  children:
+    vpn_servers:
+      hosts:
+        <vpn-host-fqdn>:
+          ansible_host: <vpn-server-ip>
+          ansible_user: root
+          ansible_port: 22
+    proxy_servers:
+      hosts:
+        <proxy-host-fqdn>:
+          ansible_host: <proxy-server-ip>
+          ansible_user: root
+          ansible_port: 22
 ```
 
 Example host vars:
@@ -108,6 +119,19 @@ After host bootstrap:
 ./ovpn doctor <server>
 ```
 
+Proxy host handoff:
+
+```bash
+./ovpn server add --name <proxy> --role proxy --host <proxy-ip> --domain <proxy-domain> --ssh-user root --ssh-port 22
+./ovpn server init <proxy>
+./ovpn server backend attach --proxy <proxy> --backend <vpn-backend>
+./ovpn deploy <vpn-backend>
+./ovpn deploy <proxy>
+./ovpn doctor <proxy>
+```
+
+Attach-first is not enough on its own. The backend should be redeployed after attachment so its Xray runtime includes the proxy relay service identity before the proxy starts sending traffic to it.
+
 Default `ovpn-agent` host bind is `127.0.0.1:19000`. If that loopback port is occupied:
 
 ```bash
@@ -123,5 +147,6 @@ export OVPN_AGENT_HOST_PORT=19001
 ## Related docs
 
 - [`README.md`](README.md)
+- [`docs/ha.md`](docs/ha.md)
 - [`docs/security.md`](docs/security.md)
 - [`docs/upgrades.md`](docs/upgrades.md)

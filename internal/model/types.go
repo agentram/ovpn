@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+const (
+	ServerRoleVPN   = "vpn"
+	ServerRoleProxy = "proxy"
+)
+
 type SSHConfig struct {
 	User            string `json:"user"`
 	Port            int    `json:"port"`
@@ -14,6 +19,7 @@ type SSHConfig struct {
 type Server struct {
 	ID                int64      `json:"id"`
 	Name              string     `json:"name"`
+	Role              string     `json:"role"`
 	Host              string     `json:"host"`
 	Domain            string     `json:"domain"`
 	SSHUser           string     `json:"ssh_user"`
@@ -27,10 +33,37 @@ type Server struct {
 	RealityShortIDs   string     `json:"reality_short_ids"`
 	RealityServerName string     `json:"reality_server_name"`
 	RealityTarget     string     `json:"reality_target"`
+	ProxyServiceUUID  string     `json:"proxy_service_uuid"`
 	Enabled           bool       `json:"enabled"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`
 	LastDeployAt      *time.Time `json:"last_deploy_at,omitempty"`
+}
+
+type ProxyBackend struct {
+	ID              int64     `json:"id"`
+	ProxyServerID   int64     `json:"proxy_server_id"`
+	BackendServerID int64     `json:"backend_server_id"`
+	Enabled         bool      `json:"enabled"`
+	Priority        int       `json:"priority"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	BackendServer   *Server   `json:"backend_server,omitempty"`
+}
+
+// NormalizedRole returns the normalized server role.
+func (s Server) NormalizedRole() string {
+	return NormalizeServerRole(s.Role)
+}
+
+// IsProxy reports whether server role is proxy.
+func (s Server) IsProxy() bool {
+	return s.NormalizedRole() == ServerRoleProxy
+}
+
+// IsVPN reports whether server role is vpn.
+func (s Server) IsVPN() bool {
+	return s.NormalizedRole() == ServerRoleVPN
 }
 
 type User struct {

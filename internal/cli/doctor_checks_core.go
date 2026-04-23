@@ -7,6 +7,7 @@ import (
 
 	"ovpn/internal/deploy"
 	"ovpn/internal/doctor"
+	"ovpn/internal/model"
 	"ovpn/internal/ssh"
 )
 
@@ -48,14 +49,14 @@ func (a *App) checkSSH(runner *ssh.Runner, cfg ssh.Config) (doctor.Check, bool) 
 
 // checkSudo returns check sudo.
 func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
-	cmd := strings.Join([]string{
+	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
 		"if sudo -n true >/dev/null 2>&1; then echo SUDO_NOPASS=1; else echo SUDO_NOPASS=0; fi",
 		"if command -v docker >/dev/null 2>&1; then echo DOCKER_BIN=1; else echo DOCKER_BIN=0; fi",
-		"if docker info >/dev/null 2>&1; then echo DOCKER_DIRECT=1; else echo DOCKER_DIRECT=0; fi",
-		"if sudo -n docker info >/dev/null 2>&1; then echo DOCKER_SUDO=1; else echo DOCKER_SUDO=0; fi",
+		"if timeout 5 docker ps -q >/dev/null 2>&1; then echo DOCKER_DIRECT=1; else echo DOCKER_DIRECT=0; fi",
+		"if timeout 5 sudo -n docker ps -q >/dev/null 2>&1; then echo DOCKER_SUDO=1; else echo DOCKER_SUDO=0; fi",
 		"echo GROUPS=$(id -nG 2>/dev/null || true)",
-	}, "; ")
+	}, "; "))
 	res, err := a.execRemote(runner, cfg, 20*time.Second, cmd)
 	if err != nil {
 		return doctor.Check{
@@ -102,12 +103,12 @@ func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 
 // checkDocker returns check docker.
 func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
-	cmd := strings.Join([]string{
+	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
-		"if command -v docker >/dev/null 2>&1; then echo DOCKER_VERSION=$(docker --version 2>/dev/null | tr -s ' '); else echo DOCKER_VERSION=; fi",
-		"if sudo -n docker info >/dev/null 2>&1; then echo DOCKER_DAEMON=1; else echo DOCKER_DAEMON=0; fi",
+		"if command -v docker >/dev/null 2>&1; then echo DOCKER_VERSION=$(timeout 5 docker version --format '{{.Client.Version}}/{{.Server.Version}}' 2>/dev/null || docker --version 2>/dev/null | tr -s ' '); else echo DOCKER_VERSION=; fi",
+		"if timeout 5 sudo -n docker ps -q >/dev/null 2>&1; then echo DOCKER_DAEMON=1; else echo DOCKER_DAEMON=0; fi",
 		"if sudo -n docker compose version >/dev/null 2>&1; then echo COMPOSE_OK=1; echo COMPOSE_VERSION=$(sudo -n docker compose version 2>/dev/null | head -n1); else echo COMPOSE_OK=0; fi",
-	}, "; ")
+	}, "; "))
 	res, err := a.execRemote(runner, cfg, 25*time.Second, cmd)
 	if err != nil {
 		return doctor.Check{
@@ -150,7 +151,7 @@ func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 }
 
 // checkDeployFiles returns check deploy files.
-func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
+func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	paths := []string{
 		deploy.RemoteDir,
 		deploy.RemoteDir + "/docker-compose.yml",
@@ -158,13 +159,20 @@ func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config) doctor.Check 
 		deploy.RemoteDir + "/xray/config.json",
 		deploy.RemoteDir + "/agent/ovpn-agent",
 	}
+	if srv.IsProxy() {
+		paths = append(paths,
+			deploy.RemoteDir+"/haproxy/haproxy.cfg",
+			deploy.RemoteDir+"/geodata/geosite.dat",
+			deploy.RemoteDir+"/geodata/geoip.dat",
+		)
+	}
 	cmdParts := []string{"set -u"}
 	for _, p := range paths {
 		cmdParts = append(cmdParts, fmt.Sprintf("if [ -e %s ]; then echo EXISTS_%s=1; else echo EXISTS_%s=0; fi", shellQuote(p), sanitizeKey(p), sanitizeKey(p)))
 	}
 	cmdParts = append(cmdParts, fmt.Sprintf("if [ -d %s ]; then stat -c 'OVPN_OWNER=%%U:%%G OVPN_MODE=%%a' %s; fi", shellQuote(deploy.RemoteDir), shellQuote(deploy.RemoteDir)))
 	cmdParts = append(cmdParts, fmt.Sprintf("if [ -d %s ]; then echo BACKUP_DIR=1; else echo BACKUP_DIR=0; fi", shellQuote(deploy.RemoteBackupDir)))
-	res, err := a.execRemote(runner, cfg, 20*time.Second, strings.Join(cmdParts, "; "))
+	res, err := a.execRemote(runner, cfg, 20*time.Second, withRemoteTimeout(10, strings.Join(cmdParts, "; ")))
 	if err != nil {
 		return doctor.Check{
 			Name:    "Deploy root and files",
@@ -205,9 +213,48 @@ func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config) doctor.Check 
 	return check
 }
 
+// checkProxyServiceRuntimeIdentity returns check proxy service runtime identity.
+func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
+	cmd := withRemoteTimeout(10, strings.Join([]string{
+		"set -e",
+		fmt.Sprintf("if grep -q %s %s/xray/config.json && grep -q %s %s/xray/config.json; then echo PROXY_SERVICE_IDENTITY=1; else echo PROXY_SERVICE_IDENTITY=0; fi",
+			shellQuote(strings.TrimSpace(srv.ProxyServiceUUID)),
+			shellQuote(deploy.RemoteDir),
+			shellQuote(proxyServiceEmail()),
+			shellQuote(deploy.RemoteDir),
+		),
+	}, "; "))
+	res, err := a.execRemote(runner, cfg, 20*time.Second, cmd)
+	if err != nil {
+		return doctor.Check{
+			Name:    "Proxy backend service identity",
+			Status:  doctor.StatusFail,
+			Message: "cannot verify proxy backend service identity in runtime config",
+			Details: []string{err.Error()},
+			Hint:    "Redeploy the backend and confirm /opt/ovpn/xray/config.json contains proxy-service@cluster.",
+		}
+	}
+	kv := doctor.ParseKV(res.Stdout)
+	check := doctor.Check{
+		Name:    "Proxy backend service identity",
+		Status:  doctor.StatusPass,
+		Message: "backend runtime config contains proxy relay service identity",
+		Details: []string{
+			"proxy_service_email=" + proxyServiceEmail(),
+			"proxy_service_uuid=" + strings.TrimSpace(srv.ProxyServiceUUID),
+		},
+	}
+	if kv["PROXY_SERVICE_IDENTITY"] != "1" {
+		check.Status = doctor.StatusFail
+		check.Message = "backend runtime config is missing the proxy relay service identity"
+		check.Hint = "Run `ovpn deploy <backend>` after attaching it to a proxy so the live backend config includes proxy-service@cluster."
+	}
+	return check
+}
+
 // checkComposeState returns check compose state.
-func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
-	validateCmd := fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml config -q", shellQuote(deploy.RemoteDir))
+func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
+	validateCmd := withRemoteTimeout(10, fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml config -q", shellQuote(deploy.RemoteDir)))
 	if _, err := a.execRemote(runner, cfg, 25*time.Second, validateCmd); err != nil {
 		return doctor.Check{
 			Name:    "Compose stack state",
@@ -218,7 +265,7 @@ func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config) doctor.Check
 		}
 	}
 
-	psCmd := fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml ps --all --format json", shellQuote(deploy.RemoteDir))
+	psCmd := withRemoteTimeout(10, fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml ps --all --format json", shellQuote(deploy.RemoteDir)))
 	psRes, err := a.execRemote(runner, cfg, 25*time.Second, psCmd)
 	if err != nil {
 		return doctor.Check{
@@ -245,6 +292,9 @@ func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config) doctor.Check
 		byService[st.Service] = st
 	}
 	required := []string{"xray", "ovpn-agent"}
+	if srv.IsProxy() {
+		required = append(required, "haproxy")
+	}
 	details := make([]string, 0, len(states))
 	status := doctor.StatusPass
 	message := "required compose services are running"
@@ -291,7 +341,9 @@ func (a *App) checkXrayConfig(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 		"set -e",
 		"cd " + shellQuote(deploy.RemoteDir),
 		". ./.env",
-		fmt.Sprintf("sudo -n docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $XRAY_IMAGE run -test -config /etc/xray/config.json", deploy.RemoteDir),
+		fmt.Sprintf("extra_mounts=''; if [ -f %s/geodata/geosite.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
+		fmt.Sprintf("if [ -f %s/geodata/geoip.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
+		fmt.Sprintf("eval sudo -n docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", deploy.RemoteDir),
 	}, "; ")
 	res, err := a.execRemote(runner, cfg, 40*time.Second, cmd)
 	if err != nil {

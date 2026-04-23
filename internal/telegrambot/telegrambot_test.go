@@ -136,3 +136,37 @@ func TestRenderAlertmanagerMessage(t *testing.T) {
 		t.Fatalf("expected normalized alertmanager URL, got: %q", text)
 	}
 }
+
+func TestRenderAlertmanagerMessageExpirySoonFriendly(t *testing.T) {
+	t.Parallel()
+
+	raw := `{
+		"status":"firing",
+		"groupLabels":{"alertname":"OVPNUserExpirySoon"},
+		"alerts":[{"labels":{"job":"ovpn_agent","instance":"ovpn-agent:9090","email":"sergey@germany-1","expiry_date":"2026-04-23"}}],
+		"commonLabels":{"severity":"warning","alertname":"OVPNUserExpirySoon","email":"sergey@germany-1","expiry_date":"2026-04-23"},
+		"commonAnnotations":{"summary":"User access expires soon","description":"sergey@germany-1 expires on 2026-04-23 UTC. Access remains active until the end of that day."},
+		"externalURL":"http://alertmanager:9093"
+	}`
+	var payload AlertmanagerWebhook
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	text := RenderAlertmanagerMessage(payload)
+	for _, want := range []string{
+		"User Expiry Reminder",
+		"User: sergey",
+		"Server: germany-1",
+		"Identity: sergey@germany-1",
+		"Expires on: 2026-04-23 UTC",
+		"Access remains active until the end of that day.",
+		"Action: extend the expiry date if this user should keep access.",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected %q in output, got: %q", want, text)
+		}
+	}
+	if strings.Contains(text, "[ALERT FIRING]") {
+		t.Fatalf("did not expect raw alert header in friendly expiry message: %q", text)
+	}
+}

@@ -13,6 +13,7 @@ func (s *Store) migrate(ctx context.Context) error {
 		`CREATE TABLE IF NOT EXISTS servers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL UNIQUE,
+			role TEXT NOT NULL DEFAULT 'vpn',
 			host TEXT NOT NULL,
 			domain TEXT NOT NULL,
 			ssh_user TEXT NOT NULL,
@@ -26,6 +27,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			reality_short_ids TEXT NOT NULL,
 			reality_server_name TEXT NOT NULL,
 			reality_target TEXT NOT NULL,
+			proxy_service_uuid TEXT NOT NULL DEFAULT '',
 			enabled INTEGER NOT NULL DEFAULT 1,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
@@ -91,6 +93,18 @@ func (s *Store) migrate(ctx context.Context) error {
 			UNIQUE(server_id, email, window_type, window_start),
 			FOREIGN KEY(server_id) REFERENCES servers(id) ON DELETE CASCADE
 		);`,
+		`CREATE TABLE IF NOT EXISTS proxy_backends (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			proxy_server_id INTEGER NOT NULL,
+			backend_server_id INTEGER NOT NULL,
+			enabled INTEGER NOT NULL DEFAULT 1,
+			priority INTEGER NOT NULL DEFAULT 100,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			UNIQUE(proxy_server_id, backend_server_id),
+			FOREIGN KEY(proxy_server_id) REFERENCES servers(id) ON DELETE CASCADE,
+			FOREIGN KEY(backend_server_id) REFERENCES servers(id) ON DELETE CASCADE
+		);`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
@@ -101,11 +115,16 @@ func (s *Store) migrate(ctx context.Context) error {
 		`ALTER TABLE users ADD COLUMN quota_enabled INTEGER NOT NULL DEFAULT 1;`,
 		`ALTER TABLE users ADD COLUMN quota_blocked INTEGER NOT NULL DEFAULT 0;`,
 		`ALTER TABLE users ADD COLUMN quota_blocked_at TEXT;`,
+		`ALTER TABLE servers ADD COLUMN role TEXT NOT NULL DEFAULT 'vpn';`,
+		`ALTER TABLE servers ADD COLUMN proxy_service_uuid TEXT NOT NULL DEFAULT '';`,
 	}
 	for _, stmt := range optionalMigrations {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
 			return err
 		}
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET role='vpn' WHERE TRIM(COALESCE(role, ''))=''`); err != nil {
+		return err
 	}
 	return nil
 }

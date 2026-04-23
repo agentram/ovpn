@@ -77,6 +77,7 @@ func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, e
 	}
 
 	report.Add(checkLocalConfig(*srv))
+	report.Add(a.checkProxyTopology(*srv))
 	cfg := sshFromServer(*srv)
 	runner := a.newRunner("doctor")
 
@@ -91,8 +92,20 @@ func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, e
 
 	report.Add(a.checkSudo(runner, cfg))
 	report.Add(a.checkDocker(runner, cfg))
-	report.Add(a.checkDeployFiles(runner, cfg))
-	report.Add(a.checkComposeState(runner, cfg))
+	report.Add(a.checkDeployFiles(runner, cfg, *srv))
+	serviceUsers, err := a.vpnServiceUsers(*srv)
+	if err != nil {
+		report.Add(doctor.Check{
+			Name:    "Proxy backend service identity",
+			Status:  doctor.StatusFail,
+			Message: "backend proxy relay identity is misconfigured in local state",
+			Details: []string{err.Error()},
+			Hint:    "Re-attach the backend to a proxy or set proxy_service_uuid before deploying HA.",
+		})
+	} else if len(serviceUsers) > 0 {
+		report.Add(a.checkProxyServiceRuntimeIdentity(runner, cfg, *srv))
+	}
+	report.Add(a.checkComposeState(runner, cfg, *srv))
 	report.Add(a.checkXrayConfig(runner, cfg))
 	report.Add(a.checkAgentHealth(runner, cfg, *srv))
 	report.Add(a.checkDisk(runner, cfg))
@@ -106,6 +119,62 @@ func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, e
 
 	report.Finalize()
 	return report, nil
+}
+
+func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
+	check := doctor.Check{
+		Name:    "Proxy topology",
+		Status:  doctor.StatusPass,
+		Message: "server role topology is coherent",
+	}
+	if !srv.IsProxy() {
+		check.Details = []string{"role=" + srv.NormalizedRole()}
+		return check
+	}
+	backends, err := a.attachedBackendServers(srv)
+	if err != nil {
+		check.Status = doctor.StatusFail
+		check.Message = "proxy backend attachments could not be read"
+		check.Details = []string{err.Error()}
+		check.Hint = "Use `ovpn server backend list --proxy <server>` and repair local state."
+		return check
+	}
+	if len(backends) == 0 {
+		check.Status = doctor.StatusFail
+		check.Message = "proxy has no attached backends"
+		check.Hint = "Attach at least one vpn backend with `ovpn server backend attach --proxy <proxy> --backend <vpn>`."
+		return check
+	}
+	if err := a.ensureVPNBackendsCompatible(backends); err != nil {
+		check.Status = doctor.StatusFail
+		check.Message = "attached backends are not parity-compatible"
+		check.Details = []string{err.Error()}
+		check.Hint = "Align REALITY and proxy service UUID values across backend vpn servers."
+		return check
+	}
+	var names []string
+	for _, backend := range backends {
+		names = append(names, backend.Name)
+	}
+	check.Details = []string{
+		"role=proxy",
+		fmt.Sprintf("backends=%s", strings.Join(names, ",")),
+	}
+	geodataDetails, geodataStale, err := a.proxyGeodataState()
+	if err != nil {
+		check.Status = doctor.StatusFail
+		check.Message = "proxy geodata assets are missing or unreadable"
+		check.Details = append(check.Details, err.Error())
+		check.Hint = "Run `ovpn config validate --server <proxy>` or deploy the proxy to refresh geodata assets."
+		return check
+	}
+	check.Details = append(check.Details, geodataDetails...)
+	if geodataStale {
+		check.Status = doctor.StatusWarn
+		check.Message = "proxy topology is coherent but geodata assets are stale"
+		check.Hint = "Re-run proxy deploy or `ovpn config validate --server <proxy>` to refresh geodata assets."
+	}
+	return check
 }
 
 // printDoctorReport returns print doctor report.

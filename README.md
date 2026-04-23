@@ -24,12 +24,13 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 - Traffic stats and rolling `30d` quota enforcement
 - Optional monitoring stack (Prometheus, Alertmanager, Grafana, Telegram bot relay)
 - Built-in Grafana user analytics dashboard (`ovpn User Statistics`)
+- Additive HA proxy topology with split routing and backend failover
 - Built-in backup and restore commands
 - Safe runtime cleanup/decommission command
 
 ## Versioning
 
-- Current pinned version: `1.1.0`
+- Current pinned version: `1.2.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -109,6 +110,10 @@ Architecture path:
 
 `Ansible -> ovpn -> optional monitoring -> optional CI workflows`
 
+HA extension path:
+
+`existing vpn servers -> Russia proxy role -> attached backend pool -> optional monitoring`
+
 ### 1. Pre-flight checks
 
 ```bash
@@ -161,6 +166,39 @@ export OVPN_SECURITY_PROFILE=minimal
 export OVPN_THREAT_DNS_SERVERS=9.9.9.9,149.112.112.112
 ./ovpn deploy <server>
 ```
+
+### 4a. Additive HA proxy rollout
+
+Use this only when adding a Russia-based proxy in front of existing foreign `vpn` servers.
+This does not modify the current direct path for existing users.
+
+```bash
+./ovpn server add \
+  --name proxy-ru \
+  --role proxy \
+  --host <proxy-ip> \
+  --domain <proxy-domain> \
+  --ssh-user root \
+  --ssh-port 22
+
+./ovpn server init proxy-ru
+./ovpn server backend attach --proxy proxy-ru --backend <vpn-backend-1>
+./ovpn deploy <vpn-backend-1>
+./ovpn config validate --server proxy-ru
+./ovpn deploy proxy-ru
+./ovpn doctor proxy-ru
+```
+
+After the first backend attachment, deploy that backend before deploying the proxy so the backend runtime picks up the proxy relay service identity used by HA.
+
+On a proxy node, `ovpn deploy` renders and starts:
+
+- `xray` for the public client entrypoint and split routing
+- `haproxy` for local TCP failover across attached foreign backends
+- `ovpn-agent` for runtime control and metrics
+- optional monitoring services if enabled
+
+See [`docs/ha.md`](docs/ha.md) for the full HA design, rollout, and failure model.
 
 ### 5. Validate runtime
 
@@ -314,6 +352,7 @@ End-user setup instructions (RU, step-by-step for iOS/Android/Windows/macOS). Ge
 - [`README.ansible.md`](README.ansible.md): host bootstrap and hardening
 - [`DEVELOPMENT.md`](DEVELOPMENT.md): contributor and architecture guide
 - [`docs/security.md`](docs/security.md): security and hardening model
+- [`docs/ha.md`](docs/ha.md): HA proxy topology and rollout
 - [`docs/monitoring.md`](docs/monitoring.md): monitoring operations
 - [`docs/ci.md`](docs/ci.md): GitHub Actions workflows
 - [`docs/testing.md`](docs/testing.md): test strategy

@@ -1,11 +1,15 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeServiceName(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"xray":          "xray",
+		"haproxy":       "haproxy",
 		"agent":         "ovpn-agent",
 		"ovpn-agent":    "ovpn-agent",
 		"prom":          "prometheus",
@@ -24,6 +28,17 @@ func TestNormalizeServiceName(t *testing.T) {
 	}
 	if _, ok := normalizeServiceName("unknown"); ok {
 		t.Fatalf("unknown service should be invalid")
+	}
+}
+
+func TestRestartableServicesHelp(t *testing.T) {
+	t.Parallel()
+
+	if got := restartableServicesHelp(false); strings.Contains(got, "haproxy") {
+		t.Fatalf("unexpected haproxy in non-proxy restart help: %q", got)
+	}
+	if got := restartableServicesHelp(true); !strings.Contains(got, "haproxy") {
+		t.Fatalf("expected haproxy in proxy restart help: %q", got)
 	}
 }
 

@@ -175,9 +175,11 @@ func TestEnsureRealityParityForServers(t *testing.T) {
 		RealityShortIDs:   "id",
 		RealityServerName: "www.microsoft.com",
 		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "svc-a",
 	}
 	other := base
 	other.Name = "b"
+	other.ProxyServiceUUID = "svc-b"
 	if err := ensureRealityParityForServers([]model.Server{base, other}); err != nil {
 		t.Fatalf("expected parity success, got %v", err)
 	}
@@ -309,6 +311,7 @@ func addGlobalUsersTestServer(t *testing.T, st *local.Store, name string) *model
 		RealityShortIDs:   "abcd1234",
 		RealityServerName: "www.microsoft.com",
 		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "11111111-1111-1111-1111-111111111111",
 		Enabled:           true,
 	}
 	if err := st.AddServer(context.Background(), s); err != nil {

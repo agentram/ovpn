@@ -65,6 +65,7 @@ type trafficSnapshot struct {
 
 var restartableServiceOrder = []string{
 	"xray",
+	"haproxy",
 	"ovpn-agent",
 	"prometheus",
 	"alertmanager",
@@ -75,6 +76,7 @@ var restartableServiceOrder = []string{
 
 var serviceAliases = map[string]string{
 	"xray":          "xray",
+	"haproxy":       "haproxy",
 	"ovpn-agent":    "ovpn-agent",
 	"agent":         "ovpn-agent",
 	"prometheus":    "prometheus",
@@ -88,8 +90,19 @@ var serviceAliases = map[string]string{
 	"cadvisor":      "cadvisor",
 }
 
-func restartableServicesHelp() string {
-	return strings.Join(restartableServiceOrder, ", ")
+func restartableServicesHelp(includeHAProxy bool) string {
+	return strings.Join(enabledRestartableServices(includeHAProxy), ", ")
+}
+
+func enabledRestartableServices(includeHAProxy bool) []string {
+	out := make([]string, 0, len(restartableServiceOrder))
+	for _, svc := range restartableServiceOrder {
+		if svc == "haproxy" && !includeHAProxy {
+			continue
+		}
+		out = append(out, svc)
+	}
+	return out
 }
 
 func normalizeServiceName(raw string) (string, bool) {
@@ -99,6 +112,10 @@ func normalizeServiceName(raw string) (string, bool) {
 	}
 	n, ok := serviceAliases[v]
 	return n, ok
+}
+
+func (b *bot) hasHAProxy() bool {
+	return strings.TrimSpace(b.cfg.haproxyURL) != ""
 }
 
 func (b *bot) collectAuditSnapshot(ctx context.Context) auditSnapshot {
@@ -182,7 +199,7 @@ func (b *bot) collectAuditSnapshot(ctx context.Context) auditSnapshot {
 }
 
 func (b *bot) collectServiceChecks(ctx context.Context, snapshot auditSnapshot) []serviceCheck {
-	checks := make([]serviceCheck, 0, 8)
+	checks := make([]serviceCheck, 0, 9)
 	checks = append(checks, b.serviceCheckFromSelfHealth(ctx))
 
 	if snapshot.HealthErr != nil {
@@ -212,6 +229,9 @@ func (b *bot) collectServiceChecks(ctx context.Context, snapshot auditSnapshot) 
 		b.serviceCheckFromProbe(ctx, serviceCheck{Key: "node-exporter", Label: "node-exporter", Critical: false, Restartable: true}, strings.TrimRight(b.cfg.nodeExporterURL, "/")+"/metrics"),
 		b.serviceCheckFromProbe(ctx, serviceCheck{Key: "cadvisor", Label: "cadvisor", Critical: false, Restartable: true}, strings.TrimRight(b.cfg.cadvisorURL, "/")+"/healthz"),
 	)
+	if b.hasHAProxy() {
+		checks = append(checks, b.serviceCheckFromProbe(ctx, serviceCheck{Key: "haproxy", Label: "haproxy", Critical: true, Restartable: true}, strings.TrimRight(b.cfg.haproxyURL, "/")))
+	}
 
 	sort.SliceStable(checks, func(i, j int) bool {
 		if checks[i].Key == "ovpn-agent" {

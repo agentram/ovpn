@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"ovpn/internal/model"
 	"ovpn/internal/ssh"
+	"ovpn/internal/xraycfg"
 )
 
 type fakeRunner struct {
@@ -22,6 +24,10 @@ type failingRunner struct {
 	fakeRunner
 	failOn string
 	err    error
+}
+
+type blockingRunner struct {
+	fakeRunner
 }
 
 func (f *failingRunner) Exec(_ context.Context, _ ssh.Config, remoteCmd string) (ssh.Result, error) {
@@ -49,6 +55,21 @@ func (f *fakeRunner) CopyFile(_ context.Context, _ ssh.Config, localPath, remote
 	}
 	f.copyOps = append(f.copyOps, [2]string{localPath, remotePath})
 	return nil
+}
+
+func (b *blockingRunner) Exec(ctx context.Context, _ ssh.Config, remoteCmd string) (ssh.Result, error) {
+	b.execCmds = append(b.execCmds, remoteCmd)
+	<-ctx.Done()
+	return ssh.Result{}, ctx.Err()
+}
+
+func (b *blockingRunner) CopyFile(ctx context.Context, _ ssh.Config, localPath, remotePath string) error {
+	if _, err := os.Stat(localPath); err != nil {
+		return err
+	}
+	b.copyOps = append(b.copyOps, [2]string{localPath, remotePath})
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func TestRenderBundleWithOverride(t *testing.T) {
@@ -155,6 +176,9 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if !strings.Contains(string(alertCfg), "http://ovpn-telegram-bot:8080/alertmanager") {
 		t.Fatalf("expected alertmanager webhook receiver, got:\n%s", string(alertCfg))
 	}
+	if _, err := os.Stat(filepath.Join(bundle.Dir, "monitoring", "grafana", "dashboards", "ovpn-proxy.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected non-proxy bundle to omit proxy dashboard, stat err=%v", err)
+	}
 }
 
 func TestRenderBundleAppliesMonitoringAndTelegramDefaults(t *testing.T) {
@@ -206,6 +230,122 @@ func TestRenderBundleAppliesMonitoringAndTelegramDefaults(t *testing.T) {
 	}
 	if adminSecretInfo.Mode().Perm() != 0o600 {
 		t.Fatalf("telegram_admin_token mode: got %o want 600", adminSecretInfo.Mode().Perm())
+	}
+}
+
+func TestRenderBundleProxyIncludesHAProxyAndGeodata(t *testing.T) {
+	t.Parallel()
+
+	geositePath := filepath.Join(t.TempDir(), "geosite.dat")
+	if err := os.WriteFile(geositePath, []byte("geosite"), 0o644); err != nil {
+		t.Fatalf("write geosite: %v", err)
+	}
+	geoipPath := filepath.Join(t.TempDir(), "geoip.dat")
+	if err := os.WriteFile(geoipPath, []byte("geoip"), 0o644); err != nil {
+		t.Fatalf("write geoip: %v", err)
+	}
+
+	bundle, err := RenderBundle(Input{
+		Server: model.Server{
+			Role:              model.ServerRoleProxy,
+			XrayVersion:       "26.3.27",
+			Domain:            "proxy.example.com",
+			RealityPrivateKey: "priv",
+			RealityPublicKey:  "proxy-pub",
+			RealityServerName: "www.microsoft.com",
+			RealityTarget:     "www.microsoft.com:443",
+			RealityShortIDs:   "abcd1234",
+		},
+		BackendServers: []model.Server{
+			{Host: "198.51.100.10"},
+			{Host: "203.0.113.20"},
+		},
+		ProxyRelay: &xraycfg.ProxyRelay{
+			Address:     "haproxy",
+			Port:        15443,
+			ServiceUUID: "22222222-2222-2222-2222-222222222222",
+			ServerName:  "backend.example.com",
+			PublicKey:   "backend-pub",
+			ShortID:     "deadbeef",
+		},
+		ProxyGeoSitePath: geositePath,
+		ProxyGeoIPPath:   geoipPath,
+	})
+	if err != nil {
+		t.Fatalf("render proxy bundle: %v", err)
+	}
+	defer CleanupBundle(bundle)
+
+	gotCompose, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	compose := string(gotCompose)
+	for _, want := range []string{
+		"haproxy:",
+		"./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro",
+		"./geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro",
+		"./geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro",
+	} {
+		if !strings.Contains(compose, want) {
+			t.Fatalf("expected proxy compose to contain %q, got:\n%s", want, compose)
+		}
+	}
+
+	gotEnv, err := os.ReadFile(filepath.Join(bundle.Dir, ".env"))
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	if !strings.Contains(string(gotEnv), "HAPROXY_IMAGE=haproxy:3.2.15-alpine3.23") {
+		t.Fatalf("expected haproxy image in env, got:\n%s", string(gotEnv))
+	}
+	if !strings.Contains(string(gotEnv), "OVPN_TELEGRAM_HAPROXY_URL=http://haproxy:8404/metrics") {
+		t.Fatalf("expected telegram haproxy url in env, got:\n%s", string(gotEnv))
+	}
+
+	gotHAProxy, err := os.ReadFile(filepath.Join(bundle.Dir, "haproxy", "haproxy.cfg"))
+	if err != nil {
+		t.Fatalf("read haproxy config: %v", err)
+	}
+	haproxyCfg := string(gotHAProxy)
+	for _, want := range []string{"bind 0.0.0.0:15443", "198.51.100.10:443", "203.0.113.20:443", "prometheus-exporter"} {
+		if !strings.Contains(haproxyCfg, want) {
+			t.Fatalf("expected haproxy config to contain %q, got:\n%s", want, haproxyCfg)
+		}
+	}
+
+	gotProm, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "prometheus.yml"))
+	if err != nil {
+		t.Fatalf("read proxy prometheus config: %v", err)
+	}
+	if !strings.Contains(string(gotProm), "job_name: haproxy") || !strings.Contains(string(gotProm), "haproxy:8404") {
+		t.Fatalf("expected proxy prometheus scrape config for haproxy, got:\n%s", string(gotProm))
+	}
+
+	gotRules, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "rules", "ovpn-alerts.yml"))
+	if err != nil {
+		t.Fatalf("read proxy alert rules: %v", err)
+	}
+	for _, want := range []string{"OVPNHAProxyMetricsDown", "OVPNForeignBackendPoolDown", "OVPNHAProxyContainerMissing"} {
+		if !strings.Contains(string(gotRules), want) {
+			t.Fatalf("expected proxy alert rule %q, got:\n%s", want, string(gotRules))
+		}
+	}
+	if _, err := os.Stat(filepath.Join(bundle.Dir, "monitoring", "grafana", "dashboards", "ovpn-proxy.json")); err != nil {
+		t.Fatalf("expected proxy dashboard asset in proxy bundle: %v", err)
+	}
+
+	for path, want := range map[string]string{
+		filepath.Join(bundle.Dir, "geodata", "geosite.dat"): "geosite",
+		filepath.Join(bundle.Dir, "geodata", "geoip.dat"):   "geoip",
+	} {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read copied geodata %s: %v", path, err)
+		}
+		if string(raw) != want {
+			t.Fatalf("unexpected copied geodata content for %s: %q", path, string(raw))
+		}
 	}
 }
 
@@ -305,7 +445,10 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[0], "/opt/ovpn-backups/ovpn-") {
 		t.Fatalf("first command should backup stack, got %q", r.execCmds[0])
 	}
-	if !strings.Contains(r.execCmds[0], "find /opt/ovpn-backups -mindepth 1 -maxdepth 1 -name 'ovpn-*'") {
+	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
+		t.Fatalf("first command should use bounded remote timeout, got %q", r.execCmds[0])
+	}
+	if !strings.Contains(r.execCmds[0], "find /opt/ovpn-backups -mindepth 1 -maxdepth 1") || !strings.Contains(r.execCmds[0], "ovpn-*") {
 		t.Fatalf("first command should prune old pre-deploy snapshots, got %q", r.execCmds[0])
 	}
 	if !strings.Contains(r.execCmds[0], "NR>7") {
@@ -323,8 +466,17 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
 		t.Fatalf("fourth command should apply validated staged bundle, got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml up -d") {
+	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[4], "up -d --force-recreate --remove-orphans") {
 		t.Fatalf("expected compose up command, got %q", r.execCmds[4])
+	}
+	if !strings.Contains(r.execCmds[4], "timeout 300 sh -c") {
+		t.Fatalf("expected compose up command to use bounded remote timeout, got %q", r.execCmds[4])
+	}
+	if !strings.Contains(r.execCmds[4], "docker ps -a --format") || !strings.Contains(r.execCmds[4], "docker-compose.monitoring.yml") || !strings.Contains(r.execCmds[4], "--profile monitoring") {
+		t.Fatalf("expected compose up command to preserve active monitoring stack, got %q", r.execCmds[4])
+	}
+	if !strings.Contains(r.execCmds[4], "--scale ovpn-telegram-bot=0") {
+		t.Fatalf("expected compose up command to guard empty telegram token when monitoring is active, got %q", r.execCmds[4])
 	}
 	if !strings.Contains(r.execCmds[4], "--remove-orphans") {
 		t.Fatalf("expected remove-orphans in deploy command, got %q", r.execCmds[4])
@@ -410,6 +562,49 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	}
 	if len(r.execCmds) != 1 || !strings.Contains(r.execCmds[0], "tar -xzf") {
 		t.Fatalf("expected extract command, got %#v", r.execCmds)
+	}
+	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
+		t.Fatalf("expected extract command to use bounded remote timeout, got %#v", r.execCmds)
+	}
+}
+
+func TestDeployRemoteReturnsTimeoutContextWhenRemoteStepHangs(t *testing.T) {
+	prev := deployBackupTimeout
+	deployBackupTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { deployBackupTimeout = prev })
+
+	r := &blockingRunner{}
+	err := DeployRemote(context.Background(), r, ssh.Config{Host: "example-host"})
+	if err == nil {
+		t.Fatalf("expected deploy timeout error")
+	}
+	if !strings.Contains(err.Error(), "create pre-deploy backup") {
+		t.Fatalf("expected backup timeout context, got %v", err)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline exceeded, got %v", err)
+	}
+}
+
+func TestUploadBundleReturnsTimeoutContextWhenCopyHangs(t *testing.T) {
+	prev := uploadCopyTimeout
+	uploadCopyTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { uploadCopyTimeout = prev })
+
+	bundleDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bundleDir, "a.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write fixture file: %v", err)
+	}
+	r := &blockingRunner{}
+	err := UploadBundle(context.Background(), r, ssh.Config{Host: "example-host"}, bundleDir)
+	if err == nil {
+		t.Fatalf("expected upload timeout error")
+	}
+	if !strings.Contains(err.Error(), "copy bundle") {
+		t.Fatalf("expected copy timeout context, got %v", err)
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline exceeded, got %v", err)
 	}
 }
 

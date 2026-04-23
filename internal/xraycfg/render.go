@@ -11,10 +11,12 @@ import (
 )
 
 type Spec struct {
+	Role                  string
 	Domain                string
 	RealityPrivateKey     string
 	RealityServerName     string
 	RealityTarget         string
+	RealityPublicKey      string
 	SecurityProfile       string
 	ThreatDNSServers      []string
 	LimitFallbackUpload   *FallbackRateLimit
@@ -24,12 +26,28 @@ type Spec struct {
 	APIPort               int
 	LogLevel              string
 	Users                 []model.User
+	ServiceUsers          []ServiceUser
+	ProxyRelay            *ProxyRelay
 }
 
 type FallbackRateLimit struct {
 	AfterBytes       int64
 	BytesPerSec      int64
 	BurstBytesPerSec int64
+}
+
+type ServiceUser struct {
+	UUID  string
+	Email string
+}
+
+type ProxyRelay struct {
+	Address     string
+	Port        int
+	ServiceUUID string
+	ServerName  string
+	PublicKey   string
+	ShortID     string
 }
 
 type XrayConfig struct {
@@ -53,6 +71,10 @@ var defaultThreatDNSServers = []string{"9.9.9.9", "149.112.112.112"}
 // RenderServerJSON renders server json into the format expected by callers.
 func RenderServerJSON(spec Spec) ([]byte, error) {
 	spec.SecurityProfile = normalizeSecurityProfile(spec.SecurityProfile)
+	spec.Role = model.NormalizeServerRole(spec.Role)
+	if spec.Role == "" {
+		spec.Role = model.ServerRoleVPN
+	}
 	if spec.SecurityProfile == SecurityProfileMinimal && len(spec.ThreatDNSServers) == 0 {
 		spec.ThreatDNSServers = append([]string(nil), defaultThreatDNSServers...)
 	}
@@ -71,21 +93,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	// Backward compatibility: older ovpn versions persisted REALITY keys in std-base64.
 	// Normalize to URL-safe raw base64 before rendering, so existing local DB state still deploys.
 	spec.RealityPrivateKey = normalizeX25519KeyBase64(spec.RealityPrivateKey)
-	users := make([]map[string]any, 0, len(spec.Users))
-	for _, u := range spec.Users {
-		if !u.Enabled {
-			continue
-		}
-		users = append(users, map[string]any{
-			"id":    u.UUID,
-			"email": u.Email,
-			"flow":  "xtls-rprx-vision",
-		})
-	}
-	// Keep stable user ordering so rendered config diffs stay deterministic.
-	sort.Slice(users, func(i, j int) bool {
-		return users[i]["email"].(string) < users[j]["email"].(string)
-	})
+	users := buildClientUsers(spec.Users, spec.ServiceUsers)
 
 	realitySettings := map[string]any{
 		"show":        false,
@@ -172,11 +180,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 				},
 			},
 		},
-		Outbounds: []any{
-			map[string]any{"protocol": "freedom", "tag": "direct"},
-			map[string]any{"protocol": "blackhole", "tag": "block"},
-			map[string]any{"protocol": "freedom", "tag": "api"},
-		},
+		Outbounds: baseOutbounds(spec),
 	}
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		cfg.DNS = map[string]any{
@@ -195,11 +199,100 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			},
 		)
 	}
+	if spec.Role == model.ServerRoleProxy {
+		cfg.Routing.(map[string]any)["rules"] = append(cfg.Routing.(map[string]any)["rules"].([]any),
+			map[string]any{
+				"type":        "field",
+				"domain":      []string{"geosite:ru-available-only-inside", "regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.xn--p1ai$"},
+				"outboundTag": "direct",
+			},
+			map[string]any{
+				"type":        "field",
+				"ip":          []string{"geoip:ru", "geoip:private"},
+				"outboundTag": "direct",
+			},
+			map[string]any{
+				"type":        "field",
+				"inboundTag":  []string{"vless-reality"},
+				"outboundTag": "foreign-pool",
+			},
+		)
+	}
 	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+func buildClientUsers(users []model.User, serviceUsers []ServiceUser) []map[string]any {
+	out := make([]map[string]any, 0, len(users)+len(serviceUsers))
+	for _, u := range users {
+		if !u.Enabled {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id":    u.UUID,
+			"email": u.Email,
+			"flow":  "xtls-rprx-vision",
+		})
+	}
+	for _, svc := range serviceUsers {
+		out = append(out, map[string]any{
+			"id":    svc.UUID,
+			"email": svc.Email,
+			"flow":  "xtls-rprx-vision",
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i]["email"].(string) < out[j]["email"].(string)
+	})
+	return out
+}
+
+func baseOutbounds(spec Spec) []any {
+	if spec.Role != model.ServerRoleProxy || spec.ProxyRelay == nil {
+		return []any{
+			map[string]any{"protocol": "freedom", "tag": "direct"},
+			map[string]any{"protocol": "blackhole", "tag": "block"},
+			map[string]any{"protocol": "freedom", "tag": "api"},
+		}
+	}
+	return []any{
+		map[string]any{"protocol": "blackhole", "tag": "block"},
+		map[string]any{"protocol": "freedom", "tag": "direct"},
+		map[string]any{"protocol": "freedom", "tag": "api"},
+		map[string]any{
+			"tag":      "foreign-pool",
+			"protocol": "vless",
+			"settings": map[string]any{
+				"vnext": []any{
+					map[string]any{
+						"address": spec.ProxyRelay.Address,
+						"port":    spec.ProxyRelay.Port,
+						"users": []any{
+							map[string]any{
+								"id":         spec.ProxyRelay.ServiceUUID,
+								"encryption": "none",
+								"flow":       "xtls-rprx-vision",
+							},
+						},
+					},
+				},
+			},
+			"streamSettings": map[string]any{
+				"network":  "tcp",
+				"security": "reality",
+				"realitySettings": map[string]any{
+					"serverName":  spec.ProxyRelay.ServerName,
+					"publicKey":   spec.ProxyRelay.PublicKey,
+					"shortId":     spec.ProxyRelay.ShortID,
+					"fingerprint": "chrome",
+					"spiderX":     "/",
+				},
+			},
+		},
+	}
 }
 
 // normalizeX25519KeyBase64 normalizes x 25519 key base 64 and applies fallback defaults.
@@ -296,6 +389,9 @@ func ValidateSpec(spec Spec) error {
 	if len(spec.ShortIDs) == 0 {
 		return fmt.Errorf("at least one short ID is required")
 	}
+	if spec.Role != "" && spec.Role != model.ServerRoleVPN && spec.Role != model.ServerRoleProxy {
+		return fmt.Errorf("role must be %q or %q", model.ServerRoleVPN, model.ServerRoleProxy)
+	}
 	for _, u := range spec.Users {
 		if !u.Enabled {
 			continue
@@ -305,6 +401,25 @@ func ValidateSpec(spec Spec) error {
 		}
 		if strings.TrimSpace(u.Email) == "" {
 			return fmt.Errorf("enabled user %q is missing email", u.Username)
+		}
+	}
+	for _, svc := range spec.ServiceUsers {
+		if strings.TrimSpace(svc.UUID) == "" || strings.TrimSpace(svc.Email) == "" {
+			return fmt.Errorf("service users must include uuid and email")
+		}
+	}
+	if spec.Role == model.ServerRoleProxy {
+		if spec.ProxyRelay == nil {
+			return fmt.Errorf("proxy relay is required for proxy role")
+		}
+		if strings.TrimSpace(spec.ProxyRelay.Address) == "" || spec.ProxyRelay.Port <= 0 {
+			return fmt.Errorf("proxy relay address and port are required")
+		}
+		if strings.TrimSpace(spec.ProxyRelay.ServiceUUID) == "" {
+			return fmt.Errorf("proxy relay service uuid is required")
+		}
+		if strings.TrimSpace(spec.ProxyRelay.ServerName) == "" || strings.TrimSpace(spec.ProxyRelay.PublicKey) == "" || strings.TrimSpace(spec.ProxyRelay.ShortID) == "" {
+			return fmt.Errorf("proxy relay reality parameters are required")
 		}
 	}
 	return nil

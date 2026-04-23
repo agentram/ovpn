@@ -42,6 +42,9 @@ func TestAddServerAndUserValidation(t *testing.T) {
 	if err := store.AddServer(ctx, server); err != nil {
 		t.Fatalf("add server: %v", err)
 	}
+	if server.ProxyServiceUUID != "" {
+		t.Fatalf("expected plain vpn server to keep empty proxy service uuid, got %q", server.ProxyServiceUUID)
+	}
 
 	user := &model.User{
 		ServerID: server.ID,
@@ -188,6 +191,113 @@ func TestDeleteServerByNameRemovesDependentState(t *testing.T) {
 	}
 }
 
+func TestListAttachedBackendServers(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	proxy := mustAddStoreTestServer(t, ctx, store, &model.Server{
+		Name:              "proxy-ru",
+		Role:              model.ServerRoleProxy,
+		Host:              "10.0.0.10",
+		Domain:            "proxy-ru.example.com",
+		SSHUser:           "debian",
+		SSHPort:           22,
+		XrayVersion:       "26.3.27",
+		RealityPrivateKey: "priv",
+		RealityPublicKey:  "proxy-pub",
+		RealityShortIDs:   "abcd",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		Enabled:           true,
+	})
+	backendA := mustAddStoreTestServer(t, ctx, store, &model.Server{
+		Name:              "backend-a",
+		Role:              model.ServerRoleVPN,
+		Host:              "198.51.100.10",
+		Domain:            "backend-a.example.com",
+		SSHUser:           "debian",
+		SSHPort:           22,
+		XrayVersion:       "26.3.27",
+		RealityPrivateKey: "priv",
+		RealityPublicKey:  "vpn-pub",
+		RealityShortIDs:   "abcd",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "svc-shared",
+		Enabled:           true,
+	})
+	backendB := mustAddStoreTestServer(t, ctx, store, &model.Server{
+		Name:              "backend-b",
+		Role:              model.ServerRoleVPN,
+		Host:              "198.51.100.11",
+		Domain:            "backend-b.example.com",
+		SSHUser:           "debian",
+		SSHPort:           22,
+		XrayVersion:       "26.3.27",
+		RealityPrivateKey: "priv",
+		RealityPublicKey:  "vpn-pub",
+		RealityShortIDs:   "abcd",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ProxyServiceUUID:  "svc-shared",
+		Enabled:           true,
+	})
+
+	if err := store.UpsertProxyBackend(ctx, &model.ProxyBackend{
+		ProxyServerID:   proxy.ID,
+		BackendServerID: backendB.ID,
+		Enabled:         false,
+		Priority:        20,
+	}); err != nil {
+		t.Fatalf("attach backend-b: %v", err)
+	}
+	if err := store.UpsertProxyBackend(ctx, &model.ProxyBackend{
+		ProxyServerID:   proxy.ID,
+		BackendServerID: backendA.ID,
+		Enabled:         true,
+		Priority:        10,
+	}); err != nil {
+		t.Fatalf("attach backend-a: %v", err)
+	}
+
+	mappings, err := store.ListProxyBackends(ctx, proxy.ID)
+	if err != nil {
+		t.Fatalf("list proxy backends: %v", err)
+	}
+	if len(mappings) != 2 {
+		t.Fatalf("expected 2 mappings, got %d", len(mappings))
+	}
+	if mappings[0].BackendServer == nil || mappings[0].BackendServer.Name != backendA.Name {
+		t.Fatalf("expected backend-a first by priority, got %+v", mappings[0])
+	}
+
+	attached, err := store.ListAttachedBackendServers(ctx, proxy.ID)
+	if err != nil {
+		t.Fatalf("list attached backend servers: %v", err)
+	}
+	if len(attached) != 1 || attached[0].Name != backendA.Name {
+		t.Fatalf("expected only enabled backend-a to be returned, got %+v", attached)
+	}
+	hasProxy, err := store.BackendHasAttachedProxy(ctx, backendA.ID)
+	if err != nil {
+		t.Fatalf("backend has attached proxy for backend-a: %v", err)
+	}
+	if !hasProxy {
+		t.Fatalf("expected backend-a to report attached proxy")
+	}
+	hasProxy, err = store.BackendHasAttachedProxy(ctx, backendB.ID)
+	if err != nil {
+		t.Fatalf("backend has attached proxy for backend-b: %v", err)
+	}
+	if hasProxy {
+		t.Fatalf("expected disabled backend-b mapping to be ignored")
+	}
+}
+
 func TestRealityPrivateKeyStoredEncryptedWhenSecretKeyConfigured(t *testing.T) {
 	resetSecretKeyCacheForTests()
 	t.Setenv("HOME", t.TempDir())
@@ -238,6 +348,14 @@ func TestRealityPrivateKeyStoredEncryptedWhenSecretKeyConfigured(t *testing.T) {
 	if got.RealityPrivateKey != "secret-private-key" {
 		t.Fatalf("unexpected decrypted private key: %q", got.RealityPrivateKey)
 	}
+}
+
+func mustAddStoreTestServer(t *testing.T, ctx context.Context, store *Store, srv *model.Server) *model.Server {
+	t.Helper()
+	if err := store.AddServer(ctx, srv); err != nil {
+		t.Fatalf("add server %s: %v", srv.Name, err)
+	}
+	return srv
 }
 
 func TestEncryptedPrivateKeyRequiresKeyOnRead(t *testing.T) {

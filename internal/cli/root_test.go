@@ -37,7 +37,7 @@ func TestServerCommandTreeContainsExpectedSubcommands(t *testing.T) {
 	for _, c := range cmd.Commands() {
 		names = append(names, c.Name())
 	}
-	for _, want := range []string{"add", "init", "list", "set-xray-version", "status", "backup", "restore", "logs", "monitor", "cleanup"} {
+	for _, want := range []string{"add", "init", "list", "set-xray-version", "status", "backup", "restore", "logs", "monitor", "cleanup", "backend"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("expected server subcommand %q, got %v", want, names)
 		}
@@ -204,6 +204,13 @@ func TestValidateComposeService(t *testing.T) {
 	}
 	if got != " ovpn-telegram-bot" {
 		t.Fatalf("unexpected telegram bot service arg: %q", got)
+	}
+	got, err = validateComposeService("haproxy")
+	if err != nil {
+		t.Fatalf("unexpected error for haproxy: %v", err)
+	}
+	if got != " haproxy" {
+		t.Fatalf("unexpected haproxy service arg: %q", got)
 	}
 	if _, err := validateComposeService("bad"); err == nil {
 		t.Fatalf("expected validation error for unknown service")

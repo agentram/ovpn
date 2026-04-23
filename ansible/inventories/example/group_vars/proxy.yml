@@ -1,0 +1,15 @@
+---
+# Example proxy-host group vars.
+# Ansible still prepares only host baseline/security; proxy runtime is rendered and deployed by `ovpn`.
+
+ovpn_manage_firewall: true
+ovpn_use_fail2ban: true
+ovpn_harden_ssh: true
+ovpn_ssh_permit_root_login: true
+ovpn_ssh_password_auth: false
+ovpn_ssh_allow_tcp_forwarding: true
+
+# Keep only the standard ovpn public surfaces on a clean proxy host.
+ovpn_firewall_allow_https: true
+ovpn_firewall_extra_tcp_ports: []
+ovpn_firewall_extra_udp_ports: []

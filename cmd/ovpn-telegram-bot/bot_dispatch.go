@@ -163,9 +163,9 @@ func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd st
 	case "/status":
 		return b.sendPlainMessage(ctx, chatID, b.renderStatusSummary(ctx), mainReplyKeyboard())
 	case "/services":
-		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "/doctor":
-		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "/users":
 		messages, err := b.renderUsersList(ctx)
 		if err != nil {
@@ -186,7 +186,7 @@ func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd st
 		return b.sendPlainMessage(ctx, chatID, text, quotaInlineKeyboard())
 	case "/restart":
 		if len(args) == 0 {
-			return b.sendPlainMessage(ctx, chatID, "Usage: /restart <service>\nAllowed: "+restartableServicesHelp(), servicesInlineKeyboard(b.adminActionsEnabled()))
+			return b.sendPlainMessage(ctx, chatID, "Usage: /restart <service>\nAllowed: "+restartableServicesHelp(b.hasHAProxy()), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 		}
 		return b.beginRestartConfirm(ctx, chatID, args[0])
 	case "/heal":
@@ -204,9 +204,9 @@ func (b *bot) dispatchMenuAction(ctx context.Context, chatID int64, _ int64, act
 	case "status":
 		return b.sendPlainMessage(ctx, chatID, b.renderStatusSummary(ctx), mainReplyKeyboard())
 	case "doctor":
-		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "services":
-		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "users":
 		messages, err := b.renderUsersList(ctx)
 		if err != nil {
@@ -303,9 +303,9 @@ func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, 
 	case "quota:back":
 		return b.sendMainMenu(ctx, chatID)
 	case "services:overview":
-		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderServicesOverview(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "services:doctor":
-		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderDoctorReport(ctx), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	case "services:heal":
 		return b.beginHealConfirm(ctx, chatID)
 	case "services:back":
@@ -314,12 +314,12 @@ func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, 
 		return b.executeConfirm(ctx, chatID)
 	case "confirm:no":
 		b.clearConfirm(chatID)
-		return b.sendPlainMessage(ctx, chatID, "Action canceled.", servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, "Action canceled.", servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	}
 
 	if strings.HasPrefix(data, "services:detail:") {
 		key := strings.TrimSpace(strings.TrimPrefix(data, "services:detail:"))
-		return b.sendPlainMessage(ctx, chatID, b.renderSingleService(ctx, key), servicesInlineKeyboard(b.adminActionsEnabled()))
+		return b.sendPlainMessage(ctx, chatID, b.renderSingleService(ctx, key), servicesInlineKeyboard(b.adminActionsEnabled(), b.hasHAProxy()))
 	}
 	if strings.HasPrefix(data, "services:restart:") {
 		target := strings.TrimSpace(strings.TrimPrefix(data, "services:restart:"))
