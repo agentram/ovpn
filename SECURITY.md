@@ -4,9 +4,12 @@
 
 Do not open public GitHub issues for security problems.
 
-Use GitHub private vulnerability reporting from the repository security tab:
+Use GitHub private vulnerability reporting from the repository security page:
 
-- open `Security` -> `Advisories` -> `Report a vulnerability`
+- open the repository `Security and quality` page
+- click `Report a vulnerability`
+
+If GitHub changes the exact page label again, use the repository security page and look for the private vulnerability reporting button rather than following an older tab path.
 
 Include:
 
