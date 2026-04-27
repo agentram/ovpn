@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ovpn - Xray VPN operations CLI</title>
+    <meta
+      name="description"
+      content="ovpn is a Go CLI and agent system for operating self-hosted Xray VLESS + REALITY VPN servers over SSH."
+    >
+    <style>
+      :root {
+        --bg: #f7f5f0;
+        --surface: #fffdf8;
+        --surface-2: #eef5f2;
+        --ink: #17231d;
+        --muted: #5d6861;
+        --line: #d9d2c3;
+        --green: #167054;
+        --green-dark: #0e4736;
+        --blue: #225b8d;
+        --rust: #8f4f23;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 5%, rgba(22, 112, 84, 0.16), transparent 24rem),
+          linear-gradient(180deg, #fbfaf6 0%, var(--bg) 72%);
+      }
+
+      a { color: var(--green-dark); }
+
+      .wrap {
+        width: min(1140px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 22px 0;
+      }
+
+      .brand {
+        color: var(--ink);
+        font-size: 1.05rem;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        text-decoration: none;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      .nav a,
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 253, 248, 0.76);
+        color: var(--ink);
+        font-size: 0.92rem;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
+      .button.primary {
+        border-color: var(--green-dark);
+        background: var(--green-dark);
+        color: #fff;
+      }
+
+      .hero {
+        min-height: min(680px, calc(100vh - 92px));
+        display: grid;
+        align-items: center;
+        padding: 38px 0 58px;
+      }
+
+      .eyebrow {
+        margin-bottom: 14px;
+        color: var(--green-dark);
+        font-size: 0.82rem;
+        font-weight: 900;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1, h2, h3, p { margin-top: 0; }
+
+      h1 {
+        max-width: 880px;
+        margin-bottom: 18px;
+        font-size: clamp(2.35rem, 6vw, 5.35rem);
+        line-height: 1.02;
+      }
+
+      .lede {
+        max-width: 780px;
+        margin-bottom: 26px;
+        color: var(--muted);
+        font-size: clamp(1.05rem, 2vw, 1.28rem);
+        line-height: 1.65;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .status-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 38px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--line);
+      }
+
+      .stat {
+        min-height: 96px;
+        padding: 18px;
+        background: rgba(255, 253, 248, 0.88);
+      }
+
+      .stat strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--ink);
+        font-size: 1.08rem;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      section {
+        padding: 50px 0;
+        border-top: 1px solid rgba(217, 210, 195, 0.78);
+      }
+
+      h2 {
+        max-width: 760px;
+        margin-bottom: 14px;
+        font-size: clamp(1.8rem, 3vw, 2.6rem);
+        line-height: 1.1;
+      }
+
+      .section-lede {
+        max-width: 760px;
+        margin-bottom: 24px;
+        color: var(--muted);
+        font-size: 1.04rem;
+        line-height: 1.65;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface);
+        box-shadow: 0 12px 34px rgba(23, 35, 29, 0.05);
+      }
+
+      .card h3 {
+        margin-bottom: 8px;
+        font-size: 1.12rem;
+      }
+
+      .card p {
+        margin-bottom: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+        gap: 26px;
+        align-items: start;
+      }
+
+      .terminal {
+        overflow: auto;
+        padding: 18px;
+        border: 1px solid #20382f;
+        border-radius: 14px;
+        background: #111c18;
+        color: #e8f3ee;
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        font-size: 0.86rem;
+        line-height: 1.65;
+      }
+
+      .terminal code {
+        white-space: pre;
+      }
+
+      .doc-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .doc-list a {
+        display: block;
+        min-height: 74px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 253, 248, 0.88);
+        color: var(--ink);
+        font-weight: 850;
+        text-decoration: none;
+      }
+
+      .doc-list span {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 0.9rem;
+        font-weight: 500;
+        line-height: 1.45;
+      }
+
+      .support {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--surface-2), var(--surface));
+      }
+
+      .support p {
+        max-width: 720px;
+        margin-bottom: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      footer {
+        padding: 26px 0 44px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 780px) {
+        .wrap { width: min(100% - 20px, 1140px); }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .nav { justify-content: flex-start; }
+        .hero { min-height: auto; padding-top: 20px; }
+        .status-strip { grid-template-columns: 1fr 1fr; }
+        .split { grid-template-columns: 1fr; }
+        .support { align-items: flex-start; flex-direction: column; }
+      }
+
+      @media (max-width: 460px) {
+        .status-strip { grid-template-columns: 1fr; }
+        .button, .nav a { width: 100%; }
+        .actions, .nav { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="wrap topbar">
+      <a class="brand" href="./">ovpn</a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="https://github.com/agentram/ovpn">GitHub</a>
+        <a href="clients.md">Clients</a>
+        <a href="monitoring.md">Monitoring</a>
+        <a href="donate/">Donate</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="wrap hero">
+        <div>
+          <div class="eyebrow">Self-hosted VPN operations</div>
+          <h1>VPN server solution based on Xray VLESS + REALITY</h1>
+          <p class="lede">
+            ovpn is a Go CLI and agent system for operating self-hosted Xray servers over SSH. It keeps the public surface small, manages runtime state locally, and deploys Docker Compose services on your own hosts.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
+            <a class="button" href="clients.md">Client guide</a>
+            <a class="button" href="donate/">Support development</a>
+          </div>
+
+          <div class="status-strip">
+            <div class="stat">
+              <strong>SSH control plane</strong>
+              <span>No public admin API for normal operations.</span>
+            </div>
+            <div class="stat">
+              <strong>Xray on 443</strong>
+              <span>VLESS + REALITY runtime for client entry.</span>
+            </div>
+            <div class="stat">
+              <strong>Local desired state</strong>
+              <span>Operator data lives under ~/.ovpn.</span>
+            </div>
+            <div class="stat">
+              <strong>Optional monitoring</strong>
+              <span>Prometheus, Grafana, Alertmanager, and Telegram relay.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <h2>What it manages</h2>
+        <p class="section-lede">
+          The public repository focuses on the operator CLI, runtime agent, host bootstrap guidance, monitoring definitions, and release automation. Real production inventory and secrets are intentionally kept outside the repo.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <h3>Server lifecycle</h3>
+            <p>Add servers, initialize hosts, deploy runtime config, check status, inspect logs, run doctor checks, and clean up old runtime safely.</p>
+          </article>
+          <article class="card">
+            <h3>User operations</h3>
+            <p>Create users, generate VLESS links, mirror users across enabled servers, set expiry dates, and enforce rolling 30 day quota limits.</p>
+          </article>
+          <article class="card">
+            <h3>HA proxy topology</h3>
+            <p>Add proxy entrypoints in front of existing VPN backends with split routing, local HAProxy failover, and country-specific presets.</p>
+          </article>
+          <article class="card">
+            <h3>Backups and restore</h3>
+            <p>Create local and remote archives, keep automatic retention, and restore server runtime state when operational recovery is needed.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <div class="split">
+          <div>
+            <h2>Operator workflow</h2>
+            <p class="section-lede">
+              Ansible prepares the host baseline and security posture. ovpn owns Xray runtime rendering, deploys the Compose stack, manages users, and exposes optional operational monitoring.
+            </p>
+            <div class="grid">
+              <article class="card">
+                <h3>Minimal public surface</h3>
+                <p>The recommended production model exposes Xray on 443/tcp and SSH on 22/tcp. Internal agent and monitoring endpoints stay private.</p>
+              </article>
+              <article class="card">
+                <h3>Security defaults</h3>
+                <p>The default minimal profile blocks BitTorrent and public tracker categories and uses threat DNS resolvers unless explicitly disabled.</p>
+              </article>
+            </div>
+          </div>
+          <pre class="terminal"><code>go build -o ovpn ./cmd/ovpn
+./ovpn version
+
+./ovpn server add \
+  --name &lt;server&gt; \
+  --host &lt;server-ip&gt; \
+  --domain &lt;domain&gt; \
+  --ssh-user root \
+  --ssh-port 22
+
+./ovpn server init &lt;server&gt;
+./ovpn deploy &lt;server&gt;
+./ovpn doctor &lt;server&gt;</code></pre>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <h2>Documentation</h2>
+        <p class="section-lede">
+          Start with the README for operator setup. The docs below cover client onboarding, monitoring, high availability, security, CI, testing, and upgrades.
+        </p>
+        <div class="doc-list">
+          <a href="https://github.com/agentram/ovpn#readme">README <span>Operator entrypoint and quick start.</span></a>
+          <a href="clients.md">Client guide <span>End-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
+          <a href="monitoring.md">Monitoring <span>Prometheus, Grafana, alerts, and Telegram bot operations.</span></a>
+          <a href="ha.md">HA topology <span>Proxy role, backend pools, split routing, and failure model.</span></a>
+          <a href="security.md">Security model <span>Threat surface, REALITY guidance, host hardening, and secrets handling.</span></a>
+          <a href="ci.md">CI/CD <span>Public workflow boundaries, release rules, and local parity checks.</span></a>
+          <a href="testing.md">Testing <span>Repository test strategy and validation commands.</span></a>
+          <a href="upgrades.md">Upgrades <span>Version bumps, rollback, cleanup, and operational recovery.</span></a>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <div class="support">
+          <div>
+            <h2>Support maintenance</h2>
+            <p>
+              Donations help fund bug fixes, documentation, release work, and operator tooling for the project.
+            </p>
+          </div>
+          <a class="button primary" href="donate/">Donate</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      Source-available under the Attribution-NonCommercial Source License 1.0 (ovpn). Commercial use requires separate permission.
+    </footer>
+  </body>
+</html>
