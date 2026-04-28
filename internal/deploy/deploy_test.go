@@ -112,9 +112,23 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if string(gotCfg) != string(override) {
 		t.Fatalf("config override mismatch")
 	}
+	cfgInfo, err := os.Stat(filepath.Join(bundle.Dir, "xray", "config.json"))
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if got := cfgInfo.Mode().Perm(); got != 0o644 {
+		t.Fatalf("config mode = %o, want 644", got)
+	}
 	gotEnv, err := os.ReadFile(filepath.Join(bundle.Dir, ".env"))
 	if err != nil {
 		t.Fatalf("read env: %v", err)
+	}
+	envInfo, err := os.Stat(filepath.Join(bundle.Dir, ".env"))
+	if err != nil {
+		t.Fatalf("stat env: %v", err)
+	}
+	if got := envInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf(".env mode = %o, want 600", got)
 	}
 	if !strings.Contains(string(gotEnv), "XRAY_IMAGE=ghcr.io/xtls/xray-core:26.3.27") {
 		t.Fatalf("missing xray image in env: %q", string(gotEnv))
@@ -153,12 +167,15 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		"monitoring/prometheus/rules/ovpn-alerts.yml",
 		"monitoring/alertmanager/alertmanager.yml",
 		"monitoring/telegram-bot",
+		"monitoring/grafana/provisioning/alerting",
 		"monitoring/grafana/provisioning/datasources/prometheus.yml",
 		"monitoring/grafana/provisioning/dashboards/dashboards.yml",
+		"monitoring/grafana/provisioning/plugins",
 		"monitoring/grafana/dashboards/ovpn-host.json",
 		"monitoring/grafana/dashboards/ovpn-containers.json",
 		"monitoring/grafana/dashboards/ovpn-agent.json",
 		"monitoring/grafana/dashboards/ovpn-users.json",
+		"monitoring/grafana/dashboards/ovpn-proxy.json",
 		"monitoring/secrets/telegram_bot_token",
 		"monitoring/secrets/telegram_admin_token",
 	} {
@@ -176,8 +193,14 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if !strings.Contains(string(alertCfg), "http://ovpn-telegram-bot:8080/alertmanager") {
 		t.Fatalf("expected alertmanager webhook receiver, got:\n%s", string(alertCfg))
 	}
-	if _, err := os.Stat(filepath.Join(bundle.Dir, "monitoring", "grafana", "dashboards", "ovpn-proxy.json")); !os.IsNotExist(err) {
-		t.Fatalf("expected non-proxy bundle to omit proxy dashboard, stat err=%v", err)
+	monitoringCompose, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.monitoring.yml"))
+	if err != nil {
+		t.Fatalf("read monitoring compose: %v", err)
+	}
+	for _, want := range []string{"--data.retention=168h", "/run/udev:/run/udev:ro", "/dev/kmsg:/dev/kmsg:ro"} {
+		if !strings.Contains(string(monitoringCompose), want) {
+			t.Fatalf("expected monitoring compose to contain %q, got:\n%s", want, string(monitoringCompose))
+		}
 	}
 }
 
@@ -466,6 +489,12 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
 		t.Fatalf("fourth command should apply validated staged bundle, got %q", r.execCmds[3])
 	}
+	if !strings.Contains(r.execCmds[3], "sudo chown root:root /opt/ovpn/.env") || !strings.Contains(r.execCmds[3], "sudo chmod 600 /opt/ovpn/.env") {
+		t.Fatalf("fourth command should lock down .env after copy, got %q", r.execCmds[3])
+	}
+	if !strings.Contains(r.execCmds[3], "sudo chown root:root /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 644 /opt/ovpn/xray/config.json") {
+		t.Fatalf("fourth command should keep xray config portable across container runtime users, got %q", r.execCmds[3])
+	}
 	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[4], "up -d --force-recreate --remove-orphans") {
 		t.Fatalf("expected compose up command, got %q", r.execCmds[4])
 	}
@@ -565,6 +594,12 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	}
 	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
 		t.Fatalf("expected extract command to use bounded remote timeout, got %#v", r.execCmds)
+	}
+	if !strings.Contains(r.execCmds[0], "sudo chown root:root /opt/ovpn/.incoming/.env") || !strings.Contains(r.execCmds[0], "sudo chmod 600 /opt/ovpn/.incoming/.env") {
+		t.Fatalf("extract command should lock down staged .env before validation, got %#v", r.execCmds)
+	}
+	if !strings.Contains(r.execCmds[0], "sudo chown root:root /opt/ovpn/.incoming/xray/config.json") || !strings.Contains(r.execCmds[0], "sudo chmod 644 /opt/ovpn/.incoming/xray/config.json") {
+		t.Fatalf("extract command should keep staged xray config portable across container runtime users before validation, got %#v", r.execCmds)
 	}
 }
 

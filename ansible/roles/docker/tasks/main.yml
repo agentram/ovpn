@@ -51,6 +51,51 @@
     state: present
     update_cache: true
 
+- name: Configure Docker daemon defaults
+  when: ovpn_manage_docker_daemon | default(true) | bool
+  block:
+    - name: Check existing Docker daemon config
+      ansible.builtin.stat:
+        path: /etc/docker/daemon.json
+      register: docker_daemon_config_stat
+
+    - name: Read existing Docker daemon config
+      ansible.builtin.slurp:
+        path: /etc/docker/daemon.json
+      register: docker_daemon_config_raw
+      when: docker_daemon_config_stat.stat.exists
+
+    - name: Initialize Docker daemon config
+      ansible.builtin.set_fact:
+        docker_existing_daemon_config: {}
+
+    - name: Parse existing Docker daemon config
+      ansible.builtin.set_fact:
+        docker_existing_daemon_config: "{{ docker_daemon_config_raw.content | b64decode | from_json }}"
+      when:
+        - docker_daemon_config_stat.stat.exists
+        - (docker_daemon_config_raw.content | b64decode | trim | length) > 0
+
+    - name: Build merged Docker daemon config
+      ansible.builtin.set_fact:
+        docker_merged_daemon_config: >-
+          {{
+            docker_existing_daemon_config | combine({
+              'live-restore': ovpn_docker_live_restore | default(true) | bool,
+              'log-driver': ovpn_docker_log_driver | default('json-file'),
+              'log-opts': (docker_existing_daemon_config.get('log-opts', {}) | combine(ovpn_docker_log_opts | default({'max-size': '10m', 'max-file': '5'})))
+            }, recursive=True)
+          }}
+
+    - name: Write merged Docker daemon config
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: "0644"
+        content: "{{ docker_merged_daemon_config | to_nice_json }}\n"
+      notify: Restart docker
+
 - name: Enable and start Docker
   ansible.builtin.service:
     name: docker

@@ -16,6 +16,7 @@ ovpn_ssh_pubkey_auth_only: true
 ovpn_ssh_login_grace_time: "30s"
 ovpn_ssh_max_auth_tries: 3
 ovpn_ssh_allow_tcp_forwarding: false
+ovpn_ssh_allow_agent_forwarding: false
 ovpn_ssh_x11_forwarding: false
 ovpn_ssh_client_alive_interval: 300
 ovpn_ssh_client_alive_count_max: 2
@@ -27,6 +28,11 @@ ovpn_firewall_allow_http: false
 ovpn_firewall_allow_https: true
 ovpn_firewall_extra_tcp_ports: []
 ovpn_firewall_extra_udp_ports: []
+ovpn_firewall_remove_tcp_ports: []
+
+# Optional cleanup for explicitly declared apt source files and packages.
+ovpn_remove_apt_source_files: []
+ovpn_purge_packages: []
 
 # Fail2ban defaults
 ovpn_fail2ban_bantime: "1h"
@@ -47,17 +53,35 @@ ovpn_tor_exit_block_port: 443
 ovpn_tor_exit_list_url: "https://check.torproject.org/torbulkexitlist"
 ovpn_tor_update_schedule: "daily"
 
-# Optional unattended security updates (low-risk baseline)
+# Optional unattended security updates (low-risk baseline).
+# Normal Ubuntu updates, Docker updates, and reboots remain manual maintenance
+# tasks by default. Add host-specific package blacklists only when needed.
 ovpn_enable_unattended_upgrades: true
+ovpn_unattended_enable_ubuntu_updates: false
+ovpn_unattended_auto_reboot: false
+ovpn_unattended_auto_reboot_with_users: false
+ovpn_unattended_auto_reboot_time: "03:30"
+ovpn_unattended_package_blacklist: []
 
 # Clean-server optimization defaults
-ovpn_purge_legacy_nginx: true
 ovpn_enable_swapfile: true
 ovpn_swapfile_path: "/swapfile"
 ovpn_swapfile_size_mb: 1024
 ovpn_swapfile_swappiness: 10
 ovpn_journald_system_max_use: "200M"
 ovpn_journald_runtime_max_use: "100M"
+
+# Docker daemon defaults for predictable runtime behavior during maintenance.
+ovpn_manage_docker_daemon: true
+ovpn_docker_live_restore: true
+ovpn_docker_log_driver: "json-file"
+ovpn_docker_log_opts:
+  max-size: "10m"
+  max-file: "5"
+
+# Optional OVPN-focused login banner.
+ovpn_manage_motd: true
+ovpn_disable_motd_news: true
 
 # Optional initial stack deployment scaffolding
 ovpn_prepare_base_stack: false

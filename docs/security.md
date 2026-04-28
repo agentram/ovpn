@@ -10,7 +10,7 @@ Recommended production model:
 - SSH control plane on `22/tcp`
 - Ansible for host baseline and hardening
 - `ovpn` for runtime lifecycle
-- No nginx/certbot layer in the recommended flow
+- No external reverse-proxy or certificate-management layer is required in the recommended flow
 
 ## Threat-surface baseline
 
@@ -79,10 +79,43 @@ Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentiona
 - Prefer key-only auth.
 - Keep root access policy explicit and controlled by inventory.
 - Use fail2ban/UFW through Ansible policy, not ad-hoc commands.
-- Recommended host is clean ovpn-only.
-- Legacy nginx packages are purged by default (`ovpn_purge_legacy_nginx: true`).
+- Recommended host is clean ovpn-only; Ansible should not remove unrelated services unless explicitly declared in inventory.
+- SSH agent forwarding is disabled by default (`ovpn_ssh_allow_agent_forwarding: false`).
+- Obsolete public firewall allows can be removed with `ovpn_firewall_remove_tcp_ports`.
+- Explicitly declared apt source files and packages can be removed with `ovpn_remove_apt_source_files` and `ovpn_purge_packages`; keep these lists empty unless a host needs cleanup.
+- Existing runtime secrets and backup archives are locked down when present; missing files are ignored so fresh hosts still bootstrap cleanly. The Xray config keeps portable read permissions so container image UID changes do not break startup.
+- Docker daemon defaults enable live-restore and json-file log rotation.
+- Docker daemon defaults are merged into existing `/etc/docker/daemon.json` content so unrelated daemon settings are preserved.
+- The optional OVPN MOTD summarizes host role, domain, deploy root, VPN port, monitoring tunnel policy, and the no-auto-reboot policy.
 - Journald limits are enforced by default (`ovpn_journald_system_max_use=200M`, `ovpn_journald_runtime_max_use=100M`).
 - Swapfile is enabled by default (`ovpn_enable_swapfile: true`, `ovpn_swapfile_size_mb: 1024`, `ovpn_swapfile_swappiness: 10`).
+
+Use `playbooks/bootstrap.yml` for fresh hosts. Use `playbooks/host-maintenance.yml` for already-deployed hosts when you need to apply host baseline changes without rewriting `/opt/ovpn` runtime scaffolding.
+
+## Unattended upgrades policy
+
+Ansible enables unattended upgrades with a conservative host-maintenance policy:
+
+- Ubuntu security and ESM security updates are automatic.
+- Normal Ubuntu `-updates` are manual unless `ovpn_unattended_enable_ubuntu_updates=true`.
+- Docker repository packages remain manual maintenance because upgrades may restart container runtime components.
+- Automatic reboot is disabled unless `ovpn_unattended_auto_reboot=true`.
+- Host-specific package blacklists can be set with `ovpn_unattended_package_blacklist`.
+
+Defaults:
+
+```yaml
+ovpn_enable_unattended_upgrades: true
+ovpn_unattended_enable_ubuntu_updates: false
+ovpn_unattended_auto_reboot: false
+ovpn_unattended_auto_reboot_with_users: false
+ovpn_unattended_auto_reboot_time: "03:30"
+ovpn_unattended_package_blacklist: []
+```
+
+Pending MOTD updates can still appear for normal Ubuntu updates, Docker packages, held packages, or a reboot required by an already-installed kernel. Treat those as manual maintenance signals, not as unattended-upgrades failure.
+
+Ansible does not reboot hosts by default. Reboots remain an explicit operator maintenance action.
 
 ## Optional Tor exit-node host profile
 
@@ -153,6 +186,7 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 - Local DB (`~/.ovpn/ovpn.db`) contains sensitive metadata.
 - Remote runtime (`/opt/ovpn`) contains runtime secrets/config.
 - Backups may contain secrets and must be treated as sensitive.
+- Deploy and host maintenance keep `/opt/ovpn/.env` at `root:root 0600`, Xray config at `root:root 0644`, and backup archives at `root:root 0600`.
 - Keep inventory secrets in `ansible-vault`.
 - Logs redact `vless://` links and common secret-like inline values (`password`, `token`, `private_key`), but avoid logging secrets intentionally.
 

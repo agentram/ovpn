@@ -1,0 +1,10 @@
+---
+- name: Apply ovpn host maintenance without touching runtime scaffolding
+  hosts: vpn_servers:proxy_servers
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: common
+    - role: docker
+    - role: security

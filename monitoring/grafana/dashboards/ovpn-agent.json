@@ -74,7 +74,8 @@
         }
       ],
       "title": "Xray API Reachable",
-      "type": "stat"
+      "type": "stat",
+      "description": "1 means ovpn-agent can reach the Xray API endpoint. 0 means runtime stats and user enforcement may be stale."
     },
     {
       "datasource": {
@@ -133,7 +134,8 @@
         }
       ],
       "title": "Collector Last Success Age",
-      "type": "stat"
+      "type": "stat",
+      "description": "Seconds since the last successful ovpn-agent collector run. Lower is better; sustained growth means collection is stuck."
     },
     {
       "datasource": {
@@ -175,7 +177,8 @@
         }
       ],
       "title": "Users Active",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current number of users with effective runtime access after manual enabled flags, quota blocks, and expiry are applied."
     },
     {
       "datasource": {
@@ -217,7 +220,8 @@
         }
       ],
       "title": "Blocked Users",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current users blocked by quota enforcement."
     },
     {
       "datasource": {
@@ -243,7 +247,8 @@
                 "value": 60
               }
             ]
-          }
+          },
+          "noValue": "Not configured"
         },
         "overrides": []
       },
@@ -270,12 +275,13 @@
       },
       "targets": [
         {
-          "expr": "min(ovpn_agent_cert_days_until_expiry)",
+          "expr": "min(ovpn_agent_cert_days_until_expiry > -365)",
           "refId": "A"
         }
       ],
-      "title": "Cert Days Remaining",
-      "type": "stat"
+      "title": "TLS Cert Days Remaining",
+      "type": "stat",
+      "description": "Shows only configured certificate files. Empty means certificate monitoring is not configured for this host."
     },
     {
       "datasource": {
@@ -334,7 +340,8 @@
         }
       ],
       "title": "Collector Errors (1h)",
-      "type": "stat"
+      "type": "stat",
+      "description": "Collector error count over the last hour. Zero is expected during normal operation."
     },
     {
       "datasource": {
@@ -376,7 +383,8 @@
         }
       ],
       "title": "Users >=80% Quota",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current users whose rolling 30 day usage is at or above 80% of their quota."
     },
     {
       "datasource": {
@@ -418,7 +426,8 @@
         }
       ],
       "title": "Users >=95% Quota",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current users whose rolling 30 day usage is at or above 95% of their quota."
     },
     {
       "datasource": {
@@ -453,7 +462,8 @@
         }
       ],
       "title": "Collector Runs (15m)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Successful and failed collector runs in each 15 minute window. A flat success line means collection cadence is stable."
     },
     {
       "datasource": {
@@ -493,7 +503,8 @@
         }
       ],
       "title": "Collector Duration",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Average and p95 collector run duration. Spikes can indicate slow Xray API calls or local state writes."
     },
     {
       "datasource": {
@@ -528,7 +539,8 @@
         }
       ],
       "title": "Collector Last Success Age",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Seconds since the last successful ovpn-agent collector run. Lower is better; sustained growth means collection is stuck."
     },
     {
       "datasource": {
@@ -557,13 +569,14 @@
       },
       "targets": [
         {
-          "expr": "sum by(operation) (increase(ovpn_agent_db_write_errors_total[1h]))",
-          "legendFormat": "{{operation}}",
+          "expr": "sum(increase(ovpn_agent_db_write_errors_total[1h])) or vector(0)",
+          "legendFormat": "db errors",
           "refId": "A"
         }
       ],
       "title": "DB Write/Read Errors (1h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Zero is expected during normal operation. Non-zero means the agent failed to read or write local state."
     },
     {
       "datasource": {
@@ -592,13 +605,14 @@
       },
       "targets": [
         {
-          "expr": "sum by(operation,result) (increase(ovpn_agent_runtime_operations_total[1h]))",
-          "legendFormat": "{{operation}} {{result}}",
+          "expr": "sum(increase(ovpn_agent_runtime_operations_total[1h])) or vector(0)",
+          "legendFormat": "operations",
           "refId": "A"
         }
       ],
       "title": "Runtime Operations (1h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Runtime operations are sparse; zero means no deploy/restart-style operations in the selected window."
     },
     {
       "datasource": {
@@ -627,13 +641,14 @@
       },
       "targets": [
         {
-          "expr": "sum by(action,result) (increase(ovpn_agent_quota_events_total[24h]))",
-          "legendFormat": "{{action}} {{result}}",
+          "expr": "sum(increase(ovpn_agent_quota_events_total[24h])) or vector(0)",
+          "legendFormat": "quota events",
           "refId": "A"
         }
       ],
       "title": "Quota Events (24h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Quota block/unblock events are sparse; zero is normal when no users crossed quota boundaries."
     },
     {
       "datasource": {
@@ -662,18 +677,19 @@
       },
       "targets": [
         {
-          "expr": "increase(ovpn_agent_collector_counter_resets_total[24h])",
+          "expr": "sum(increase(ovpn_agent_collector_counter_resets_total[24h])) or vector(0)",
           "legendFormat": "counter resets",
           "refId": "A"
         },
         {
-          "expr": "increase(ovpn_agent_user_spike_events_total[24h])",
+          "expr": "sum(increase(ovpn_agent_user_spike_events_total[24h])) or vector(0)",
           "legendFormat": "spike events",
           "refId": "B"
         }
       ],
       "title": "Anomaly Signals (24h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Zero is normal. These counters highlight suspicious collector resets or unusual user-traffic spikes."
     },
     {
       "datasource": {
@@ -718,7 +734,8 @@
         }
       ],
       "title": "Health and Activity",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Combined view of health-check successes, users seen by the collector, and currently active users."
     },
     {
       "datasource": {
@@ -763,7 +780,8 @@
         }
       ],
       "title": "Quota Pressure",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Current quota pressure counts: users over 80%, users over 95%, and blocked users."
     },
     {
       "datasource": {
@@ -822,7 +840,8 @@
         }
       ],
       "title": "Users Expiring <=2d",
-      "type": "stat"
+      "type": "stat",
+      "description": "Users with effective access that expire within the next two UTC days."
     },
     {
       "datasource": {
@@ -881,7 +900,8 @@
         }
       ],
       "title": "Expired Users",
-      "type": "stat"
+      "type": "stat",
+      "description": "Users whose expiry cutoff has passed."
     },
     {
       "datasource": {

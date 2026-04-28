@@ -1,0 +1,12 @@
+#!/bin/sh
+cat <<'MOTD'
+
+OVPN service host
+  Role: {{ 'proxy' if 'proxy_servers' in group_names else 'vpn-server' }}
+  Domain: {{ ovpn_domain | default(inventory_hostname) }}
+  Deploy root: {{ ovpn_deploy_root | default('/opt/ovpn') }}
+  Public VPN port: {{ ovpn_xray_inbound_port | default(443) }}/tcp
+  Monitoring: {{ 'SSH tunnel enabled for local Grafana access' if (ovpn_ssh_allow_tcp_forwarding | default(false) | bool) else 'SSH tunnel disabled by policy' }}
+  Maintenance: unattended security updates only; no automatic reboot
+
+MOTD

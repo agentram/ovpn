@@ -61,7 +61,8 @@
         }
       ],
       "title": "Users Seen",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current number of users exported by ovpn-agent for this local server."
     },
     {
       "datasource": {
@@ -103,7 +104,8 @@
         }
       ],
       "title": "Quota Enabled Users",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current users with quota enforcement enabled."
     },
     {
       "datasource": {
@@ -162,7 +164,8 @@
         }
       ],
       "title": "Blocked Users",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current users blocked by quota enforcement."
     },
     {
       "datasource": {
@@ -204,7 +207,8 @@
         }
       ],
       "title": "Total Traffic (All Users)",
-      "type": "stat"
+      "type": "stat",
+      "description": "Total accumulated traffic reported by Xray for the selected users on this local server."
     },
     {
       "datasource": {
@@ -247,7 +251,8 @@
         }
       ],
       "title": "Avg Quota Usage",
-      "type": "stat"
+      "type": "stat",
+      "description": "Average rolling 30 day quota usage percentage across selected users."
     },
     {
       "datasource": {
@@ -290,7 +295,8 @@
         }
       ],
       "title": "Max Quota Usage",
-      "type": "stat"
+      "type": "stat",
+      "description": "Highest rolling 30 day quota usage percentage among selected users."
     },
     {
       "datasource": {
@@ -332,7 +338,8 @@
         }
       ],
       "title": "Top Users by Total Traffic",
-      "type": "bargauge"
+      "type": "bargauge",
+      "description": "Top users by accumulated total traffic on this local server."
     },
     {
       "datasource": {
@@ -392,7 +399,34 @@
         }
       ],
       "title": "Quota Usage % by User",
-      "type": "bargauge"
+      "type": "bargauge",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Quota usage %"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -432,7 +466,34 @@
         }
       ],
       "title": "Total Traffic by User",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Total traffic"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -472,7 +533,34 @@
         }
       ],
       "title": "Rolling 30d Usage by User",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "30d usage"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -512,7 +600,34 @@
         }
       ],
       "title": "Rolling 30d Quota by User",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "30d quota"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -570,7 +685,8 @@
         }
       ],
       "title": "Quota Usage % by User",
-      "type": "table"
+      "type": "table",
+      "description": "Rolling 30 day quota usage percentage per selected user."
     },
     {
       "datasource": {
@@ -623,7 +739,34 @@
         }
       ],
       "title": "Blocked by Quota (1/0)",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Blocked"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -676,7 +819,34 @@
         }
       ],
       "title": "Quota Enabled (1/0)",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Quota enabled"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -721,7 +891,8 @@
         }
       ],
       "title": "Quota Pressure Trend",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Trend of users over 80%, users over 95%, and users blocked by quota."
     },
     {
       "datasource": {
@@ -761,7 +932,8 @@
         }
       ],
       "title": "User Activity Trend",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Trend of users seen by the collector and users currently active after policy enforcement."
     },
     {
       "datasource": {
@@ -806,7 +978,8 @@
         }
       ],
       "title": "Traffic Totals by Direction",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Total uplink, downlink, and combined traffic for the selected users."
     },
     {
       "datasource": {
@@ -865,7 +1038,8 @@
         }
       ],
       "title": "Users Expiring <=2d",
-      "type": "stat"
+      "type": "stat",
+      "description": "Users with effective access that expire within the next two UTC days."
     },
     {
       "datasource": {
@@ -924,7 +1098,8 @@
         }
       ],
       "title": "Expired Users",
-      "type": "stat"
+      "type": "stat",
+      "description": "Users whose expiry cutoff has passed."
     },
     {
       "datasource": {
@@ -998,7 +1173,34 @@
         }
       ],
       "title": "Days Until Expiry by User",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Days until expiry"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -1051,7 +1253,34 @@
         }
       ],
       "title": "Expired (1/0)",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Expired"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     },
     {
       "datasource": {
@@ -1104,7 +1333,34 @@
         }
       ],
       "title": "Effective Enabled (1/0)",
-      "type": "table"
+      "type": "table",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "direction": true,
+              "instance": true,
+              "job": true,
+              "inbound_tag": true,
+              "uuid": true
+            },
+            "indexByName": {
+              "email": 0,
+              "expiry_date": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "email": "User",
+              "expiry_date": "Expiry date",
+              "Value": "Effective enabled"
+            }
+          }
+        }
+      ],
+      "description": "Compact latest-value table; Prometheus metric/internal labels are hidden for operator readability."
     }
   ],
   "refresh": "30s",
@@ -1154,7 +1410,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "ovpn User Statistics",
+  "title": "ovpn User Statistics (Local Server)",
   "uid": "ovpn-users",
   "version": 2,
   "weekStart": ""
