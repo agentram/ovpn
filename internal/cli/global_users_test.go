@@ -139,7 +139,7 @@ func TestMaterializePreservesExistingServerStyledEmail(t *testing.T) {
 	t.Parallel()
 
 	app := newGlobalUsersTestApp(t)
-	source := addGlobalUsersTestServer(t, app.store, "germany-1")
+	source := addGlobalUsersTestServer(t, app.store, "node-a")
 	target := addGlobalUsersTestServer(t, app.store, "finland-1")
 
 	u := &model.User{

@@ -20,4 +20,4 @@ ClientAliveCountMax {{ ovpn_ssh_client_alive_count_max }}
 AllowTcpForwarding {{ 'yes' if (ovpn_ssh_allow_tcp_forwarding | bool) else 'no' }}
 X11Forwarding {{ 'yes' if (ovpn_ssh_x11_forwarding | bool) else 'no' }}
 PermitTunnel no
-AllowAgentForwarding yes
+AllowAgentForwarding {{ 'yes' if (ovpn_ssh_allow_agent_forwarding | default(false) | bool) else 'no' }}

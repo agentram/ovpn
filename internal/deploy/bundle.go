@@ -152,8 +152,10 @@ func RenderBundle(in Input) (*Bundle, error) {
 		"monitoring/alertmanager",
 		"monitoring/telegram-bot",
 		"monitoring/telegram-bot/assets",
+		"monitoring/grafana/provisioning/alerting",
 		"monitoring/grafana/provisioning/datasources",
 		"monitoring/grafana/provisioning/dashboards",
+		"monitoring/grafana/provisioning/plugins",
 		"monitoring/grafana/dashboards",
 		"monitoring/secrets",
 	} {
@@ -206,7 +208,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		in.TelegramAPIFallbackIPs,
 		proxyTelegramHAProxyURL(in.Server),
 	)
-	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o600); err != nil {
 		return nil, err
 	}
 	linkConfig := fmt.Sprintf("{\n  \"address\": %q,\n  \"server_name\": %q,\n  \"public_key\": %q,\n  \"short_id\": %q\n}\n",
@@ -243,21 +245,13 @@ func RenderBundle(in Input) (*Bundle, error) {
 		{asset: "templates/grafana-dashboard-containers.json", dst: "monitoring/grafana/dashboards/ovpn-containers.json", mode: 0o644},
 		{asset: "templates/grafana-dashboard-agent.json", dst: "monitoring/grafana/dashboards/ovpn-agent.json", mode: 0o644},
 		{asset: "templates/grafana-dashboard-users.json", dst: "monitoring/grafana/dashboards/ovpn-users.json", mode: 0o644},
+		{asset: "templates/grafana-dashboard-proxy.json", dst: "monitoring/grafana/dashboards/ovpn-proxy.json", mode: 0o644},
 	} {
 		raw, err := AssetFS.ReadFile(f.asset)
 		if err != nil {
 			return nil, err
 		}
 		if err := os.WriteFile(filepath.Join(tmpDir, f.dst), raw, f.mode); err != nil {
-			return nil, err
-		}
-	}
-	if in.Server.IsProxy() {
-		raw, err := AssetFS.ReadFile("templates/grafana-dashboard-proxy.json")
-		if err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(filepath.Join(tmpDir, "monitoring", "grafana", "dashboards", "ovpn-proxy.json"), raw, 0o644); err != nil {
 			return nil, err
 		}
 	}

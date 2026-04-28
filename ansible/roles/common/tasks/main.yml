@@ -8,3 +8,22 @@
 - name: Configure timezone
   ansible.builtin.command: "timedatectl set-timezone {{ ovpn_timezone }}"
   changed_when: false
+
+- name: Disable Ubuntu MOTD news (optional)
+  ansible.builtin.copy:
+    dest: /etc/default/motd-news
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      ENABLED=0
+  when: ovpn_disable_motd_news | default(true) | bool
+
+- name: Install OVPN MOTD script
+  ansible.builtin.template:
+    src: ovpn-motd.sh.j2
+    dest: /etc/update-motd.d/99-ovpn
+    owner: root
+    group: root
+    mode: "0755"
+  when: ovpn_manage_motd | default(true) | bool

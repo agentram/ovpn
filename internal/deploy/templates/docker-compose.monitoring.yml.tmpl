@@ -33,6 +33,7 @@ services:
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --web.external-url=http://alertmanager:9093
+      - --data.retention=168h
     volumes:
       - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     expose:
@@ -124,6 +125,7 @@ services:
       - --path.rootfs=/host
     volumes:
       - /:/host:ro,rslave
+      - /run/udev:/run/udev:ro
     expose:
       - "9100"
     logging:
@@ -149,6 +151,7 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker:/var/lib/docker:ro
       - /dev/disk:/dev/disk:ro
+      - /dev/kmsg:/dev/kmsg:ro
     expose:
       - "8080"
     logging:

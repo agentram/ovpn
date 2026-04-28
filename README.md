@@ -31,7 +31,7 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 
 ## Versioning
 
-- Current pinned version: `1.2.0`
+- Current pinned version: `1.3.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -71,7 +71,9 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 - Host hardening defaults now include:
   - journald cap (`200M` system, `100M` runtime),
   - swapfile `1 GB` with `vm.swappiness=10`,
-  - purge of legacy nginx packages.
+  - Docker daemon live-restore and json-file log defaults,
+  - optional apt source/package cleanup only when declared in inventory,
+  - OVPN-focused MOTD.
 
 ## Capacity defaults
 
@@ -134,7 +136,16 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml pla
 
 Start from the checked-in example inventory, then copy it privately to `ansible/inventories/production` before using real infrastructure values.
 
-Temporary non-ovpn exceptions (for example Zabbix `10050/tcp`) should be declared per-host via `ovpn_firewall_extra_tcp_ports`, not as global defaults.
+Temporary non-ovpn public port exceptions should be declared per-host via `ovpn_firewall_extra_tcp_ports`, not as global defaults. Remove obsolete broad allows with `ovpn_firewall_remove_tcp_ports`.
+
+For already-deployed hosts, apply host baseline changes without touching runtime scaffolding:
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --syntax-check
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host> --check --diff
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host>
+```
 
 ### 3. Register server in local state
 

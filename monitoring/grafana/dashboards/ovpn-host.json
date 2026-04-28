@@ -135,7 +135,8 @@
         }
       ],
       "title": "CPU Usage Now",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current host CPU usage percentage averaged across all cores."
     },
     {
       "datasource": {
@@ -195,7 +196,8 @@
         }
       ],
       "title": "Memory Usage Now",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current host memory usage percentage based on MemAvailable."
     },
     {
       "datasource": {
@@ -255,7 +257,8 @@
         }
       ],
       "title": "Swap Usage Now",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current swap usage percentage. Some swap usage is normal on small VPS hosts."
     },
     {
       "datasource": {
@@ -315,7 +318,8 @@
         }
       ],
       "title": "Root Disk Usage",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current root filesystem usage percentage."
     },
     {
       "datasource": {
@@ -373,7 +377,8 @@
         }
       ],
       "title": "Root Free Bytes",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current free bytes on the root filesystem."
     },
     {
       "datasource": {
@@ -431,7 +436,8 @@
         }
       ],
       "title": "Load 1m",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current one-minute host load average."
     },
     {
       "datasource": {
@@ -472,7 +478,8 @@
         }
       ],
       "title": "Uptime",
-      "type": "stat"
+      "type": "stat",
+      "description": "Seconds since the host last booted."
     },
     {
       "datasource": {
@@ -523,7 +530,8 @@
         }
       ],
       "title": "CPU Mode Breakdown",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "CPU time split by user, system, iowait, and idle modes."
     },
     {
       "datasource": {
@@ -559,7 +567,8 @@
         }
       ],
       "title": "CPU Usage %",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Overall host CPU usage percentage over time."
     },
     {
       "datasource": {
@@ -608,7 +617,8 @@
         }
       ],
       "title": "Memory Breakdown",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Host memory split into used, available, cached, and buffers."
     },
     {
       "datasource": {
@@ -642,7 +652,8 @@
         }
       ],
       "title": "Swap Used",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Swap bytes currently in use."
     },
     {
       "datasource": {
@@ -687,7 +698,8 @@
         }
       ],
       "title": "Load Average",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "One, five, and fifteen minute host load averages."
     },
     {
       "datasource": {
@@ -726,7 +738,8 @@
         }
       ],
       "title": "Network Throughput by Interface",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Receive and transmit throughput per non-loopback physical interface."
     },
     {
       "datasource": {
@@ -765,7 +778,8 @@
         }
       ],
       "title": "Disk Throughput by Device",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Read and write throughput per block device."
     },
     {
       "datasource": {
@@ -804,7 +818,8 @@
         }
       ],
       "title": "Disk IOPS by Device",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Read and write operations per second by block device."
     },
     {
       "datasource": {
@@ -840,7 +855,8 @@
         }
       ],
       "title": "Disk IO Saturation",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Disk IO time percentage by block device."
     },
     {
       "datasource": {
@@ -876,7 +892,8 @@
         }
       ],
       "title": "Filesystem Usage % by Mount",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Filesystem usage percentage by mountpoint, excluding temporary and overlay filesystems."
     },
     {
       "datasource": {
@@ -915,7 +932,8 @@
         }
       ],
       "title": "Context Switches / Interrupts",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Host context-switch and interrupt rates, useful for spotting scheduler or interrupt pressure."
     },
     {
       "datasource": {
@@ -959,7 +977,8 @@
         }
       ],
       "title": "Process and File Descriptor Pressure",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Runnable/blocked process counts and file descriptor usage percentage."
     },
     {
       "datasource": {
@@ -1003,7 +1022,8 @@
         }
       ],
       "title": "TCP Connection States",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Current TCP connection state counters from node exporter."
     },
     {
       "datasource": {
@@ -1050,7 +1070,8 @@
         }
       ],
       "title": "Filesystem Breakdown (Usage / Free / Inodes)",
-      "type": "table"
+      "type": "table",
+      "description": "Current filesystem usage, free bytes, and inode usage by mountpoint."
     },
     {
       "datasource": {
@@ -1090,7 +1111,8 @@
         }
       ],
       "title": "Network by Interface (Current)",
-      "type": "table"
+      "type": "table",
+      "description": "Current network throughput by interface."
     },
     {
       "datasource": {
@@ -1137,7 +1159,8 @@
         }
       ],
       "title": "Block Device Utilization (Current)",
-      "type": "table"
+      "type": "table",
+      "description": "Current disk utilization, read throughput, and write throughput by block device."
     },
     {
       "datasource": {
@@ -1179,7 +1202,8 @@
         }
       ],
       "title": "Memory Available (MiB)",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current available host memory in MiB. Low values indicate memory pressure."
     },
     {
       "datasource": {
@@ -1239,7 +1263,8 @@
         }
       ],
       "title": "Root Inode Usage %",
-      "type": "stat"
+      "type": "stat",
+      "description": "Current root filesystem inode usage percentage."
     },
     {
       "datasource": {
@@ -1275,7 +1300,8 @@
         }
       ],
       "title": "CPU Usage by Core %",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Per-core CPU usage percentage."
     },
     {
       "datasource": {
@@ -1315,7 +1341,8 @@
         }
       ],
       "title": "Root Disk Free Forecast (24h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Root filesystem free-space trend plus 24 hour linear forecast."
     }
   ],
   "refresh": "30s",

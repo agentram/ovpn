@@ -68,11 +68,13 @@ ssh <ssh-user>@<server-ip> 'test -s /opt/ovpn/monitoring/secrets/telegram_bot_to
 
 ## Host update runbook (Ansible)
 
+For already-deployed hosts, use the maintenance playbook. It applies common packages, Docker daemon defaults, SSH/firewall/fail2ban policy, optional declared cleanup, and runtime file permission hardening without re-rendering the OVPN runtime scaffold.
+
 ```bash
 cd ansible
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --syntax-check
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --limit <host> --check --diff
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --limit <host>
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --syntax-check
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host> --check --diff
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host>
 ```
 
 Then re-validate runtime:
@@ -81,6 +83,8 @@ Then re-validate runtime:
 ./ovpn doctor <server>
 ./ovpn server status <server>
 ```
+
+The maintenance playbook must not reboot the host. If `/var/run/reboot-required` exists, schedule a separate maintenance window.
 
 ## Rollback runbook
 

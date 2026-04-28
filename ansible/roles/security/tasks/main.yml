@@ -47,34 +47,118 @@
           APT::Periodic::AutocleanInterval "7";
           APT::Periodic::Unattended-Upgrade "1";
 
+    - name: Install ovpn unattended upgrades policy
+      ansible.builtin.template:
+        src: unattended-upgrades-ovpn.j2
+        dest: /etc/apt/apt.conf.d/52ovpn-unattended-upgrades
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Enable unattended-upgrades service
       ansible.builtin.service:
         name: unattended-upgrades
         state: started
         enabled: true
 
-- name: Purge legacy nginx packages (optional)
-  when: ovpn_purge_legacy_nginx | bool
-  block:
-    - name: Stop and disable nginx service
-      ansible.builtin.service:
-        name: nginx
-        state: stopped
-        enabled: false
-      failed_when: false
+- name: Disable unattended upgrades package config when unattended upgrades are off
+  when: not (ovpn_enable_unattended_upgrades | bool)
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Download-Upgradeable-Packages "0";
+      APT::Periodic::AutocleanInterval "7";
+      APT::Periodic::Unattended-Upgrade "0";
 
-    - name: Purge nginx packages
-      ansible.builtin.apt:
-        name:
-          - nginx
-          - nginx-common
-          - nginx-core
-          - nginx-full
-          - nginx-light
-          - nginx-extras
-        state: absent
-        purge: true
-        autoremove: true
+- name: Remove ovpn unattended upgrades policy when unattended upgrades are off
+  when: not (ovpn_enable_unattended_upgrades | bool)
+  ansible.builtin.file:
+    path: /etc/apt/apt.conf.d/52ovpn-unattended-upgrades
+    state: absent
+
+- name: Remove declared apt source files (optional)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ ovpn_remove_apt_source_files | default([]) }}"
+  register: security_removed_apt_sources
+
+- name: Refresh apt cache after apt source cleanup
+  ansible.builtin.apt:
+    update_cache: true
+  when:
+    - not ansible_check_mode
+    - security_removed_apt_sources is changed
+
+- name: Purge declared packages (optional)
+  ansible.builtin.apt:
+    name: "{{ ovpn_purge_packages | default([]) }}"
+    state: absent
+    purge: true
+    autoremove: true
+  when: (ovpn_purge_packages | default([]) | length) > 0
+
+- name: Check sensitive runtime files
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+  loop:
+    - path: "{{ ovpn_deploy_root }}/.env"
+      owner: root
+      group: root
+      mode: "0600"
+    - path: "{{ ovpn_xray_config_path }}"
+      owner: root
+      group: root
+      mode: "0644"
+  register: security_sensitive_runtime_files
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Lock down existing sensitive runtime files
+  ansible.builtin.file:
+    path: "{{ item.stat.path }}"
+    owner: "{{ item.item.owner }}"
+    group: "{{ item.item.group }}"
+    mode: "{{ item.item.mode }}"
+  loop: "{{ security_sensitive_runtime_files.results }}"
+  loop_control:
+    label: "{{ item.stat.path }}"
+  when: item.stat.exists
+
+- name: Check backup root
+  ansible.builtin.stat:
+    path: "{{ ovpn_backup_root }}"
+  register: security_backup_root
+
+- name: Lock down backup root
+  ansible.builtin.file:
+    path: "{{ ovpn_backup_root }}"
+    owner: root
+    group: root
+    mode: "0750"
+  when: security_backup_root.stat.exists
+
+- name: Find existing backup archives
+  ansible.builtin.find:
+    paths: "{{ ovpn_backup_root }}"
+    patterns: "*.tgz"
+    file_type: file
+  register: security_backup_archives
+  when: security_backup_root.stat.exists
+
+- name: Lock down existing backup archives
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ security_backup_archives.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
 
 - name: Configure journald disk limits
   block:
@@ -190,12 +274,12 @@
     - name: Set UFW default deny incoming
       ansible.builtin.command: ufw --force default deny incoming
       register: security_ufw_default_in
-      changed_when: "'Default incoming policy changed' in security_ufw_default_in.stdout"
+      changed_when: false
 
     - name: Set UFW default allow outgoing
       ansible.builtin.command: ufw --force default allow outgoing
       register: security_ufw_default_out
-      changed_when: "'Default outgoing policy changed' in security_ufw_default_out.stdout"
+      changed_when: false
 
     - name: Allow effective TCP ports
       ansible.builtin.command: "ufw allow {{ item }}/tcp"
@@ -212,6 +296,15 @@
         label: "{{ item }}/udp"
       register: security_ufw_allow_udp
       changed_when: "'Skipping' not in (security_ufw_allow_udp.stdout | default(''))"
+
+    - name: Remove obsolete TCP port allows
+      ansible.builtin.command: "ufw delete allow {{ item }}/tcp"
+      loop: "{{ ovpn_firewall_remove_tcp_ports | default([]) | map('int') | list }}"
+      loop_control:
+        label: "{{ item }}/tcp"
+      register: security_ufw_remove_tcp
+      changed_when: "'Rule deleted' in (security_ufw_remove_tcp.stdout | default(''))"
+      failed_when: false
 
     - name: Enable UFW firewall
       ansible.builtin.command: ufw --force enable

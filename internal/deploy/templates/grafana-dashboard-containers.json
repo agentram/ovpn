@@ -70,7 +70,7 @@
       },
       "targets": [
         {
-          "expr": "max((container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=\"xray\"} > 0) or vector(0))",
+          "expr": "max((time() - container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=\"xray\"}) < bool 120) or vector(0)",
           "refId": "A"
         }
       ],
@@ -126,7 +126,7 @@
       },
       "targets": [
         {
-          "expr": "max((container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=\"ovpn-agent\"} > 0) or vector(0))",
+          "expr": "max((time() - container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=\"ovpn-agent\"}) < bool 120) or vector(0)",
           "refId": "A"
         }
       ],
@@ -187,7 +187,7 @@
       },
       "targets": [
         {
-          "expr": "sum(max by(container_label_com_docker_compose_service) ((container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=~\"prometheus|alertmanager|grafana|node-exporter|cadvisor\"} > 0)))",
+          "expr": "sum(max by(container_label_com_docker_compose_service) ((time() - container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service=~\"prometheus|alertmanager|grafana|node-exporter|cadvisor\"}) < bool 120)) or vector(0)",
           "refId": "A"
         }
       ],
@@ -247,7 +247,7 @@
       },
       "targets": [
         {
-          "expr": "count(max by(container_label_com_docker_compose_service) ((container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"} > 0)))",
+          "expr": "sum(max by(container_label_com_docker_compose_service) ((time() - container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"}) < bool 120)) or vector(0)",
           "refId": "A"
         }
       ],
@@ -287,7 +287,8 @@
         }
       ],
       "title": "Container CPU % by Service",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Per-service CPU usage as a percent of one CPU core, averaged over five minutes."
     },
     {
       "datasource": {
@@ -321,7 +322,8 @@
         }
       ],
       "title": "Container Memory Working Set",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Per-service working-set memory: memory actively used by each container, excluding easily reclaimable cache."
     },
     {
       "datasource": {
@@ -360,7 +362,8 @@
         }
       ],
       "title": "Container Network Throughput",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Per-service receive and transmit network throughput in bits per second."
     },
     {
       "datasource": {
@@ -395,7 +398,8 @@
         }
       ],
       "title": "Container Restarts (1h)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Container restart count in the last hour, inferred from container start-time changes."
     },
     {
       "datasource": {
@@ -429,7 +433,8 @@
         }
       ],
       "title": "Service Age (seconds)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Seconds since each service container last started. A sudden drop usually means a restart or redeploy."
     },
     {
       "datasource": {
@@ -454,7 +459,7 @@
       },
       "targets": [
         {
-          "expr": "max by(container_label_com_docker_compose_service) ((container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"} > 0))",
+          "expr": "max by(container_label_com_docker_compose_service) ((time() - container_last_seen{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"}) < bool 120)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{container_label_com_docker_compose_service}}",
@@ -469,7 +474,8 @@
         }
       ],
       "title": "Service Presence and Last Seen Age",
-      "type": "table"
+      "type": "table",
+      "description": "For each service, shows whether cAdvisor has seen it recently and how many seconds ago it was last observed."
     },
     {
       "datasource": {
@@ -499,13 +505,14 @@
       },
       "targets": [
         {
-          "expr": "100 * sum by(container_label_com_docker_compose_service) (container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"}) / max(machine_memory_bytes{job=\"cadvisor\"})",
+          "expr": "100 * sum by(container_label_com_docker_compose_service) (container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_service!=\"\"}) / scalar(max(machine_memory_bytes{job=\"cadvisor\"}))",
           "legendFormat": "{{container_label_com_docker_compose_service}}",
           "refId": "A"
         }
       ],
       "title": "Container Memory % of Host by Service",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Container working-set memory as a percentage of host memory. Uses scalar host memory so per-service labels are preserved."
     },
     {
       "datasource": {
@@ -540,7 +547,8 @@
         }
       ],
       "title": "Top CPU Services (Top 5)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "The five services using the most CPU over the selected time window."
     },
     {
       "datasource": {
@@ -575,7 +583,8 @@
         }
       ],
       "title": "Restart Pressure (15m)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Container restart count in the last 15 minutes. Non-zero values are worth checking after unexpected outages."
     }
   ],
   "refresh": "30s",

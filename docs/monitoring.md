@@ -22,7 +22,7 @@ Default Grafana folder `ovpn` includes:
 - `ovpn Agent Overview`
 - `ovpn User Statistics (Local Server)` (per-user traffic and quota state for the current server)
 
-Proxy nodes add one extra dashboard:
+The proxy dashboard is included in generated monitoring bundles and is active only on proxy nodes:
 
 - `ovpn Proxy HA Overview`
 
@@ -38,6 +38,11 @@ Proxy nodes add one extra dashboard:
 `ovpn User Statistics` uses per-user `email` labels from `ovpn-agent` metrics. Treat Grafana/Prometheus access as sensitive.
 User identities are mirrored cluster-wide by CLI flows, but this dashboard remains local per server.
 Expiry state is also exported per user and uses UTC end-of-day semantics.
+Sparse operational panels such as runtime operations, quota events, anomaly signals, and DB errors show zero when no events occurred in the selected window.
+Certificate panels show no configured certificate instead of treating the agent's sentinel value as an expired certificate.
+If it is opened on a regular VPN host, the HAProxy scrape target is shown as not proxy and backend panels remain at zero.
+Container presence cards use a two-minute cAdvisor freshness window and display `1` for present or `0` for missing.
+Generated Grafana provisioning includes empty `alerting` and `plugins` directories so Grafana starts without missing-provisioning-directory noise.
 
 Quota-related metrics are rolling-window semantics:
 
@@ -74,6 +79,8 @@ Default alerts cover:
 - user expiry warning (`OVPNUserExpirySoon`) when an effectively enabled user is within the next 2 days of expiry
 - bot health:
   - `OVPNTelegramBotDown`
+
+Alertmanager is started with `--data.retention=168h` so the weekly user-expiry repeat interval fits within Alertmanager retention.
   - `OVPNTelegramBotPollingStale`
   - `OVPNTelegramBotSendFailures`
 

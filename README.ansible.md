@@ -21,7 +21,8 @@ The first built-in proxy preset is `ru`.
 - Root SSH is allowed by default.
 - SSH remains on port `22` in the recommended flow.
 - Firewall automation is enabled by default for clean ovpn-only hosts.
-- Legacy nginx packages are purged by default.
+- Unattended upgrades install security updates only by default.
+- Normal Ubuntu updates, Docker updates, and reboots remain manual maintenance tasks.
 - Journald disk limits are enforced (`200M` system, `100M` runtime).
 - Swapfile is enabled by default (`1GB`, `vm.swappiness=10`).
 
@@ -57,7 +58,6 @@ ovpn_ssh_password_auth: false
 ovpn_manage_firewall: true
 
 # Clean-server optimization defaults.
-ovpn_purge_legacy_nginx: true
 ovpn_enable_swapfile: true
 ovpn_swapfile_size_mb: 1024
 ovpn_swapfile_swappiness: 10
@@ -66,6 +66,13 @@ ovpn_journald_runtime_max_use: "100M"
 
 # Optional host-level Tor exit blocking for Xray 443 only (default off).
 ovpn_block_tor_exit_nodes: false
+
+# Optional unattended security updates. Keep downtime-producing reboots under
+# manual maintenance by default. Add host-specific package blacklists only when needed.
+ovpn_enable_unattended_upgrades: true
+ovpn_unattended_enable_ubuntu_updates: false
+ovpn_unattended_auto_reboot: false
+ovpn_unattended_package_blacklist: []
 ```
 
 ### 2. Validate and apply bootstrap
@@ -102,11 +109,28 @@ ssh -p 22 root@<server-ip> 'sudo ss -lntup'
 ssh -p 22 root@<server-ip> 'sudo docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 ```
 
-If you temporarily keep a non-ovpn service (for example Zabbix agent on `10050/tcp`), add only a host-specific firewall exception:
+If you temporarily keep a non-ovpn service, add only a host-specific firewall exception:
 
 ```yaml
 ovpn_firewall_extra_tcp_ports:
   - 10050
+```
+
+Unattended upgrades policy:
+
+- security and ESM security updates are automatic when `ovpn_enable_unattended_upgrades=true`
+- normal Ubuntu `-updates` are manual unless `ovpn_unattended_enable_ubuntu_updates=true`
+- Docker repository packages are manual maintenance by default
+- automatic reboot is disabled unless `ovpn_unattended_auto_reboot=true`
+- host-specific package blacklists can be set with `ovpn_unattended_package_blacklist`
+
+Manual maintenance window:
+
+```bash
+apt update
+apt list --upgradable
+apt full-upgrade
+reboot
 ```
 
 ## Handoff to ovpn runtime
