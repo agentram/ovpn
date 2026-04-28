@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.3.0
+
+### Changed
+- Added an Ansible host-maintenance playbook for already-deployed hosts so host baseline changes can be applied without rewriting runtime scaffolding.
+- Docker daemon management now merges live-restore and default json-file log rotation into existing daemon config for more predictable maintenance behavior.
+- SSH hardening now disables agent forwarding by default while preserving explicit TCP forwarding overrides for monitoring tunnels.
+- Host maintenance now supports optional declared apt source/package cleanup and obsolete UFW allow cleanup.
+- Login MOTD now shows OVPN service role, domain, deploy root, public VPN port, monitoring tunnel policy, and no-auto-reboot maintenance policy.
+- Monitoring compose now gives node_exporter/cAdvisor host metadata mounts and aligns Alertmanager retention with weekly expiry alert repeats.
+
+### Fixed
+- Existing OVPN runtime secret files and backup archives are locked down when present without failing on fresh hosts where those files do not exist yet.
+- Deploy now preserves the same runtime file permissions expected by host maintenance for `.env` and Xray config, avoiding permission drift after redeploys.
+- Generated Grafana provisioning now creates empty alerting/plugins directories to avoid missing-directory startup noise.
+
+## 1.2.1
+
+### Changed
+- Grafana dashboards now present sparse operational events as zero instead of empty panels, hide noisy Prometheus internals in user tables, and treat missing certificate monitoring as not configured rather than expired.
+- Container dashboard memory-percent panels now preserve per-service labels when dividing by host memory.
+- Proxy HA dashboard now distinguishes regular VPN hosts from proxy hosts instead of showing HAProxy as a broken scrape target on non-proxy deployments.
+- Ansible unattended-upgrades policy is now explicitly managed as security-only by default, with normal Ubuntu updates, Docker updates, and reboots left for manual maintenance.
+
+### Fixed
+- Host-specific unattended-upgrades package blacklists are now inventory-driven instead of hard-coded into the public defaults.
+- Container presence cards now display boolean `1`/`0` values instead of raw `container_last_seen` Unix timestamps.
+
 ## 1.2.0
 
 ### Added

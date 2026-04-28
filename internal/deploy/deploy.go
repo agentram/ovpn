@@ -98,7 +98,7 @@ func BootstrapRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 
 // buildExtractCommand builds extract command from the current inputs and defaults.
 func buildExtractCommand(remoteTar string) string {
-	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar -xzf %[2]s -C %[1]s; rm -f %[2]s", RemoteStageDir, remoteTar)
+	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar -xzf %[2]s -C %[1]s; rm -f %[2]s; if [ -f %[1]s/.env ]; then sudo chown root:root %[1]s/.env; sudo chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown root:root %[1]s/xray/config.json; sudo chmod 644 %[1]s/xray/config.json; fi", RemoteStageDir, remoteTar)
 }
 
 func shellQuote(v string) string {
@@ -175,7 +175,7 @@ func buildDeployApplyCommand() string {
 	// ETXTBSY ("Text file busy"). Same applies to ovpn-telegram-bot binary when monitoring is up.
 	// Unlink first, then copy staged files.
 	return fmt.Sprintf(
-		"set -e; token_file=%[1]s/monitoring/secrets/telegram_bot_token; token_backup=/tmp/ovpn-telegram-bot-token-prev; stage_token=%[2]s/monitoring/secrets/telegram_bot_token; admin_file=%[1]s/monitoring/secrets/telegram_admin_token; admin_backup=/tmp/ovpn-telegram-admin-token-prev; stage_admin=%[2]s/monitoring/secrets/telegram_admin_token; rm -f \"$token_backup\" \"$admin_backup\"; if [ -s \"$token_file\" ]; then cp -f \"$token_file\" \"$token_backup\"; fi; if [ -s \"$admin_file\" ]; then cp -f \"$admin_file\" \"$admin_backup\"; fi; mkdir -p %[1]s/agent %[1]s/monitoring/telegram-bot; rm -f %[1]s/agent/ovpn-agent %[1]s/monitoring/telegram-bot/ovpn-telegram-bot; cp -a %[2]s/. %[1]s/; mkdir -p %[1]s/monitoring/secrets; if [ ! -s \"$stage_token\" ] && [ -s \"$token_backup\" ]; then mv -f \"$token_backup\" \"$token_file\"; fi; if [ ! -s \"$stage_admin\" ] && [ -s \"$admin_backup\" ]; then mv -f \"$admin_backup\" \"$admin_file\"; fi; if [ -f \"$token_file\" ]; then chmod 600 \"$token_file\"; fi; if [ -f \"$admin_file\" ]; then chmod 600 \"$admin_file\"; fi; rm -f \"$token_backup\" \"$admin_backup\"",
+		"set -e; token_file=%[1]s/monitoring/secrets/telegram_bot_token; token_backup=/tmp/ovpn-telegram-bot-token-prev; stage_token=%[2]s/monitoring/secrets/telegram_bot_token; admin_file=%[1]s/monitoring/secrets/telegram_admin_token; admin_backup=/tmp/ovpn-telegram-admin-token-prev; stage_admin=%[2]s/monitoring/secrets/telegram_admin_token; rm -f \"$token_backup\" \"$admin_backup\"; if [ -s \"$token_file\" ]; then cp -f \"$token_file\" \"$token_backup\"; fi; if [ -s \"$admin_file\" ]; then cp -f \"$admin_file\" \"$admin_backup\"; fi; mkdir -p %[1]s/agent %[1]s/monitoring/telegram-bot; rm -f %[1]s/agent/ovpn-agent %[1]s/monitoring/telegram-bot/ovpn-telegram-bot; cp -a %[2]s/. %[1]s/; mkdir -p %[1]s/monitoring/secrets; if [ ! -s \"$stage_token\" ] && [ -s \"$token_backup\" ]; then mv -f \"$token_backup\" \"$token_file\"; fi; if [ ! -s \"$stage_admin\" ] && [ -s \"$admin_backup\" ]; then mv -f \"$admin_backup\" \"$admin_file\"; fi; if [ -f %[1]s/.env ]; then sudo chown root:root %[1]s/.env; sudo chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown root:root %[1]s/xray/config.json; sudo chmod 644 %[1]s/xray/config.json; fi; if [ -f \"$token_file\" ]; then chmod 600 \"$token_file\"; fi; if [ -f \"$admin_file\" ]; then chmod 600 \"$admin_file\"; fi; rm -f \"$token_backup\" \"$admin_backup\"",
 		RemoteDir,
 		RemoteStageDir,
 	)

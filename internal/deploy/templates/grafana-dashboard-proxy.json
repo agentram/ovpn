@@ -34,15 +34,38 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "blue",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
               },
               {
                 "color": "green",
                 "value": 1
               }
             ]
-          }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Up",
+                  "color": "green"
+                },
+                "-1": {
+                  "text": "Not proxy",
+                  "color": "blue"
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
@@ -69,12 +92,13 @@
       },
       "targets": [
         {
-          "expr": "max(up{job=\"haproxy\"}) or vector(0)",
+          "expr": "max(up{job=\"haproxy\"}) or vector(-1)",
           "refId": "A"
         }
       ],
-      "title": "HAProxy Metrics Reachable",
-      "type": "stat"
+      "title": "HAProxy Scrape Target",
+      "type": "stat",
+      "description": "Proxy-only panel. Not proxy means this dashboard is being viewed on a regular VPN host."
     },
     {
       "datasource": {
@@ -116,7 +140,8 @@
         }
       ],
       "title": "Healthy Foreign Backends",
-      "type": "stat"
+      "type": "stat",
+      "description": "Proxy-only: number of foreign backend servers currently marked UP by HAProxy."
     },
     {
       "datasource": {
@@ -158,7 +183,8 @@
         }
       ],
       "title": "Down Foreign Backends",
-      "type": "stat"
+      "type": "stat",
+      "description": "Proxy-only: number of foreign backend servers currently marked DOWN by HAProxy."
     },
     {
       "datasource": {
@@ -200,7 +226,8 @@
         }
       ],
       "title": "Backend State Changes (15m)",
-      "type": "stat"
+      "type": "stat",
+      "description": "Proxy-only: backend UP/DOWN state changes in the last 15 minutes. Non-zero can indicate flapping."
     },
     {
       "datasource": {
@@ -229,13 +256,14 @@
       },
       "targets": [
         {
-          "expr": "sum by(state) (haproxy_backend_status{proxy=\"foreign_backends\"})",
-          "legendFormat": "{{state}}",
+          "expr": "sum by(state) (haproxy_backend_status{proxy=\"foreign_backends\"}) or vector(0)",
+          "legendFormat": "backend state",
           "refId": "A"
         }
       ],
       "title": "Foreign Backend Pool Status",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Proxy-only: current HAProxy backend pool state split by UP/DOWN state."
     },
     {
       "datasource": {
@@ -264,13 +292,14 @@
       },
       "targets": [
         {
-          "expr": "sum by(server) (haproxy_server_check_up_down_total{proxy=\"foreign_backends\"})",
+          "expr": "sum by(server) (increase(haproxy_server_check_up_down_total{proxy=\"foreign_backends\"}[24h])) or vector(0)",
           "legendFormat": "{{server}}",
           "refId": "A"
         }
       ],
       "title": "Per-Backend Failover Events",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Proxy-only: backend health transition counts per backend over the selected window."
     },
     {
       "datasource": {
@@ -299,13 +328,14 @@
       },
       "targets": [
         {
-          "expr": "avg(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"haproxy\"}[5m]))",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"haproxy\"}[5m])) * 100 or vector(0)",
           "legendFormat": "haproxy",
           "refId": "A"
         }
       ],
       "title": "HAProxy CPU Usage",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Proxy-only: HAProxy container CPU usage as a percent of one CPU core."
     },
     {
       "datasource": {
@@ -334,13 +364,14 @@
       },
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_service=\"haproxy\"}",
+          "expr": "sum(container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_service=\"haproxy\"}) or vector(0)",
           "legendFormat": "haproxy",
           "refId": "A"
         }
       ],
       "title": "HAProxy Memory Working Set",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Proxy-only: HAProxy container working-set memory."
     }
   ],
   "refresh": "30s",
@@ -363,5 +394,6 @@
   "title": "ovpn Proxy HA Overview",
   "uid": "ovpn-proxy",
   "version": 1,
-  "weekStart": ""
+  "weekStart": "",
+  "description": "Proxy-only dashboard. On regular VPN hosts the HAProxy scrape target is shown as Not proxy and backend panels stay at zero."
 }
