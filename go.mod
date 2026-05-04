@@ -4,13 +4,13 @@ go 1.26.2
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/jedib0t/go-pretty/v6 v6.7.9
+	github.com/jedib0t/go-pretty/v6 v6.7.10
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
 	github.com/xtls/xray-core v1.260327.0
 	golang.org/x/crypto v0.50.0
-	google.golang.org/grpc v1.80.0
-	modernc.org/sqlite v1.49.1
+	google.golang.org/grpc v1.81.0
+	modernc.org/sqlite v1.50.0
 )
 
 require (
@@ -47,7 +47,7 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 	modernc.org/libc v1.72.0 // indirect
