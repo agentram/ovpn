@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.3.1
+
+### Changed
+- Refreshed Go module dependencies, including the CLI table renderer, gRPC, modernc SQLite, Prometheus support libraries, and `golang.org/x` modules.
+- Documented source-root resolution for installed `ovpn` binaries that run `init` or `deploy` outside the repository checkout.
+
+### Fixed
+- Installed `ovpn` binaries now resolve the project source root before building local runtime binaries, so `server init` no longer fails with a missing `go.mod` when launched from another directory.
+- Deploy workflows now validate local runtime binary builds before bootstrapping a remote host.
+
 ## 1.3.0
 
 ### Changed
