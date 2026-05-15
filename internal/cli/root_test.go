@@ -29,6 +29,85 @@ func TestNewRootCmdRegistersTopLevelCommands(t *testing.T) {
 	}
 }
 
+func TestResolveRepoRootUsesExplicitEnv(t *testing.T) {
+	root := testRepoRoot(t)
+	t.Setenv("OVPN_REPO_ROOT", root)
+
+	got, err := resolveRepoRoot(t.TempDir())
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	if got != root {
+		t.Fatalf("expected %q, got %q", root, got)
+	}
+}
+
+func TestResolveRepoRootRejectsRelativeEnv(t *testing.T) {
+	t.Setenv("OVPN_REPO_ROOT", "relative/path")
+
+	_, err := resolveRepoRoot(t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "OVPN_REPO_ROOT must be an absolute path") {
+		t.Fatalf("expected absolute path error, got %v", err)
+	}
+}
+
+func TestResolveRepoRootRejectsInvalidAbsoluteEnv(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("OVPN_REPO_ROOT", root)
+
+	_, err := resolveRepoRoot(t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "is not an ovpn source root") {
+		t.Fatalf("expected source root error, got %v", err)
+	}
+}
+
+func TestFindRepoRootWalksParents(t *testing.T) {
+	t.Parallel()
+
+	root := testRepoRoot(t)
+	nested := filepath.Join(root, "nested", "child")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatalf("make nested dir: %v", err)
+	}
+
+	got, ok := findRepoRoot(nested)
+	if !ok {
+		t.Fatal("expected repo root")
+	}
+	if got != root {
+		t.Fatalf("expected %q, got %q", root, got)
+	}
+}
+
+func TestResolveRepoRootFallsBackToCompiledSourceRoot(t *testing.T) {
+	t.Setenv("OVPN_REPO_ROOT", "")
+	expected, ok := compiledRepoRoot()
+	if !ok {
+		t.Skip("compiled source root is not available")
+	}
+
+	got, err := resolveRepoRoot(t.TempDir())
+	if err != nil {
+		t.Fatalf("resolve repo root: %v", err)
+	}
+	if got != expected {
+		t.Fatalf("expected %q, got %q", expected, got)
+	}
+}
+
+func TestIsRepoRootRequiresAllRuntimeSourceDirs(t *testing.T) {
+	root := testRepoRoot(t)
+	if !isRepoRoot(root) {
+		t.Fatal("expected complete test repo root")
+	}
+	if err := os.RemoveAll(filepath.Join(root, "cmd", "ovpn-telegram-bot")); err != nil {
+		t.Fatalf("remove telegram bot dir: %v", err)
+	}
+	if isRepoRoot(root) {
+		t.Fatal("expected incomplete repo root to be rejected")
+	}
+}
+
 func TestServerCommandTreeContainsExpectedSubcommands(t *testing.T) {
 	t.Parallel()
 
@@ -42,6 +121,22 @@ func TestServerCommandTreeContainsExpectedSubcommands(t *testing.T) {
 			t.Fatalf("expected server subcommand %q, got %v", want, names)
 		}
 	}
+}
+
+func testRepoRoot(t *testing.T) string {
+	t.Helper()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module ovpn\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "cmd", "ovpn-agent"), 0o755); err != nil {
+		t.Fatalf("make ovpn-agent dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "cmd", "ovpn-telegram-bot"), 0o755); err != nil {
+		t.Fatalf("make ovpn-telegram-bot dir: %v", err)
+	}
+	return root
 }
 
 func TestUserAddRequiresFlags(t *testing.T) {

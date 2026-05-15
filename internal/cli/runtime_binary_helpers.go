@@ -27,6 +27,9 @@ func (a *App) ensureAgentBinary() (string, error) {
 		a.log().Debug("using external ovpn-agent binary", "path", cleanPath)
 		return cleanPath, nil
 	}
+	if !isRepoRoot(a.repoRoot) {
+		return "", fmt.Errorf("locate ovpn source root: run from the ovpn checkout or set OVPN_REPO_ROOT=/absolute/path/to/ovpn")
+	}
 	goos := "linux"
 	goarch, err := normalizedAgentGOARCH(strings.TrimSpace(os.Getenv("OVPN_AGENT_GOARCH")))
 	if err != nil {
@@ -65,6 +68,9 @@ func (a *App) ensureTelegramBotBinary() (string, error) {
 		}
 		a.log().Debug("using external ovpn-telegram-bot binary", "path", cleanPath)
 		return cleanPath, nil
+	}
+	if !isRepoRoot(a.repoRoot) {
+		return "", fmt.Errorf("locate ovpn source root: run from the ovpn checkout or set OVPN_REPO_ROOT=/absolute/path/to/ovpn")
 	}
 	goos := "linux"
 	goarch, err := normalizedAgentGOARCH(strings.TrimSpace(os.Getenv("OVPN_TELEGRAM_BOT_GOARCH")))
