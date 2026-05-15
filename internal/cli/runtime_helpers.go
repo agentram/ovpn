@@ -46,6 +46,14 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	runner := a.newRunner("deploy")
 	sshCfg := sshFromServer(srv)
 	a.log().Info("starting deploy workflow", "server", srv.Name, "host", srv.Host, "bootstrap", bootstrap, "dry_run", a.dryRun)
+	agentBinary, err := a.ensureAgentBinary()
+	if err != nil {
+		return err
+	}
+	telegramBotBinary, err := a.ensureTelegramBotBinary()
+	if err != nil {
+		return err
+	}
 	if bootstrap {
 		if err = deploy.BootstrapRemote(a.ctx, runner, sshCfg); err != nil {
 			return fmt.Errorf("bootstrap remote host %s for server %s: %w", srv.Host, srv.Name, err)
@@ -66,14 +74,6 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 		return err
 	}
 	a.log().Debug("loaded users for deploy", "server", srv.Name, "users", len(users))
-	agentBinary, err := a.ensureAgentBinary()
-	if err != nil {
-		return err
-	}
-	telegramBotBinary, err := a.ensureTelegramBotBinary()
-	if err != nil {
-		return err
-	}
 	fallbackUpload, fallbackDownload, err := a.realityFallbackRateLimits()
 	if err != nil {
 		return err

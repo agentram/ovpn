@@ -52,13 +52,17 @@ func NewRootCmd() *cobra.Command {
 			if err := util.EnsureDir(app.dataDir); err != nil {
 				return fmt.Errorf("ensure data dir %s: %w", app.dataDir, err)
 			}
+			wd, _ := os.Getwd()
+			repoRoot, err := resolveRepoRoot(wd)
+			if err != nil {
+				return err
+			}
 			st, err := local.Open(app.ctx, app.dataDir)
 			if err != nil {
 				return fmt.Errorf("open local store: %w", err)
 			}
 			app.store = st
-			wd, _ := os.Getwd()
-			app.repoRoot = wd
+			app.repoRoot = repoRoot
 			app.logger.Debug("command context initialized", "data_dir", app.dataDir, "repo_root", app.repoRoot)
 			return nil
 		},

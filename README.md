@@ -31,7 +31,7 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 
 ## Versioning
 
-- Current pinned version: `1.3.0`
+- Current pinned version: `1.3.1`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -164,6 +164,17 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml pla
 ```bash
 ./ovpn server init <server>
 ./ovpn deploy <server>
+```
+
+`init` and `deploy` build local Linux binaries for `ovpn-agent` and `ovpn-telegram-bot`
+before uploading the rendered bundle. If you run an installed `ovpn` binary outside
+this checkout, the CLI can resolve the source root only when the original checkout is
+still present on the same machine. For release binaries, copied binaries, or custom
+layouts, point the CLI at the checkout explicitly:
+
+```bash
+export OVPN_REPO_ROOT=/absolute/path/to/ovpn
+ovpn server init <server>
 ```
 
 `init` vs `deploy`:
