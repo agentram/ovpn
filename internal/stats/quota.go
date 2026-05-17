@@ -11,7 +11,7 @@ import (
 )
 
 const DefaultQuotaWindow = 30 * 24 * time.Hour
-const DefaultWindow30DQuotaBytes int64 = 200 * 1024 * 1024 * 1024
+const DefaultWindow30DQuotaBytes int64 = 300 * 1024 * 1024 * 1024
 
 // DefaultMonthlyQuotaBytes is kept as a compatibility alias for older callsites.
 const DefaultMonthlyQuotaBytes int64 = DefaultWindow30DQuotaBytes

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.3.2
+
+### Changed
+- Increased the default rolling `30d` quota for users from `200 GB` to `300 GB`.
+- Updated quota documentation and CLI help text to match the new default.
+
 ## 1.3.1
 
 ### Changed

@@ -149,7 +149,7 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&quotaSet.username, "username", "", "Username")
-	cmd.Flags().Int64Var(&quotaSet.monthlyByte, "monthly-bytes", 0, "Rolling 30d quota in bytes (0 uses default 200GB)")
+	cmd.Flags().Int64Var(&quotaSet.monthlyByte, "monthly-bytes", 0, "Rolling 30d quota in bytes (0 uses default 300GB)")
 	cmd.Flags().BoolVar(&quotaSet.enabled, "enabled", true, "Enable rolling 30d quota enforcement for this user")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
