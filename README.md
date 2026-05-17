@@ -31,7 +31,7 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 
 ## Versioning
 
-- Current pinned version: `1.3.1`
+- Current pinned version: `1.3.2`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -66,7 +66,7 @@ Checked-in Ansible inventory is example-only. Keep real hostnames, IPs, and host
 - Fast rollback if geosite resources are missing in image:
   - `export OVPN_SECURITY_PROFILE=off`
   - `./ovpn deploy <server>`
-- Default user quota is rolling `30d`, `200 GB` when per-user limit is not explicitly set.
+- Default user quota is rolling `30d`, `300 GB` when per-user limit is not explicitly set.
 - Optional host-level Tor exit-node blocking is available in Ansible (`ovpn_block_tor_exit_nodes`), default `off`.
 - Host hardening defaults now include:
   - journald cap (`200M` system, `100M` runtime),

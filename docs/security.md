@@ -193,7 +193,7 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 ## Quota enforcement model
 
 - Quota window is rolling last `30d`.
-- Default quota is `200 GB` when per-user limit is unset and quota is enabled.
+- Default quota is `300 GB` when per-user limit is unset and quota is enabled.
 - User is blocked when `usage >= quota` and unblocked automatically when usage drops below quota window threshold.
 - Per-user speed limiting is intentionally out of scope in this stage.
 

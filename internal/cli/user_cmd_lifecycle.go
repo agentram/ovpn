@@ -89,7 +89,7 @@ func (a *App) newUserAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&add.uuid, "uuid", "", "UUID (auto if empty)")
 	cmd.Flags().StringVar(&add.email, "email", "", "Email used by Xray stats (shared across servers)")
 	cmd.Flags().StringVar(&add.expiry, "expiry", "", "Expiry date YYYY-MM-DD")
-	cmd.Flags().Int64Var(&add.quota, "quota-bytes", 0, "Rolling 30d traffic quota in bytes (default 200GB when unset)")
+	cmd.Flags().Int64Var(&add.quota, "quota-bytes", 0, "Rolling 30d traffic quota in bytes (default 300GB when unset)")
 	cmd.Flags().StringVar(&add.notes, "notes", "", "Notes")
 	cmd.Flags().StringVar(&add.tags, "tags", "", "Comma separated tags")
 	_ = cmd.MarkFlagRequired("username")
