@@ -73,8 +73,8 @@ For already-deployed hosts, use the maintenance playbook. It applies common pack
 ```bash
 cd ansible
 ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --syntax-check
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host> --check --diff
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/host-maintenance.yml --limit <host>
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit <host> --check --diff
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit <host>
 ```
 
 Then re-validate runtime:

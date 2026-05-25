@@ -7,9 +7,7 @@ This document covers host-layer automation only.
 - Ansible: host bootstrap and security baseline
 - `ovpn` CLI: VPN runtime, users, monitoring, and backup/restore commands
 
-This split also applies to `proxy` hosts used for HA.
-The proxy host is prepared by Ansible the same way as a regular VPN host, then configured as `--role proxy` by `ovpn`.
-The first built-in proxy preset is `ru`.
+This split also applies to `proxy` hosts used for HA. A proxy host is prepared by Ansible like a regular VPN host, then configured as `--role proxy` by `ovpn`.
 
 ## Supported targets
 
@@ -30,7 +28,14 @@ The first built-in proxy preset is `ru`.
 
 ### 1. Configure inventory
 
-Example `ansible/inventories/example/hosts.yml` (copy it privately to `ansible/inventories/production` before real deployments):
+Start from the checked-in example inventory, then keep your real inventory private:
+
+```bash
+mkdir -p ansible/inventories/production
+cp -R ansible/inventories/example/. ansible/inventories/production/
+```
+
+Example inventory shape:
 
 ```yaml
 all:
@@ -80,16 +85,16 @@ ovpn_unattended_package_blacklist: []
 ```bash
 cd ansible
 ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/bootstrap.yml --syntax-check
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/bootstrap.yml --limit <host> --check --diff
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/bootstrap.yml --limit <host>
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/bootstrap.yml --limit <host> --check --diff
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/bootstrap.yml --limit <host>
 ```
 
 ### 3. Optional: apply security playbook
 
 ```bash
 ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --syntax-check
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --limit <host> --check --diff
-ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml playbooks/security.yml --limit <host>
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/security.yml --limit <host> --check --diff
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/security.yml --limit <host>
 ```
 
 Optional Tor exit-node blocking profile (host layer, fail-open, daily refresh):
@@ -147,7 +152,7 @@ After host bootstrap:
 Proxy host handoff:
 
 ```bash
-./ovpn server add --name <proxy> --role proxy --proxy-preset ru --host <proxy-ip> --domain <proxy-domain> --ssh-user root --ssh-port 22
+./ovpn server add --name <proxy> --role proxy --proxy-preset <preset> --host <proxy-ip> --domain <proxy-domain> --ssh-user root --ssh-port 22
 ./ovpn server init <proxy>
 ./ovpn server backend attach --proxy <proxy> --backend <vpn-backend>
 ./ovpn deploy <vpn-backend>
