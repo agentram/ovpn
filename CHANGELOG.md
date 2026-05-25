@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.3.3
+
+### Changed
+- Simplified public documentation for first-time users, local proof-of-concept setups, and small VPS/VDS deployments.
+- Updated the pinned CodeQL SARIF upload action from `4.35.3` to `4.35.5`.
+
 ## 1.3.2
 
 ### Changed

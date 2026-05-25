@@ -77,12 +77,9 @@ Default alerts cover:
 - service pressure (`xray` high CPU, `prometheus` high memory, `grafana` high memory)
 - agent health, collector runtime errors, cert expiry
 - user expiry warning (`OVPNUserExpirySoon`) when an effectively enabled user is within the next 2 days of expiry
-- bot health:
-  - `OVPNTelegramBotDown`
+- bot health (`OVPNTelegramBotDown`, `OVPNTelegramBotPollingStale`, `OVPNTelegramBotSendFailures`)
 
-Alertmanager is started with `--data.retention=168h` so the weekly user-expiry repeat interval fits within Alertmanager retention.
-  - `OVPNTelegramBotPollingStale`
-  - `OVPNTelegramBotSendFailures`
+Alertmanager starts with `--data.retention=168h` so weekly user-expiry repeats fit within retention.
 
 Proxy nodes add:
 
