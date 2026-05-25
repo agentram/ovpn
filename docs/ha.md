@@ -5,7 +5,7 @@ This document describes the additive HA extension for `ovpn`.
 ## Goal
 
 Add a preset-driven `proxy` entrypoint in front of existing foreign `vpn` servers without breaking current direct users.
-The first built-in preset is Russia (`ru`).
+The first built-in preset is Russia (`ru`), but server names should be your own generic names.
 
 Resulting behavior:
 
@@ -164,28 +164,25 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml 
 
 ```bash
 ./ovpn server add \
-  --name proxy-ru \
+  --name <proxy> \
   --role proxy \
   --proxy-preset ru \
   --host <proxy-ip> \
   --domain <proxy-domain> \
   --ssh-user root \
-  --ssh-port 22 \
-  --reality-private-key <private-key> \
-  --reality-public-key <public-key> \
-  --reality-short-id <short-id>
+  --ssh-port 22
 ```
 
 3. Initialize it:
 
 ```bash
-./ovpn server init proxy-ru
+./ovpn server init <proxy>
 ```
 
 4. Attach one backend first:
 
 ```bash
-./ovpn server backend attach --proxy proxy-ru --backend <vpn-backend-1>
+./ovpn server backend attach --proxy <proxy> --backend <vpn-backend-1>
 ```
 
 The first attach lazily provisions the shared backend relay identity if the backend does not have one yet.
@@ -201,16 +198,16 @@ The first attach lazily provisions the shared backend relay identity if the back
 6. Validate and deploy the proxy:
 
 ```bash
-./ovpn config validate --server proxy-ru
-./ovpn deploy proxy-ru
-./ovpn doctor proxy-ru
+./ovpn config validate --server <proxy>
+./ovpn deploy <proxy>
+./ovpn doctor <proxy>
 ```
 
 7. Start monitoring:
 
 ```bash
-./ovpn server monitor up proxy-ru
-./ovpn server monitor status proxy-ru
+./ovpn server monitor up <proxy>
+./ovpn server monitor status <proxy>
 ```
 
 If a fresh host hits public registry pull limits, preload the monitoring images from another ovpn host or redeploy with explicit image overrides before starting monitoring.
@@ -228,10 +225,10 @@ The HA design does not require Docker Hub specifically; it only requires that th
 9. Attach additional backends one by one:
 
 ```bash
-./ovpn server backend attach --proxy proxy-ru --backend <vpn-backend-2>
+./ovpn server backend attach --proxy <proxy> --backend <vpn-backend-2>
 ./ovpn deploy <vpn-backend-2>
-./ovpn deploy proxy-ru
-./ovpn doctor proxy-ru
+./ovpn deploy <proxy>
+./ovpn doctor <proxy>
 ```
 
 10. Pilot proxy links with a small user set.
@@ -270,7 +267,7 @@ Check in this order:
 1. Proxy Xray logs:
 
 ```bash
-./ovpn server logs proxy-ru --service xray --tail 200
+./ovpn server logs <proxy> --service xray --tail 200
 ```
 
 Expected: `vless-reality -> foreign-pool` for the affected user.
@@ -278,7 +275,7 @@ Expected: `vless-reality -> foreign-pool` for the affected user.
 2. HAProxy counters on the proxy:
 
 ```bash
-./ovpn server logs proxy-ru --service haproxy --tail 200
+./ovpn server logs <proxy> --service haproxy --tail 200
 ```
 
 And in Grafana / Prometheus:
@@ -310,10 +307,10 @@ The backend doctor now verifies that the live runtime config contains `proxy-ser
 ## Commands you will use most
 
 ```bash
-./ovpn server backend list --proxy proxy-ru
-./ovpn config validate --server proxy-ru
-./ovpn deploy proxy-ru
-./ovpn doctor proxy-ru --include-logs
-./ovpn server logs proxy-ru --service haproxy --tail 200
-./ovpn server monitor status proxy-ru
+./ovpn server backend list --proxy <proxy>
+./ovpn config validate --server <proxy>
+./ovpn deploy <proxy>
+./ovpn doctor <proxy> --include-logs
+./ovpn server logs <proxy> --service haproxy --tail 200
+./ovpn server monitor status <proxy>
 ```

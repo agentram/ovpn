@@ -4,7 +4,7 @@ This document defines the practical security posture for `ovpn`.
 
 ## Scope
 
-Recommended production model:
+Recommended VPS/VDS model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
 - SSH control plane on `22/tcp`
@@ -38,7 +38,7 @@ Follow official Xray guidance:
 Operational rules:
 
 - Do not use wildcard-style server names.
-- Avoid sloppy or placeholder `reality_target` values.
+- Avoid placeholder `reality_target` values.
 - Keep `OVPN_SECURITY_PROFILE=minimal` unless you need emergency rollback.
 - Minimal profile adds protocol/domain blocking and threat DNS resolvers.
 - Keep fallback rate limits disabled by default.

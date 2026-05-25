@@ -26,14 +26,14 @@ ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ansible/inventories/examp
 
 Do not commit:
 
-- real production inventory
+- real host inventory
 - `.env`
 - Telegram tokens, SSH keys, vault passwords, or private keys
 - generated binaries, PDFs, SARIF reports, coverage files, or local databases
 - real customer or user data
 
 Keep real Ansible inventory under `ansible/inventories/production` locally. That path is intentionally ignored by git.
-Start from `ansible/inventories/example` and copy it privately.
+Start from `ansible/inventories/example` and copy its contents privately.
 
 Generate the client guide PDF locally only when you need it for Telegram `/guide` deployment:
 

@@ -1,3 +1,5 @@
+# Monitoring Secrets
+
 Place runtime secrets in this directory on the target server:
 
 - `telegram_bot_token`: Telegram bot token used for polling and notifications.
