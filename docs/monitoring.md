@@ -195,7 +195,7 @@ Owner id fallback behavior:
 ./ovpn server monitor up <server>
 ```
 
-Official `ovpn` release binaries embed the Linux `ovpn-telegram-bot` runtime binary used by this deploy path. A normal Telegram setup does not require a local Go toolchain or source checkout; `OVPN_REPO_ROOT` is only needed for development builds without embedded runtime assets or unsupported runtime architectures.
+Official `ovpn` release binaries embed the Linux `ovpn-telegram-bot` runtime binary used by this deploy path. Release archives contain only `ovpn`; a normal Telegram setup does not require a sidecar binary, local Go toolchain, or source checkout. `OVPN_REPO_ROOT` is only needed for development builds without embedded runtime assets or unsupported runtime architectures.
 
 One-shot setup command:
 
@@ -271,6 +271,7 @@ Slash command fallback:
 - Bot accepts username or full email for lookup.
 - Bot reads user status from `GET /users/status` and quota policy from `GET /quota/policies`.
 - Link generation uses auto-generated `monitoring/telegram-bot/link-config.json` from server deploy data.
+- The bot sends the text link first and then a QR image for mobile import; both contain the full client credential and must be treated as secrets.
 - Mutating actions are owner-only, require two-step confirmation, and are enabled only with `telegram_admin_token`.
 - `/users`, `/traffic`, `/quota` report local server data; user identities are mirrored globally by `ovpn user` workflows.
 - Expiry alerts are sent by Prometheus/Alertmanager/Telegram and repeat per normal alerting rules until resolved.

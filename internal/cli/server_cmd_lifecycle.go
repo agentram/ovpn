@@ -149,7 +149,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	}
 	addCmd.Flags().StringVar(&add.name, "name", "", "server name")
 	addCmd.Flags().StringVar(&add.role, "role", model.ServerRoleVPN, "Server role: vpn|proxy")
-	addCmd.Flags().StringVar(&add.proxyPreset, "proxy-preset", "", "Proxy routing preset for role=proxy (default: ru)")
+	addCmd.Flags().StringVar(&add.proxyPreset, "proxy-preset", "", "Proxy routing preset for role=proxy: "+model.SupportedProxyPresetsText()+" (default: ru)")
 	addCmd.Flags().StringVar(&add.host, "host", "", "server IP or hostname")
 	addCmd.Flags().StringVar(&add.domain, "domain", "", "server domain for clients")
 	addCmd.Flags().StringVar(&add.sshUser, "ssh-user", os.Getenv("USER"), "SSH user")

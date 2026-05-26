@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -302,6 +303,89 @@ func TestDispatchCallbackUsersLinkNonOwnerDenied(t *testing.T) {
 	}
 }
 
+func TestHandlePromptInputSendsUserLinkAndQRCode(t *testing.T) {
+	t.Parallel()
+
+	var telegramPaths []string
+	var linkText string
+	var photoBytes []byte
+	b := &bot{
+		cfg: config{
+			ownerUserID:    42,
+			agentURL:       "http://ovpn-agent:9090",
+			linkAddress:    "example.com",
+			linkServerName: "www.microsoft.com",
+			linkPublicKey:  "publickey",
+			linkShortID:    "abcd1234",
+		},
+		httpClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path != "/quota/policies" {
+				t.Fatalf("unexpected agent path: %s", req.URL.Path)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"email":"alice@test","uuid":"11111111-1111-1111-1111-111111111111"}]`)),
+				Header:     make(http.Header),
+			}, nil
+		})},
+		tg: &telegramClient{
+			token: "token",
+			http: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				telegramPaths = append(telegramPaths, req.URL.Path)
+				switch req.URL.Path {
+				case "/bottoken/sendMessage":
+					var payload map[string]any
+					raw, _ := io.ReadAll(req.Body)
+					if err := json.Unmarshal(raw, &payload); err != nil {
+						t.Fatalf("decode sendMessage payload: %v", err)
+					}
+					linkText, _ = payload["text"].(string)
+				case "/bottoken/sendPhoto":
+					if !strings.Contains(req.Header.Get("Content-Type"), "multipart/form-data") {
+						t.Fatalf("expected multipart content-type, got %q", req.Header.Get("Content-Type"))
+					}
+					mr, err := req.MultipartReader()
+					if err != nil {
+						t.Fatalf("multipart reader: %v", err)
+					}
+					for {
+						part, err := mr.NextPart()
+						if errors.Is(err, io.EOF) {
+							break
+						}
+						if err != nil {
+							t.Fatalf("multipart part: %v", err)
+						}
+						if part.FormName() == "photo" {
+							if part.FileName() != "ovpn-user-link.png" {
+								t.Fatalf("unexpected photo filename: %q", part.FileName())
+							}
+							photoBytes, _ = io.ReadAll(part)
+						}
+					}
+				default:
+					t.Fatalf("unexpected telegram path: %s", req.URL.Path)
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":{}}`)), Header: make(http.Header)}, nil
+			})},
+		},
+		prompts: map[int64]promptState{},
+	}
+
+	if err := b.handlePromptInput(context.Background(), 11, 42, promptState{Kind: promptUserLink}, "alice"); err != nil {
+		t.Fatalf("handlePromptInput: %v", err)
+	}
+	if !slices.Equal(telegramPaths, []string{"/bottoken/sendMessage", "/bottoken/sendPhoto"}) {
+		t.Fatalf("unexpected telegram calls: %v", telegramPaths)
+	}
+	if !strings.HasPrefix(linkText, "vless://11111111-1111-1111-1111-111111111111@example.com:443?") {
+		t.Fatalf("unexpected link text: %q", linkText)
+	}
+	if len(photoBytes) < 8 || string(photoBytes[:8]) != "\x89PNG\r\n\x1a\n" {
+		t.Fatalf("expected PNG QR photo, got %q", photoBytes[:min(len(photoBytes), 8)])
+	}
+}
+
 func TestSendGuideMissingFileReturnsMessage(t *testing.T) {
 	t.Parallel()
 
@@ -342,6 +426,63 @@ func TestTelegramClientSendDocument(t *testing.T) {
 	err := c.sendDocument(context.Background(), 1, "clients.pdf", strings.NewReader("pdf"), "guide")
 	if err != nil {
 		t.Fatalf("sendDocument error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected telegram API call")
+	}
+}
+
+func TestTelegramClientSendPhoto(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	c := &telegramClient{
+		token: "token",
+		http: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			called = true
+			if req.URL.Path != "/bottoken/sendPhoto" {
+				t.Fatalf("unexpected telegram method path: %s", req.URL.Path)
+			}
+			if !strings.Contains(req.Header.Get("Content-Type"), "multipart/form-data") {
+				t.Fatalf("expected multipart content-type, got %q", req.Header.Get("Content-Type"))
+			}
+			mr, err := req.MultipartReader()
+			if err != nil {
+				t.Fatalf("multipart reader: %v", err)
+			}
+			fields := map[string]string{}
+			var photo string
+			for {
+				part, err := mr.NextPart()
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					t.Fatalf("multipart part: %v", err)
+				}
+				raw, _ := io.ReadAll(part)
+				if part.FormName() == "photo" {
+					if part.FileName() != "link.png" {
+						t.Fatalf("unexpected photo filename: %q", part.FileName())
+					}
+					photo = string(raw)
+					continue
+				}
+				fields[part.FormName()] = string(raw)
+			}
+			if fields["chat_id"] != "1" || fields["caption"] != "qr" || photo != "png" {
+				t.Fatalf("unexpected multipart payload: fields=%v photo=%q", fields, photo)
+			}
+			if !strings.Contains(fields["reply_markup"], "callback_data") {
+				t.Fatalf("expected reply_markup field, got %q", fields["reply_markup"])
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":{}}`)), Header: make(http.Header)}, nil
+		})},
+	}
+
+	err := c.sendPhoto(context.Background(), 1, "link.png", strings.NewReader("png"), "qr", usersInlineKeyboard(true))
+	if err != nil {
+		t.Fatalf("sendPhoto error: %v", err)
 	}
 	if !called {
 		t.Fatalf("expected telegram API call")

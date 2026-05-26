@@ -17,7 +17,26 @@ func renderTerminalQRCode(link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return qr.ToSmallString(false), nil
+	return trimTerminalQRCodeQuietZone(qr.ToSmallString(false), 2), nil
+}
+
+func trimTerminalQRCodeQuietZone(qrText string, cells int) string {
+	if cells <= 0 {
+		return qrText
+	}
+	lines := strings.Split(strings.TrimRight(qrText, "\n"), "\n")
+	trimRows := (cells + 1) / 2
+	if len(lines) <= trimRows*2 {
+		return qrText
+	}
+	lines = lines[trimRows : len(lines)-trimRows]
+	for i, line := range lines {
+		if len(line) <= cells*2 {
+			return qrText
+		}
+		lines[i] = line[cells : len(line)-cells]
+	}
+	return strings.Join(lines, "\n") + "\n"
 }
 
 func writeQRCodePNG(link string, path string) error {

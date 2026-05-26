@@ -340,7 +340,7 @@ func (b *bot) handlePromptInput(ctx context.Context, chatID int64, userID int64,
 		if err != nil {
 			return b.sendPlainMessage(ctx, chatID, "Cannot build link: "+err.Error(), usersInlineKeyboard(true))
 		}
-		return b.sendPlainMessage(ctx, chatID, link, usersInlineKeyboard(true))
+		return b.sendUserLinkWithQRCode(ctx, chatID, link, usersInlineKeyboard(true))
 	default:
 		return b.sendPlainMessage(ctx, chatID, "Prompt expired. Use /menu.", mainReplyKeyboard())
 	}

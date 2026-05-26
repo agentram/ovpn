@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -55,6 +56,17 @@ func (b *bot) buildUserLink(ctx context.Context, query string) (string, error) {
 		Label:      "ovpn-" + username,
 	})
 	return link, nil
+}
+
+func (b *bot) sendUserLinkWithQRCode(ctx context.Context, chatID int64, link string, replyMarkup any) error {
+	png, err := renderUserLinkQRCodePNG(link)
+	if err != nil {
+		return fmt.Errorf("render user link QR: %w", err)
+	}
+	if err := b.sendPlainMessage(ctx, chatID, link, nil); err != nil {
+		return err
+	}
+	return b.sendPhoto(ctx, chatID, "ovpn-user-link.png", bytes.NewReader(png), "User link QR", replyMarkup)
 }
 
 // findPolicyForQuery returns policy for query for callers.

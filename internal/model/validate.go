@@ -65,7 +65,7 @@ func (s Server) Validate() error {
 	}
 	if role == ServerRoleProxy {
 		if NormalizeProxyPreset(s.ProxyPreset) == "" {
-			errs = append(errs, "proxy_preset must be one of: ru")
+			errs = append(errs, "proxy_preset must be one of: "+SupportedProxyPresetsText())
 		}
 	} else if strings.TrimSpace(s.ProxyPreset) != "" {
 		errs = append(errs, "proxy_preset is only supported for proxy role")
