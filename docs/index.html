@@ -386,7 +386,8 @@
               </article>
             </div>
           </div>
-          <pre class="terminal"><code>go build -o ovpn ./cmd/ovpn
+          <pre class="terminal"><code># Use a release archive, or build from source for development:
+# go build -o ovpn ./cmd/ovpn
 ./ovpn version
 
 ./ovpn server add \
@@ -398,7 +399,8 @@
 
 ./ovpn server init &lt;server&gt;
 ./ovpn deploy &lt;server&gt;
-./ovpn doctor &lt;server&gt;</code></pre>
+./ovpn doctor &lt;server&gt;
+./ovpn user link --server &lt;server&gt; --username &lt;user&gt;</code></pre>
         </div>
       </section>
 

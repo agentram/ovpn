@@ -195,6 +195,8 @@ Owner id fallback behavior:
 ./ovpn server monitor up <server>
 ```
 
+Official `ovpn` release binaries embed the Linux `ovpn-telegram-bot` runtime binary used by this deploy path. A normal Telegram setup does not require a local Go toolchain or source checkout; `OVPN_REPO_ROOT` is only needed for development builds without embedded runtime assets or unsupported runtime architectures.
+
 One-shot setup command:
 
 ```bash

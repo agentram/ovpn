@@ -95,6 +95,21 @@ jobs:
           set -euo pipefail
           go test -json -covermode=atomic -coverprofile=coverage.out ./... | tee test-report.jsonl
 
+      - name: Test embedded runtime asset path
+        id: runtimeassets_test
+        run: |
+          set -euo pipefail
+          runtime_assets="internal/runtimeassets/assets"
+          rm -rf "$runtime_assets"
+          trap 'rm -rf "$runtime_assets"' EXIT
+          mkdir -p "$runtime_assets/linux_amd64" "$runtime_assets/linux_arm64"
+          for runtime_arch in amd64 arm64; do
+            printf 'fake ovpn-agent %s\n' "$runtime_arch" > "$runtime_assets/linux_${runtime_arch}/ovpn-agent"
+            printf 'fake ovpn-telegram-bot %s\n' "$runtime_arch" > "$runtime_assets/linux_${runtime_arch}/ovpn-telegram-bot"
+            chmod 755 "$runtime_assets/linux_${runtime_arch}/ovpn-agent" "$runtime_assets/linux_${runtime_arch}/ovpn-telegram-bot"
+          done
+          go test -tags runtimeassets ./internal/runtimeassets ./internal/cli
+
       - name: Coverage and test counters
         id: coverage
         run: |
@@ -127,8 +142,8 @@ jobs:
 
       - name: GolangCI-Lint
         id: golangci
-        # golangci/golangci-lint-action v9.2.0
-        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
+        # golangci/golangci-lint-action v9.2.1
+        uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee
         with:
           version: v2.11.4
           args: --timeout=5m
@@ -166,6 +181,7 @@ jobs:
           GOFMT_OUTCOME: ${{ steps.gofmt.outcome }}
           GOVET_OUTCOME: ${{ steps.govet.outcome }}
           GOTEST_OUTCOME: ${{ steps.gotest.outcome }}
+          RUNTIMEASSETS_TEST_OUTCOME: ${{ steps.runtimeassets_test.outcome }}
           GOLANGCI_OUTCOME: ${{ steps.golangci.outcome }}
           GOSEC_GATE_OUTCOME: ${{ steps.gosec_gate.outcome }}
           JSON_VALIDATE_OUTCOME: ${{ steps.json_validate.outcome }}
@@ -198,6 +214,7 @@ jobs:
           gofmt_status="$(status_icon "${GOFMT_OUTCOME}")"
           govet_status="$(status_icon "${GOVET_OUTCOME}")"
           gotest_status="$(status_icon "${GOTEST_OUTCOME}")"
+          runtimeassets_test_status="$(status_icon "${RUNTIMEASSETS_TEST_OUTCOME}")"
           golangci_status="$(status_icon "${GOLANGCI_OUTCOME}")"
           gosec_status="$(status_icon "${GOSEC_GATE_OUTCOME}")"
           json_validate_status="$(status_icon "${JSON_VALIDATE_OUTCOME}")"
@@ -221,6 +238,7 @@ jobs:
             echo "- ${gofmt_status} gofmt"
             echo "- ${govet_status} go vet"
             echo "- ${gotest_status} go test"
+            echo "- ${runtimeassets_test_status} runtimeassets tagged test"
             echo "- ${golangci_status} golangci-lint"
             echo "- ${gosec_status} gosec gate (high/high)"
             echo "- ${json_validate_status} JSON example validation"
