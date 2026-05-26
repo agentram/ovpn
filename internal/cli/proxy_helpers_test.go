@@ -68,6 +68,34 @@ func TestProxyGeodataPathsDefaultToPresetSpecificCacheNames(t *testing.T) {
 	}
 }
 
+func TestProxyPresetConfigSupportsChinaPreset(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := proxyPresetConfigForServer(model.Server{
+		Name:        "proxy-cn",
+		Role:        model.ServerRoleProxy,
+		ProxyPreset: model.ProxyPresetCN,
+	})
+	if err != nil {
+		t.Fatalf("proxyPresetConfigForServer: %v", err)
+	}
+	if cfg.Key != model.ProxyPresetCN {
+		t.Fatalf("expected cn key, got %q", cfg.Key)
+	}
+	if !strings.Contains(strings.Join(cfg.DirectDomainSets, ","), "geosite:cn") {
+		t.Fatalf("expected China direct domain set, got %+v", cfg.DirectDomainSets)
+	}
+	if !strings.Contains(strings.Join(cfg.DirectIPSets, ","), "geoip:cn") {
+		t.Fatalf("expected China direct IP set, got %+v", cfg.DirectIPSets)
+	}
+	if !strings.Contains(cfg.GeoSiteURL, "Loyalsoldier/v2ray-rules-dat") || !strings.Contains(cfg.GeoIPURL, "Loyalsoldier/v2ray-rules-dat") {
+		t.Fatalf("unexpected China geodata URLs: geosite=%q geoip=%q", cfg.GeoSiteURL, cfg.GeoIPURL)
+	}
+	if cfg.GeoSiteCacheName != "proxy-cn-geosite.dat" || cfg.GeoIPCacheName != "proxy-cn-geoip.dat" {
+		t.Fatalf("unexpected China cache names: %+v", cfg)
+	}
+}
+
 func TestBuildXraySpecVPNOmitsProxyServiceUserWhenUnattached(t *testing.T) {
 	t.Parallel()
 

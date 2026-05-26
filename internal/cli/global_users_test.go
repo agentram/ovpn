@@ -336,6 +336,34 @@ func TestServerAddRejectsProxyPresetForVPNRole(t *testing.T) {
 	}
 }
 
+func TestServerAddAcceptsChinaProxyPresetAlias(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "base")
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{
+		"add",
+		"--name", "proxy-cn",
+		"--role", model.ServerRoleProxy,
+		"--proxy-preset", "china",
+		"--host", "10.0.0.22",
+		"--domain", "proxy-cn.example.com",
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("server add proxy cn failed: %v", err)
+	}
+
+	got, err := app.store.GetServerByName(app.ctx, "proxy-cn")
+	if err != nil {
+		t.Fatalf("load proxy server: %v", err)
+	}
+	if got.NormalizedProxyPreset() != model.ProxyPresetCN {
+		t.Fatalf("expected proxy preset %q, got %q", model.ProxyPresetCN, got.NormalizedProxyPreset())
+	}
+}
+
 func newGlobalUsersTestApp(t *testing.T) *App {
 	t.Helper()
 	ctx := context.Background()

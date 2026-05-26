@@ -210,7 +210,7 @@ jobs:
           name: runtime-assets
           path: internal/runtimeassets/assets
 
-      - name: Build ovpn and runtime binaries
+      - name: Build ovpn release binary
         env:
           VERSION: ${{ needs.resolve.outputs.version }}
         run: |
@@ -226,11 +226,15 @@ jobs:
           test -s internal/runtimeassets/assets/linux_arm64/ovpn-telegram-bot
 
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -tags runtimeassets -trimpath -ldflags="${ldflags}" -o "$outdir/ovpn" ./cmd/ovpn
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -ldflags="${ldflags}" -o "$outdir/ovpn-agent" ./cmd/ovpn-agent
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -ldflags="${ldflags}" -o "$outdir/ovpn-telegram-bot" ./cmd/ovpn-telegram-bot
 
           archive="ovpn_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz"
-          tar -C "$outdir" -czf "dist/$archive" ovpn ovpn-agent ovpn-telegram-bot
+          tar -C "$outdir" -czf "dist/$archive" ovpn
+          archive_contents="$(tar -tzf "dist/$archive" | sort)"
+          if [ "$archive_contents" != "ovpn" ]; then
+            echo "unexpected release archive contents:" >&2
+            printf '%s\n' "$archive_contents" >&2
+            exit 1
+          fi
 
           if [ "${{ matrix.goos }}" = "linux" ] && [ "${{ matrix.goarch }}" = "amd64" ]; then
             go test -tags runtimeassets ./internal/runtimeassets ./internal/cli

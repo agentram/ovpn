@@ -46,6 +46,8 @@ Manual rebuild flow:
 - the target release must already exist
 - assets are rebuilt and re-uploaded with `--clobber`
 
+Release archives contain only the `ovpn` executable. Linux `ovpn-agent` and `ovpn-telegram-bot` runtime binaries are still built in the workflow, but they are embedded into `ovpn` for remote deploy and Telegram setup instead of being shipped as top-level sidecars.
+
 ## Required secrets and repository settings
 
 Public workflows do not require infrastructure secrets.
