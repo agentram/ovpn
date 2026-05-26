@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -157,7 +159,12 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 
 // newUserLinkCmd initializes user link cmd with the required dependencies.
 func (a *App) newUserLinkCmd() *cobra.Command {
-	var link struct{ server, username string }
+	var link struct {
+		server   string
+		username string
+		qr       bool
+		qrFile   string
+	}
 	cmd := &cobra.Command{
 		Use:   "link",
 		Short: "Generate vless:// link",
@@ -180,11 +187,26 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 			}
 			vless := xraycfg.BuildVLESSLink(xraycfg.LinkInput{Address: address, Port: 443, UUID: u.UUID, ServerName: srv.RealityServerName, Password: srv.RealityPublicKey, ShortID: shortID, Label: "ovpn-" + u.Username})
 			fmt.Println(vless)
+			if link.qr {
+				qrText, err := renderTerminalQRCode(vless)
+				if err != nil {
+					return fmt.Errorf("render QR: %w", err)
+				}
+				fmt.Print(qrText)
+			}
+			if link.qrFile != "" {
+				if err := writeQRCodePNG(vless, link.qrFile); err != nil {
+					return fmt.Errorf("write QR file: %w", err)
+				}
+				fmt.Fprintf(os.Stderr, "QR saved: %s\n", filepath.Clean(link.qrFile))
+			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&link.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&link.username, "username", "", "Username")
+	cmd.Flags().BoolVar(&link.qr, "qr", true, "Print a terminal QR code after the link; use --qr=false for link-only output")
+	cmd.Flags().StringVar(&link.qrFile, "qr-file", "", "Save a PNG QR code to this path")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd

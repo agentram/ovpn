@@ -53,6 +53,7 @@ Public workflows do not require infrastructure secrets.
 Recommended repository settings:
 
 - enable Dependabot alerts and security updates
+- keep Dependabot version updates grouped and monthly for routine Go/GitHub Actions updates
 - enable private vulnerability reporting
 - enable code scanning only if you want SARIF uploads from `security.yml`
 - protect `main` with required pull requests and required checks:

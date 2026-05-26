@@ -27,7 +27,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Versioning
 
-- Current pinned version: `1.3.3`
+- Current pinned version: `1.4.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -86,7 +86,9 @@ See [`docs/security.md`](docs/security.md) for the full security model.
 Use this flow for a first small server. Replace placeholders with your own values.
 
 ```bash
-go build -o ovpn ./cmd/ovpn
+# Use the release archive for your workstation OS/arch, or build from source for development.
+# Source build:
+# go build -o ovpn ./cmd/ovpn
 ./ovpn version
 
 ./ovpn server add \
@@ -102,6 +104,8 @@ go build -o ovpn ./cmd/ovpn
 ./ovpn user add --username <user>
 ./ovpn user link --server <server> --username <user>
 ```
+
+`user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
 
 `server init` performs the first bootstrap/deploy for the VPN runtime. Use `deploy` later when you change runtime settings:
 
@@ -184,7 +188,7 @@ Use `deploy` after config or code changes:
 ./ovpn doctor <server>
 ```
 
-If you run an installed `ovpn` binary outside this checkout, point it at the source tree when it needs to build/upload local runtime binaries:
+Official release binaries embed the Linux runtime binaries used by deploys, so normal installed usage does not require Go or a source checkout. Use `OVPN_REPO_ROOT` only for development builds without embedded runtime assets, or when you intentionally deploy an unsupported runtime architecture through source fallback:
 
 ```bash
 export OVPN_REPO_ROOT=/absolute/path/to/ovpn
@@ -236,11 +240,13 @@ See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 ./ovpn user rm --username <user>
 
 ./ovpn user link --server <server> --username <user>
+./ovpn user link --server <server> --username <user> --qr=false
+./ovpn user link --server <server> --username <user> --qr-file ~/Desktop/<user>.png
 ./ovpn user show --server <server> --username <user>
 ./ovpn user list --server <server>
 ```
 
-Mutating user commands apply to all enabled servers by default. Link and read commands stay server-scoped.
+Mutating user commands apply to all enabled servers by default. Link and read commands stay server-scoped. QR output is enabled by default and contains the same full client credential as the `vless://` link; treat saved QR files as secrets.
 
 When `--email` is omitted, new users get stable identity `username@global`. User expiry is cluster-wide and uses UTC end-of-day semantics.
 
