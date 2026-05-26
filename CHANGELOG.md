@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.0
+
+### Added
+- Embedded Linux `ovpn-agent` and `ovpn-telegram-bot` runtime binaries in release `ovpn` builds, so normal deploys no longer require a local Go toolchain or source checkout.
+- Added default terminal QR output to `ovpn user link`, `--qr=false` for link-only output, and `--qr-file <path.png>` for saved PNG QR codes.
+
+### Changed
+- Release builds now package `ovpn-telegram-bot` alongside `ovpn` and `ovpn-agent`, and run a self-contained deploy smoke test without `go` in `PATH`.
+
 ## 1.3.3
 
 ### Changed
