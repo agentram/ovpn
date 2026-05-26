@@ -359,8 +359,13 @@ func resolveProxyPreset(raw string) (proxyPreset, error) {
 			DirectDomains: []string{"geosite:ru-available-only-inside", "regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.xn--p1ai$"},
 			DirectIPs:     []string{"geoip:ru", "geoip:private"},
 		}, nil
+	case model.ProxyPresetCN:
+		return proxyPreset{
+			DirectDomains: []string{"geosite:cn", "regexp:.*\\.cn$", "regexp:.*\\.xn--fiqs8s$", "regexp:.*\\.xn--fiqz9s$", "regexp:.*\\.xn--55qx5d$", "regexp:.*\\.xn--io0a7i$"},
+			DirectIPs:     []string{"geoip:cn", "geoip:private"},
+		}, nil
 	default:
-		return proxyPreset{}, fmt.Errorf("proxy preset must be %q", model.ProxyPresetRU)
+		return proxyPreset{}, fmt.Errorf("proxy preset must be one of: %s", model.SupportedProxyPresetsText())
 	}
 }
 

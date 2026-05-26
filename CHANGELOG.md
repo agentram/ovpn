@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.1
+
+### Added
+- Telegram bot user-link generation now sends a QR image after the owner-only `vless://` link.
+- Added the `cn` proxy preset for China split routing, with `china` accepted as an alias.
+
+### Changed
+- Release archives now contain only the `ovpn` CLI because `ovpn-agent` and `ovpn-telegram-bot` are embedded in release builds for deploy and Telegram setup.
+- Terminal QR output for `ovpn user link` is smaller while keeping the link as the first stdout line.
+
 ## 1.4.0
 
 ### Added

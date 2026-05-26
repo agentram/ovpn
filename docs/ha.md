@@ -105,22 +105,27 @@ It is not sent directly from the proxy country.
 Proxy behavior is selected by `proxy_preset`.
 If it is omitted, `ovpn` defaults proxy nodes to `ru` for backward compatibility with the first HA implementation.
 
-Current built-in preset:
+Current built-in presets:
 
 - `ru`
   - direct domains: `geosite:ru-available-only-inside`, `.ru`, `.su`, `.xn--p1ai`
   - direct IPs: `geoip:ru`, `geoip:private`
   - geodata defaults: runetfreedom geosite/geoip feeds
+- `cn`
+  - alias: `china`
+  - direct domains: `geosite:cn`, `.cn`, `.xn--fiqs8s`, `.xn--fiqz9s`, `.xn--55qx5d`, `.xn--io0a7i`
+  - direct IPs: `geoip:cn`, `geoip:private`
+  - geodata defaults: Loyalsoldier `v2ray-rules-dat` geosite/geoip release feeds
 
 Future presets can be added without changing the `proxy` role model itself.
 
-## How the current `ru` preset determines local destinations
+## How presets determine local destinations
 
 The proxy uses Xray split-routing rules in this order:
 
-- `geosite:ru-available-only-inside`
-- domain suffix matches for `.ru`, `.su`, and `.xn--p1ai`
-- `geoip:ru`
+- country geosite data for the selected preset
+- explicit country domain suffixes for the selected preset
+- country GeoIP data for the selected preset
 - `geoip:private`
 
 Anything matched by those rules is sent to `direct` on the proxy.
@@ -128,9 +133,9 @@ All remaining user traffic is sent to `foreign-pool`, which is the local HAProxy
 
 This means routing is based on a mix of:
 
-- Xray geosite data for known Russia-only services
-- explicit Russian domain suffixes
-- Russian IP geo matches
+- Xray geosite data for known country-local services
+- explicit country domain suffixes
+- country IP geo matches
 - local/private address ranges
 
 If a destination does not match those rules, it is treated as foreign.
@@ -161,6 +166,7 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml 
 ```
 
 2. Register the proxy in local state:
+Use `--proxy-preset cn` for China-local direct routing.
 
 ```bash
 ./ovpn server add \

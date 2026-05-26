@@ -31,6 +31,15 @@ func TestServerValidate(t *testing.T) {
 		t.Fatalf("expected valid proxy server with default preset, got error: %v", err)
 	}
 
+	validCNProxy := validProxy
+	validCNProxy.ProxyPreset = ProxyPresetCN
+	if err := validCNProxy.Validate(); err != nil {
+		t.Fatalf("expected valid proxy server with cn preset, got error: %v", err)
+	}
+	if got := NormalizeProxyPreset("china"); got != ProxyPresetCN {
+		t.Fatalf("expected china alias to normalize to %q, got %q", ProxyPresetCN, got)
+	}
+
 	invalid := valid
 	invalid.Name = ""
 	invalid.Host = ""

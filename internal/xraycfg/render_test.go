@@ -340,6 +340,44 @@ func TestValidateSpecRejectsUnknownProxyPreset(t *testing.T) {
 	}
 }
 
+func TestRenderServerJSONProxySupportsChinaPreset(t *testing.T) {
+	t.Parallel()
+
+	raw, err := RenderServerJSON(Spec{
+		Role:              model.ServerRoleProxy,
+		ProxyPreset:       model.ProxyPresetCN,
+		RealityPrivateKey: "priv",
+		RealityPublicKey:  "backend-pub",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd1234"},
+		ThreatDNSServers:  []string{"1.1.1.2"},
+		Users:             []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "client@example.com", Enabled: true}},
+		ServiceUsers:      []ServiceUser{{UUID: "22222222-2222-2222-2222-222222222222", Email: "proxy-service@cluster"}},
+		ProxyRelay: &ProxyRelay{
+			Address:     "haproxy",
+			Port:        15443,
+			ServiceUUID: "22222222-2222-2222-2222-222222222222",
+			ServerName:  "backend.example.com",
+			PublicKey:   "backend-pub",
+			ShortID:     "beefcafe",
+		},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	rendered := string(raw)
+	for _, want := range []string{"geosite:cn", "regexp:.*\\\\.cn$", "geoip:cn", "foreign-pool"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("expected rendered proxy config to contain %q", want)
+		}
+	}
+	if strings.Contains(rendered, "geosite:ru-available-only-inside") {
+		t.Fatalf("china preset should not include russian direct routing rules")
+	}
+}
+
 func TestRenderServerJSONVPNIncludesProxyServiceUser(t *testing.T) {
 	t.Parallel()
 

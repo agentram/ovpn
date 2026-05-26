@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/skip2/go-qrcode"
+
 	"ovpn/internal/model"
 )
 
@@ -109,6 +111,26 @@ func TestUserLinkPrintsAndWritesQR(t *testing.T) {
 		t.Fatalf("expected saved status on stderr, got %q", stderr)
 	}
 	assertPNGQRCodeFile(t, qrPath)
+}
+
+func TestTerminalQRCodeTrimsQuietZone(t *testing.T) {
+	t.Parallel()
+
+	qr, err := qrcode.New(testAliceVLESSLink, qrcode.Medium)
+	if err != nil {
+		t.Fatalf("build QR: %v", err)
+	}
+	full := qr.ToSmallString(false)
+	trimmed, err := renderTerminalQRCode(testAliceVLESSLink)
+	if err != nil {
+		t.Fatalf("renderTerminalQRCode: %v", err)
+	}
+	if len(trimmed) >= len(full) {
+		t.Fatalf("expected trimmed terminal QR to be smaller")
+	}
+	if len(strings.Split(strings.TrimRight(trimmed, "\n"), "\n")) >= len(strings.Split(strings.TrimRight(full, "\n"), "\n")) {
+		t.Fatalf("expected trimmed terminal QR to use fewer rows")
+	}
 }
 
 func assertPNGQRCodeFile(t *testing.T, path string) {

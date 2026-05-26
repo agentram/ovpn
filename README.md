@@ -27,7 +27,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Versioning
 
-- Current pinned version: `1.4.0`
+- Current pinned version: `1.4.1`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -47,7 +47,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Requirements
 
-- Local machine with Go `1.26.2+`
+- Release binary, or Go `1.26.2+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
 - Clean VPS/VDS recommended
@@ -87,6 +87,7 @@ Use this flow for a first small server. Replace placeholders with your own value
 
 ```bash
 # Use the release archive for your workstation OS/arch, or build from source for development.
+# Release archives contain one executable: ovpn.
 # Source build:
 # go build -o ovpn ./cmd/ovpn
 ./ovpn version
@@ -188,7 +189,7 @@ Use `deploy` after config or code changes:
 ./ovpn doctor <server>
 ```
 
-Official release binaries embed the Linux runtime binaries used by deploys, so normal installed usage does not require Go or a source checkout. Use `OVPN_REPO_ROOT` only for development builds without embedded runtime assets, or when you intentionally deploy an unsupported runtime architecture through source fallback:
+Official release binaries embed the Linux `ovpn-agent` and `ovpn-telegram-bot` runtime binaries used by deploys, so release archives contain only the `ovpn` executable. Normal installed usage does not require Go, a source checkout, or keeping sidecar binaries in the same directory. Use `OVPN_REPO_ROOT` only for development builds without embedded runtime assets, or when you intentionally deploy an unsupported runtime architecture through source fallback:
 
 ```bash
 export OVPN_REPO_ROOT=/absolute/path/to/ovpn
@@ -198,6 +199,7 @@ ovpn deploy <server>
 ### 4a. Optional HA proxy rollout
 
 Use a proxy only when you want one entrypoint in front of existing VPN backends.
+Available proxy presets are `ru` and `cn` (`china` is accepted as an alias for `cn`).
 
 ```bash
 ./ovpn server add \

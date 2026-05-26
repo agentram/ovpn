@@ -117,6 +117,59 @@ func (c *telegramClient) sendDocument(ctx context.Context, chatID int64, filenam
 	return nil
 }
 
+// sendPhoto handles send photo HTTP behavior for this service.
+func (c *telegramClient) sendPhoto(ctx context.Context, chatID int64, filename string, src io.Reader, caption string, replyMarkup any) error {
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	if err := mw.WriteField("chat_id", strconv.FormatInt(chatID, 10)); err != nil {
+		return err
+	}
+	if strings.TrimSpace(caption) != "" {
+		if err := mw.WriteField("caption", caption); err != nil {
+			return err
+		}
+	}
+	if replyMarkup != nil {
+		raw, err := json.Marshal(replyMarkup)
+		if err != nil {
+			return err
+		}
+		if err := mw.WriteField("reply_markup", string(raw)); err != nil {
+			return err
+		}
+	}
+	part, err := mw.CreateFormFile("photo", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(part, src); err != nil {
+		return err
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendPhoto", c.token)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
+	if err != nil {
+		return c.redactError(err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return c.redactError(err)
+	}
+	defer resp.Body.Close()
+	var out telegramAPIResponse[map[string]any]
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return c.redactError(err)
+	}
+	if !out.OK {
+		return errors.New(defaultText(out.Description, "telegram sendPhoto failed"))
+	}
+	return nil
+}
+
 // callTelegram handles call telegram HTTP behavior for this service.
 func (c *telegramClient) callTelegram(ctx context.Context, method string, payload any, out any) error {
 	raw, err := json.Marshal(payload)

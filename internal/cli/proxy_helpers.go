@@ -51,6 +51,16 @@ func proxyPresetConfigForServer(srv model.Server) (proxyPresetConfig, error) {
 			GeoSiteCacheName: "proxy-ru-geosite.dat",
 			GeoIPCacheName:   "proxy-ru-geoip.dat",
 		}, nil
+	case model.ProxyPresetCN:
+		return proxyPresetConfig{
+			Key:              model.ProxyPresetCN,
+			DirectDomainSets: []string{"geosite:cn", "regexp:.*\\.cn$", "regexp:.*\\.xn--fiqs8s$", "regexp:.*\\.xn--fiqz9s$", "regexp:.*\\.xn--55qx5d$", "regexp:.*\\.xn--io0a7i$"},
+			DirectIPSets:     []string{"geoip:cn", "geoip:private"},
+			GeoSiteURL:       "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat",
+			GeoIPURL:         "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat",
+			GeoSiteCacheName: "proxy-cn-geosite.dat",
+			GeoIPCacheName:   "proxy-cn-geoip.dat",
+		}, nil
 	default:
 		return proxyPresetConfig{}, fmt.Errorf("unsupported proxy preset %q", strings.TrimSpace(srv.ProxyPreset))
 	}

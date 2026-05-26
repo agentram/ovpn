@@ -53,6 +53,16 @@ func (b *bot) sendDocument(ctx context.Context, chatID int64, filename string, s
 	return nil
 }
 
+func (b *bot) sendPhoto(ctx context.Context, chatID int64, filename string, src io.Reader, caption string, replyMarkup any) error {
+	err := b.tg.sendPhoto(ctx, chatID, filename, src, caption, replyMarkup)
+	if err != nil {
+		b.ensureHealth().onSendFailure(err)
+		return err
+	}
+	b.ensureHealth().onSendSuccess(time.Now().UTC())
+	return nil
+}
+
 func (b *bot) sendHTMLChunks(ctx context.Context, chatID int64, messages []string, replyMarkup any) error {
 	if len(messages) == 0 {
 		return errors.New("empty telegram HTML payload")
