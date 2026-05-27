@@ -27,7 +27,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Versioning
 
-- Current pinned version: `1.4.1`
+- Current pinned version: `1.4.2`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
