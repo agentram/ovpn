@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ovpn - Xray VPN operations CLI</title>
+    <title>ovpn - self-hosted Xray operations for engineers</title>
     <meta
       name="description"
-      content="ovpn is a Go CLI and agent system for operating self-hosted Xray VLESS + REALITY VPN servers over SSH."
+      content="ovpn is a Go CLI, remote agent, and release pipeline for operating self-hosted Xray VLESS + REALITY servers over SSH."
     >
     <style>
       :root {
@@ -34,6 +34,8 @@
           radial-gradient(circle at 15% 5%, rgba(22, 112, 84, 0.16), transparent 24rem),
           linear-gradient(180deg, #fbfaf6 0%, var(--bg) 72%);
       }
+
+      body { overflow-x: hidden; }
 
       a { color: var(--green-dark); }
 
@@ -63,6 +65,7 @@
         flex-wrap: wrap;
         justify-content: flex-end;
         gap: 10px;
+        max-width: 100%;
       }
 
       .nav a,
@@ -79,6 +82,7 @@
         font-size: 0.92rem;
         font-weight: 800;
         text-decoration: none;
+        white-space: nowrap;
       }
 
       .button.primary {
@@ -154,6 +158,28 @@
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.45;
+      }
+
+      .tech-list {
+        display: grid;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .tech-list li {
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 253, 248, 0.76);
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .tech-list code {
+        color: var(--green-dark);
+        font-weight: 800;
       }
 
       section {
@@ -283,7 +309,11 @@
           flex-direction: column;
         }
 
-        .nav { justify-content: flex-start; }
+        .nav {
+          justify-content: flex-start;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
         .hero { min-height: auto; padding-top: 20px; }
         .status-strip { grid-template-columns: 1fr 1fr; }
         .split { grid-template-columns: 1fr; }
@@ -292,7 +322,7 @@
 
       @media (max-width: 460px) {
         .status-strip { grid-template-columns: 1fr; }
-        .button, .nav a { width: 100%; }
+        .button { width: 100%; }
         .actions, .nav { width: 100%; }
       }
     </style>
@@ -302,8 +332,8 @@
       <a class="brand" href="./">ovpn</a>
       <nav class="nav" aria-label="Primary navigation">
         <a href="https://github.com/agentram/ovpn">GitHub</a>
-        <a href="clients.md">Clients</a>
-        <a href="monitoring.md">Monitoring</a>
+        <a href="doc.html?doc=clients.md">Clients</a>
+        <a href="doc.html?doc=monitoring.md">Monitoring</a>
         <a href="donate/">Donate</a>
       </nav>
     </header>
@@ -311,59 +341,59 @@
     <main>
       <section class="wrap hero">
         <div>
-          <div class="eyebrow">Self-hosted VPN operations</div>
-          <h1>VPN server solution based on Xray VLESS + REALITY</h1>
+          <div class="eyebrow">For operators and engineers</div>
+          <h1>Self-hosted Xray operations controlled over SSH</h1>
           <p class="lede">
-            ovpn is a Go CLI and agent system for operating self-hosted Xray servers over SSH. It keeps the public surface small, manages runtime state locally, and deploys Docker Compose services on your own hosts.
+            ovpn is a Go CLI, remote agent, and release pipeline for running Xray VLESS + REALITY on your own hosts. It keeps desired state local, renders deployable runtime bundles, and avoids a public management API.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
-            <a class="button" href="clients.md">Client guide</a>
+            <a class="button" href="doc.html?doc=monitoring.md">Read monitoring docs</a>
             <a class="button" href="donate/">Support development</a>
           </div>
 
           <div class="status-strip">
             <div class="stat">
               <strong>SSH control plane</strong>
-              <span>No public admin API for normal operations.</span>
+              <span>Operations run through authenticated SSH, not an exposed control endpoint.</span>
+            </div>
+            <div class="stat">
+              <strong>Embedded runtime assets</strong>
+              <span>Release CLI embeds Linux agent and Telegram bot binaries for deploys.</span>
             </div>
             <div class="stat">
               <strong>Xray on 443</strong>
-              <span>VLESS + REALITY runtime for client entry.</span>
-            </div>
-            <div class="stat">
-              <strong>Local desired state</strong>
-              <span>Operator data lives under ~/.ovpn.</span>
+              <span>VLESS + REALITY entrypoint with rendered server configuration.</span>
             </div>
             <div class="stat">
               <strong>Optional monitoring</strong>
-              <span>Prometheus, Grafana, Alertmanager, and Telegram relay.</span>
+              <span>Prometheus, Grafana, Alertmanager, and owner-only Telegram operations.</span>
             </div>
           </div>
         </div>
       </section>
 
       <section class="wrap">
-        <h2>What it manages</h2>
+        <h2>What the system actually manages</h2>
         <p class="section-lede">
-          The public repository focuses on the operator CLI, runtime agent, host bootstrap guidance, monitoring definitions, and release automation. Real production inventory and secrets are intentionally kept outside the repo.
+          The project is not a hosted VPN product. It is a self-hosted operations toolchain: CLI state, runtime rendering, remote deployment, sidecar APIs, monitoring bundles, and release automation.
         </p>
         <div class="grid">
           <article class="card">
-            <h3>Server lifecycle</h3>
-            <p>Add servers, initialize hosts, deploy runtime config, check status, inspect logs, run doctor checks, and clean up old runtime safely.</p>
+            <h3>Local desired state</h3>
+            <p>Server and user records live under <code>~/.ovpn</code>. The CLI renders runtime files from that state and pushes them over SSH.</p>
           </article>
           <article class="card">
-            <h3>User operations</h3>
-            <p>Create users, generate VLESS links, mirror users across enabled servers, set expiry dates, and enforce rolling 30 day quota limits.</p>
+            <h3>Runtime agent boundary</h3>
+            <p><code>ovpn-agent</code> exposes local health, stats, quota, and user mutation endpoints inside the deployed host runtime.</p>
+          </article>
+          <article class="card">
+            <h3>User and quota workflow</h3>
+            <p>Users can be mirrored across enabled servers, exported as VLESS links or QR codes, expired, disabled, and quota-limited.</p>
           </article>
           <article class="card">
             <h3>HA proxy topology</h3>
-            <p>Add proxy entrypoints in front of existing VPN backends with split routing, local HAProxy failover, and country-specific presets.</p>
-          </article>
-          <article class="card">
-            <h3>Backups and restore</h3>
-            <p>Create local and remote archives, keep automatic retention, and restore server runtime state when operational recovery is needed.</p>
+            <p>Optional proxy nodes route local-country traffic directly and relay foreign traffic to backend VPN servers through HAProxy.</p>
           </article>
         </div>
       </section>
@@ -371,20 +401,16 @@
       <section class="wrap">
         <div class="split">
           <div>
-            <h2>Operator workflow</h2>
+            <h2>Technical shape</h2>
             <p class="section-lede">
-              Ansible prepares the host baseline and security posture. ovpn owns Xray runtime rendering, deploys the Compose stack, manages users, and exposes optional operational monitoring.
+              The main design boundary is a small public surface, reproducible release artifacts, deploy-time runtime materialization, and enough diagnostics to operate a small fleet without a separate control plane.
             </p>
-            <div class="grid">
-              <article class="card">
-                <h3>Minimal public surface</h3>
-                <p>The recommended production model exposes Xray on 443/tcp and SSH on 22/tcp. Internal agent and monitoring endpoints stay private.</p>
-              </article>
-              <article class="card">
-                <h3>Security defaults</h3>
-                <p>The default minimal profile blocks BitTorrent and public tracker categories and uses threat DNS resolvers unless explicitly disabled.</p>
-              </article>
-            </div>
+            <ul class="tech-list">
+              <li><code>ovpn</code> release archives contain one executable; deploy-time Linux runtime binaries are embedded into the CLI.</li>
+              <li>Remote runtime is Docker Compose under <code>/opt/ovpn</code>; internal agent and monitoring ports stay private by default.</li>
+              <li><code>doctor</code>, logs, status, backup, restore, cleanup, and monitoring commands are first-class operator workflows.</li>
+              <li>GitHub Actions build self-contained releases, run a no-Go deploy smoke, and keep private host inventory outside the public repo.</li>
+            </ul>
           </div>
           <pre class="terminal"><code># Use a release archive, or build from source for development.
 # Release archives contain one executable: ovpn.
@@ -408,17 +434,17 @@
       <section class="wrap">
         <h2>Documentation</h2>
         <p class="section-lede">
-          Start with the README for operator setup. The docs below cover client onboarding, monitoring, high availability, security, CI, testing, and upgrades.
+          Start with the README for setup. Documentation links below open in the site renderer so Markdown files are readable on GitHub Pages.
         </p>
         <div class="doc-list">
           <a href="https://github.com/agentram/ovpn#readme">README <span>Operator entrypoint and quick start.</span></a>
-          <a href="clients.md">Client guide <span>End-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
-          <a href="monitoring.md">Monitoring <span>Prometheus, Grafana, alerts, and Telegram bot operations.</span></a>
-          <a href="ha.md">HA topology <span>Proxy role, backend pools, split routing, and failure model.</span></a>
-          <a href="security.md">Security model <span>Threat surface, REALITY guidance, host hardening, and secrets handling.</span></a>
-          <a href="ci.md">CI/CD <span>Public workflow boundaries, release rules, and local parity checks.</span></a>
-          <a href="testing.md">Testing <span>Repository test strategy and validation commands.</span></a>
-          <a href="upgrades.md">Upgrades <span>Version bumps, rollback, cleanup, and operational recovery.</span></a>
+          <a href="doc.html?doc=clients.md">Client guide <span>End-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
+          <a href="doc.html?doc=monitoring.md">Monitoring <span>Prometheus, Grafana, alerts, and Telegram bot operations.</span></a>
+          <a href="doc.html?doc=ha.md">HA topology <span>Proxy role, backend pools, split routing, and failure model.</span></a>
+          <a href="doc.html?doc=security.md">Security model <span>Threat surface, REALITY guidance, host hardening, and secrets handling.</span></a>
+          <a href="doc.html?doc=ci.md">CI/CD <span>Public workflow boundaries, release rules, and local parity checks.</span></a>
+          <a href="doc.html?doc=testing.md">Testing <span>Repository test strategy and validation commands.</span></a>
+          <a href="doc.html?doc=upgrades.md">Upgrades <span>Version bumps, rollback, cleanup, and operational recovery.</span></a>
         </div>
       </section>
 
