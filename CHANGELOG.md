@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.2
+
+### Fixed
+- Telegram bot stale polling now degrades health metrics without failing the Docker healthcheck, avoiding restart loops during temporary Telegram API outages.
+
 ## 1.4.1
 
 ### Added

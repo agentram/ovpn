@@ -86,12 +86,12 @@ func (h *botHealth) snapshot(now time.Time) botHealthSnapshot {
 	staleAfter := h.staleAfter()
 	switch {
 	case h.lastPollSuccess.IsZero() && now.UTC().Sub(h.startedAt) > staleAfter:
-		status = "unhealthy"
-		ok = false
+		status = "degraded"
+		ok = true
 		h.watchdogUnhealthy = true
 	case !h.lastPollSuccess.IsZero() && now.UTC().Sub(h.lastPollSuccess) > staleAfter:
-		status = "unhealthy"
-		ok = false
+		status = "degraded"
+		ok = true
 		h.watchdogUnhealthy = true
 	case h.consecutiveSendFailures >= 3:
 		status = "degraded"
@@ -126,19 +126,20 @@ func (b *bot) healthSnapshot() botHealthSnapshot {
 func (b *bot) watchdogLoop(ctx context.Context) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
+	wasUnhealthy := false
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			snap := b.healthSnapshot()
-			if snap.Status != "unhealthy" {
+			if !snap.WatchdogUnhealthy {
+				wasUnhealthy = false
 				continue
 			}
-			b.logger.Error("telegram bot watchdog detected unhealthy polling state", "last_poll_success", snap.LastPollSuccess, "consecutive_poll_failures", snap.ConsecutivePollFailures, "last_poll_failure", snap.LastPollFailure)
-			if b.exitFn != nil {
-				b.exitFn(1)
-				return
+			if !wasUnhealthy {
+				b.logger.Warn("telegram bot polling is stale; keeping process alive for recovery", "last_poll_success", snap.LastPollSuccess, "consecutive_poll_failures", snap.ConsecutivePollFailures, "last_poll_failure", snap.LastPollFailure)
+				wasUnhealthy = true
 			}
 		}
 	}
