@@ -118,7 +118,7 @@ Bot metrics exported by `ovpn-telegram-bot`:
   - `/users` shows expiry date and state (`no-exp`, `expiring`, `expired`)
   - `/doctor` includes `expiring_2d` and `expired` counts
   - Optional `User link` generation fails open: broken link config disables only that feature and does not stop alert delivery
-  - Polling stale state triggers an in-process watchdog exit so Compose `restart: unless-stopped` can recover the bot
+  - Polling stale state is exposed through bot health/metrics while the process stays alive, so temporary Telegram API outages do not create a restart loop
 
 ```text
 Telegram <-> ovpn-telegram-bot (long polling)

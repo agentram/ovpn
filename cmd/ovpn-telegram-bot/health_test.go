@@ -20,8 +20,8 @@ func TestBotHealthSnapshotTransitions(t *testing.T) {
 	h.startedAt = time.Now().UTC().Add(-5 * time.Minute)
 
 	snap := h.snapshot(time.Now().UTC())
-	if snap.Status != "unhealthy" || snap.OK {
-		t.Fatalf("expected unhealthy startup snapshot, got %+v", snap)
+	if snap.Status != "degraded" || !snap.OK || !snap.WatchdogUnhealthy {
+		t.Fatalf("expected degraded stale-polling startup snapshot, got %+v", snap)
 	}
 
 	h.onPollSuccess(time.Now().UTC())
@@ -52,7 +52,7 @@ func TestBuildPreformattedMessagesSplitsLongContent(t *testing.T) {
 	}
 }
 
-func TestHandleHealthReturnsServiceUnavailableWhenPollingStale(t *testing.T) {
+func TestHandleHealthReturnsOKWhenPollingStale(t *testing.T) {
 	t.Parallel()
 
 	b := &bot{
@@ -65,11 +65,11 @@ func TestHandleHealthReturnsServiceUnavailableWhenPollingStale(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	b.handleHealth(rec, req)
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), `"status":"unhealthy"`) {
-		t.Fatalf("expected unhealthy payload, got %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `"status":"degraded"`) || !strings.Contains(rec.Body.String(), `"watchdog_unhealthy":true`) {
+		t.Fatalf("expected degraded stale-polling payload, got %s", rec.Body.String())
 	}
 }
 
