@@ -92,6 +92,17 @@ func TestQuotaSetRejectsUnexpectedTrailingUnit(t *testing.T) {
 	}
 }
 
+func TestQuotaSetRejectsConflictingFlagsBeforeStoreLookup(t *testing.T) {
+	t.Parallel()
+
+	cmd := (&App{}).userCmd()
+	cmd.SetArgs([]string{"quota-set", "--username", "alice", "--monthly-gb", "1", "--monthly-bytes", "1"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "only one") {
+		t.Fatalf("expected quota flag conflict before store lookup, got %v", err)
+	}
+}
+
 func TestUserCommandsRejectUnexpectedArgs(t *testing.T) {
 	t.Parallel()
 
@@ -116,6 +127,64 @@ func TestUserCommandsRejectUnexpectedArgs(t *testing.T) {
 			err := cmd.Execute()
 			if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("unknown command %q", "extra")) && !strings.Contains(err.Error(), "accepts 0 arg(s)") {
 				t.Fatalf("expected unexpected arg error for %v, got %v", args, err)
+			}
+		})
+	}
+}
+
+func TestUserCommandsRejectBlankRequiredFlagsBeforeStoreLookup(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "add username", args: []string{"add", "--username", " "}, want: "--username is required"},
+		{name: "rm username", args: []string{"rm", "--username", " "}, want: "--username is required"},
+		{name: "enable username", args: []string{"enable", "--username", " "}, want: "--username is required"},
+		{name: "disable username", args: []string{"disable", "--username", " "}, want: "--username is required"},
+		{name: "expiry-set username", args: []string{"expiry-set", "--username", " ", "--date", "2026-12-31"}, want: "--username is required"},
+		{name: "expiry-clear username", args: []string{"expiry-clear", "--username", " "}, want: "--username is required"},
+		{name: "list server", args: []string{"list", "--server", " "}, want: "--server is required"},
+		{name: "show server", args: []string{"show", "--server", " ", "--username", "alice"}, want: "--server is required"},
+		{name: "show username", args: []string{"show", "--server", "main", "--username", " "}, want: "--username is required"},
+		{name: "top server", args: []string{"top", "--server", " "}, want: "--server is required"},
+		{name: "quota-reset username", args: []string{"quota-reset", "--username", " "}, want: "--username is required"},
+		{name: "quota-set username", args: []string{"quota-set", "--username", " ", "--monthly-gb", "400"}, want: "--username is required"},
+		{name: "link server", args: []string{"link", "--server", " ", "--username", "alice"}, want: "--server is required"},
+		{name: "link username", args: []string{"link", "--server", "main", "--username", " "}, want: "--username is required"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := (&App{}).userCmd()
+			cmd.SetArgs(tc.args)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q for %v, got %v", tc.want, tc.args, err)
+			}
+		})
+	}
+}
+
+func TestUserAddRejectsInvalidScalarInputsBeforeStoreLookup(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "negative quota", args: []string{"add", "--username", "alice", "--quota-bytes", "-1"}, want: "--quota-bytes must be >= 0"},
+		{name: "bad uuid", args: []string{"add", "--username", "alice", "--uuid", "bad"}, want: "--uuid must be a valid UUID"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := (&App{}).userCmd()
+			cmd.SetArgs(tc.args)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q for %v, got %v", tc.want, tc.args, err)
 			}
 		})
 	}

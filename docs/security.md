@@ -4,7 +4,7 @@ This document defines the practical security posture for `ovpn`.
 
 ## Scope
 
-Recommended VPS/VDS model:
+Recommended host model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
 - SSH control plane on `22/tcp`
@@ -161,7 +161,7 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 - Remote server backup archives: keep latest `7`.
 - Local backup archives: keep latest `7`.
 - Remote pre-deploy snapshots (`ovpn-*`): keep latest `7`.
-- Monitoring defaults are tuned for 1GB-class VPS:
+- Monitoring defaults are tuned for small 1GB-class hosts:
   - Prometheus scrape/evaluation interval `30s`
   - Prometheus TSDB retention `10d`
   - cAdvisor housekeeping `30s`, max `2m`

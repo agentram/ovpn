@@ -36,6 +36,8 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 			if strings.TrimSpace(reconcile.toServer) != "" && reconcile.all {
 				return fmt.Errorf("cannot use --to-server and --all together")
 			}
+			reconcile.fromServer = strings.TrimSpace(reconcile.fromServer)
+			reconcile.toServer = strings.TrimSpace(reconcile.toServer)
 
 			source, err := a.store.GetServerByName(a.ctx, reconcile.fromServer)
 			if err != nil {

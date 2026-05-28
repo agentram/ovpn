@@ -4,14 +4,14 @@
 [![Security](https://github.com/agentram/ovpn/actions/workflows/security.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/security.yml)
 [![Release](https://github.com/agentram/ovpn/actions/workflows/release.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/release.yml)
 
-`ovpn` is a Go CLI for running self-hosted Xray (`VLESS + REALITY`) VPN servers over SSH.
+`ovpn` operates self-hosted Xray (`VLESS + REALITY`) VPN servers from a local Go CLI over SSH.
 
-It is built for operator-managed deployments: one VPS/VDS, a small fleet of VPN servers, or an HA proxy entrypoint in front of several backends.
+The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
 ## Fast navigation
 
 - [Architecture](#architecture)
-- [Advantages](#advantages)
+- [Design points](#design-points)
 - [Security and quota defaults](#security-and-quota-defaults)
 - [Quick start](#quick-start)
 - [Production flow](#production-flow)
@@ -46,52 +46,53 @@ flowchart LR
     ci["GitHub Actions\nCI, security, release"]
   end
 
-  subgraph vpn["VPN host"]
-    compose["/opt/ovpn\nDocker Compose"]
-    xray["Xray\nVLESS + REALITY\n443/tcp"]
-    agent["ovpn-agent\nusers, quotas, health, metrics"]
-    monitoring["optional monitoring\nPrometheus, Grafana,\nAlertmanager, Telegram bot"]
-    backups["backups + cleanup\nlocal and remote snapshots"]
+  subgraph vpn["VPN host(s)"]
+    hostA["VPN host A\n/opt/ovpn\nXray 443 + agent"]
+    hostN["VPN host B..N\nsame runtime model"]
+    monitoring["optional monitoring\nPrometheus/Grafana\nTelegram bot"]
+    backups["backup + cleanup\nsnapshots"]
   end
 
   subgraph ha["Optional HA entrypoint"]
     proxy["HAProxy proxy\ncountry preset routing"]
-    backends["backend pool\nfailover targets"]
+    backends["VPN backend pool\nhost A..N"]
   end
 
   clients["Clients\nmobile / desktop\nVLESS link or QR"]
 
   state --> cli
-  ansible -->|bootstrap| compose
+  ansible -->|bootstrap| hostA
+  ansible -->|bootstrap| hostN
   ci -->|validated release binary| cli
-  cli -->|SSH/SCP render + deploy| compose
-  compose --> xray
-  compose --> agent
-  compose --> monitoring
-  compose --> backups
-  agent -->|sync runtime users + quotas| xray
-  proxy -->|foreign traffic relay| backends
-  backends --> xray
+  cli -->|SSH/SCP deploy| hostA
+  cli -->|SSH/SCP deploy| hostN
+  hostA --> monitoring
+  hostN --> monitoring
+  hostA --> backups
+  hostN --> backups
+  proxy -->|foreign relay| backends
+  backends --> hostA
+  backends --> hostN
   clients -->|443/tcp| proxy
-  clients -->|direct 443/tcp| xray
+  clients -->|direct 443/tcp| hostA
+  clients -->|direct 443/tcp| hostN
 
   class cli,state,ansible,ci operator
-  class compose host
-  class xray,agent,backups runtime
+  class hostA,hostN host
+  class backups runtime
   class monitoring,proxy,backends optional
   class clients client
 ```
 
-## Advantages
+## Design points
 
-- Go CLI: one local binary for day-to-day operations, release archives embed the Linux runtime assets needed for deploys.
-- Local desired state: servers and users are tracked in `~/.ovpn`, which makes repeated deploys and multi-server automation straightforward.
-- Docker runtime: Xray, agent, optional proxy, and monitoring run through Docker Compose under `/opt/ovpn`.
-- SSH/SCP control path: deploys work with normal server access and do not require exposing a separate management API.
-- Multi-server user lifecycle: user add/remove/enable/disable/quota commands apply to all enabled servers by default.
-- HA proxy mode: optional HAProxy entrypoint can route local-country traffic directly and relay foreign traffic to backend VPN servers.
-- Security defaults: minimal profile blocks BitTorrent protocol traffic and public tracker domains; optional Ansible rules can block Tor exit-node traffic at host level.
-- Operational maintenance: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are first-class workflows.
+- Local state: `~/.ovpn` stores servers, users, quotas, and metadata used for rendering.
+- SSH/SCP deploy path: commands render files locally and apply them through normal server access.
+- Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
+- Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
+- Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
+- Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering.
+- Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
 
 ## Key features
 
@@ -129,7 +130,7 @@ flowchart LR
 - Release binary, or Go `1.26.2+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
-- Clean VPS/VDS recommended
+- Clean Linux host recommended
 - Root SSH access is the simplest supported setup
 - Docker/Compose on the host, usually installed by the Ansible bootstrap
 
@@ -155,7 +156,7 @@ See [`docs/security.md`](docs/security.md) for the full security model.
 - Remote server backups: keep latest `7`
 - Local backups: keep latest `7`
 - Remote pre-deploy snapshots: keep latest `7`
-- Monitoring defaults are sized for small VPS/VDS hosts:
+- Monitoring defaults are sized for small hosts:
   - Prometheus scrape/evaluation interval: `30s`
   - Prometheus retention: `10d`
   - cAdvisor housekeeping: `30s`

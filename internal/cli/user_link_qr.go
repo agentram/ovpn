@@ -11,7 +11,7 @@ import (
 )
 
 const userLinkQRCodeSize = 512
-const terminalQRCodeQuietZoneCells = 3
+const terminalQRCodeQuietZoneCells = 2
 
 func renderTerminalQRCode(link string) (string, error) {
 	qr, err := qrcode.New(link, qrcode.Low)

@@ -29,12 +29,23 @@ func (a *App) newUserAddCmd() *cobra.Command {
 		Short: "Add user",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			targets, err := a.resolveUserMutationServers()
+			username, err := requiredFlagValue("--username", add.username)
 			if err != nil {
 				return err
 			}
+			add.username = username
+			add.uuid = strings.TrimSpace(add.uuid)
+			if add.quota < 0 {
+				return fmt.Errorf("--quota-bytes must be >= 0")
+			}
 			if add.uuid == "" {
 				add.uuid = uuid.NewString()
+			} else if _, err := uuid.Parse(add.uuid); err != nil {
+				return fmt.Errorf("--uuid must be a valid UUID")
+			}
+			targets, err := a.resolveUserMutationServers()
+			if err != nil {
+				return err
 			}
 			email := strings.TrimSpace(add.email)
 			if email == "" {
@@ -108,6 +119,11 @@ func (a *App) newUserExpirySetCmd() *cobra.Command {
 		Short: "Set user expiration date",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", set.username)
+			if err != nil {
+				return err
+			}
+			set.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -157,6 +173,11 @@ func (a *App) newUserExpiryClearCmd() *cobra.Command {
 		Short: "Clear user expiration date",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", clear.username)
+			if err != nil {
+				return err
+			}
+			clear.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -197,6 +218,11 @@ func (a *App) newUserRemoveCmd() *cobra.Command {
 		Short: "Remove user",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", rm.username)
+			if err != nil {
+				return err
+			}
+			rm.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -253,6 +279,11 @@ func (a *App) newUserSetEnabledCmd(enable bool) *cobra.Command {
 		Short: short,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", toggle.username)
+			if err != nil {
+				return err
+			}
+			toggle.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -291,6 +322,11 @@ func (a *App) newUserListCmd() *cobra.Command {
 		Short: "List users",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", list.server)
+			if err != nil {
+				return err
+			}
+			list.server = server
 			srv, err := a.store.GetServerByName(a.ctx, list.server)
 			if err != nil {
 				return err
@@ -328,6 +364,16 @@ func (a *App) newUserShowCmd() *cobra.Command {
 		Short: "Show user",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", show.server)
+			if err != nil {
+				return err
+			}
+			username, err := requiredFlagValue("--username", show.username)
+			if err != nil {
+				return err
+			}
+			show.server = server
+			show.username = username
 			srv, err := a.store.GetServerByName(a.ctx, show.server)
 			if err != nil {
 				return err

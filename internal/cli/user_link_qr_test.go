@@ -165,6 +165,39 @@ func TestTerminalQRCodeStaysCompactForVLESSLinks(t *testing.T) {
 	}
 }
 
+func TestTerminalQRCodeKeepsVerticalQuietZone(t *testing.T) {
+	t.Parallel()
+
+	qrText, err := renderTerminalQRCode(testAliceVLESSLink)
+	if err != nil {
+		t.Fatalf("renderTerminalQRCode: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(qrText, "\n"), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected QR rows, got %d", len(lines))
+	}
+	if !isUniformTerminalQRLine(lines[0]) {
+		t.Fatalf("top QR quiet zone was clipped: %q", lines[0])
+	}
+	if !isUniformTerminalQRLine(lines[len(lines)-1]) {
+		t.Fatalf("bottom QR quiet zone was clipped: %q", lines[len(lines)-1])
+	}
+}
+
+func isUniformTerminalQRLine(line string) bool {
+	runes := []rune(line)
+	if len(runes) == 0 {
+		return false
+	}
+	first := runes[0]
+	for _, r := range runes[1:] {
+		if r != first {
+			return false
+		}
+	}
+	return true
+}
+
 func assertPNGQRCodeFile(t *testing.T, path string) {
 	t.Helper()
 

@@ -128,18 +128,6 @@
         gap: 12px;
       }
 
-      .badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 20px;
-      }
-
-      .badges img {
-        display: block;
-        height: 20px;
-      }
-
       .quick-nav {
         display: flex;
         flex-wrap: wrap;
@@ -182,6 +170,7 @@
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.45;
+        overflow-wrap: anywhere;
       }
 
       .tech-list {
@@ -292,6 +281,7 @@
         color: var(--muted);
         font-size: 0.94rem;
         line-height: 1.48;
+        overflow-wrap: anywhere;
       }
 
       .arch-node code {
@@ -382,6 +372,7 @@
         margin-bottom: 0;
         color: var(--muted);
         line-height: 1.55;
+        overflow-wrap: anywhere;
       }
 
       .split {
@@ -522,7 +513,7 @@
       <a class="brand" href="./">ovpn</a>
       <nav class="nav" aria-label="Primary navigation">
         <a href="https://github.com/agentram/ovpn">GitHub</a>
-        <a href="#advantages">Advantages</a>
+        <a href="#design">Design</a>
         <a href="#architecture">Architecture</a>
         <a href="#docs">Docs</a>
         <a href="donate/">Donate</a>
@@ -535,20 +526,15 @@
           <div class="eyebrow">For operators and engineers</div>
           <h1>Self-hosted Xray operations controlled over SSH</h1>
           <p class="lede">
-            ovpn is a Go CLI for operating Xray VLESS + REALITY hosts from local desired state. It renders Docker Compose runtime bundles, pushes them over SSH/SCP, and keeps maintenance practical across one server or a small fleet.
+            ovpn operates Xray VLESS + REALITY from local state. The CLI stores servers and users in <code>~/.ovpn</code>, renders Docker Compose files, and applies them to Linux hosts over SSH/SCP.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
             <a class="button" href="#architecture">View architecture</a>
             <a class="button" href="#quick-commands">Quick commands</a>
           </div>
-          <div class="badges" aria-label="CI status">
-            <a href="https://github.com/agentram/ovpn/actions/workflows/ci.yml"><img alt="Go Quality" src="https://github.com/agentram/ovpn/actions/workflows/ci.yml/badge.svg"></a>
-            <a href="https://github.com/agentram/ovpn/actions/workflows/security.yml"><img alt="Security" src="https://github.com/agentram/ovpn/actions/workflows/security.yml/badge.svg"></a>
-            <a href="https://github.com/agentram/ovpn/actions/workflows/release.yml"><img alt="Release" src="https://github.com/agentram/ovpn/actions/workflows/release.yml/badge.svg"></a>
-          </div>
           <div class="quick-nav" aria-label="Fast navigation">
-            <a href="#advantages">advantages</a>
+            <a href="#design">design</a>
             <a href="#architecture">architecture</a>
             <a href="#automation">automation</a>
             <a href="#docs">docs</a>
@@ -558,46 +544,46 @@
 
           <div class="status-strip">
             <div class="stat">
-              <strong>Go CLI</strong>
-              <span>One local binary for deploy, users, quotas, status, logs, backups, and cleanup.</span>
+              <strong>Local state</strong>
+              <span><code>~/.ovpn</code> stores server, user, quota, and deploy metadata.</span>
             </div>
             <div class="stat">
               <strong>Docker runtime</strong>
-              <span>Xray, agent, optional proxy, and monitoring run under Compose in /opt/ovpn.</span>
+              <span>Xray, agent, optional proxy, and monitoring run under Compose in <code>/opt/ovpn</code>.</span>
             </div>
             <div class="stat">
-              <strong>Local state</strong>
-              <span>Servers and users live under ~/.ovpn and are rendered into remote desired state.</span>
+              <strong>SSH deploy</strong>
+              <span>The CLI renders files locally and pushes runtime bundles over SSH/SCP.</span>
             </div>
             <div class="stat">
-              <strong>HA option</strong>
-              <span>HAProxy entrypoint can route preset-local traffic and fail over backend VPN nodes.</span>
+              <strong>Proxy role</strong>
+              <span>HAProxy can front several VPN backends and apply country preset routing.</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="wrap" id="advantages">
-        <h2>Advantages for operating many servers</h2>
+      <section class="wrap" id="design">
+        <h2>Design points</h2>
         <p class="section-lede">
-          The project focuses on repeatable operator workflows: local desired state, Docker-based runtime isolation, simple SSH automation, and enough diagnostics to maintain several VPN hosts without a separate control plane.
+          The project keeps the control plane local. It uses Go for the operator CLI, Docker Compose for the remote runtime, and Ansible for host bootstrap and hardening.
         </p>
         <div class="grid">
           <article class="card">
-            <h3>Desired state on servers</h3>
-            <p>The CLI stores server and user state locally, renders Xray/Compose files, and deploys the same model repeatedly to remote hosts.</p>
+            <h3>Local desired state</h3>
+            <p>Servers, users, quotas, and runtime intent are stored locally, then rendered into remote files when deploy runs.</p>
           </article>
           <article class="card">
-            <h3>Easy automation</h3>
-            <p>Commands are scriptable: add users, set quotas, deploy, run doctor checks, collect logs, back up, restore, and clean up old runtime.</p>
+            <h3>Scriptable CLI</h3>
+            <p>Commands cover deploy, users, quotas, doctor checks, logs, backup, restore, cleanup, and monitoring setup.</p>
           </article>
           <article class="card">
             <h3>Security baseline</h3>
             <p>Ansible handles host hardening. The minimal Xray profile blocks BitTorrent and public trackers; optional host rules block Tor exit traffic.</p>
           </article>
           <article class="card">
-            <h3>HA proxy topology</h3>
-            <p>Proxy nodes can sit in front of backends, route local-country destinations directly, and relay foreign traffic with backend failover.</p>
+            <h3>Multiple VPN hosts</h3>
+            <p>User mutations can apply to all enabled VPN hosts. A proxy host can route traffic to a backend pool when HA is needed.</p>
           </article>
         </div>
       </section>
@@ -605,7 +591,7 @@
       <section class="wrap" id="architecture">
         <h2>Highlighted architecture</h2>
         <p class="section-lede">
-          The public endpoint is the VPN service itself. Operations happen from the operator machine over SSH/SCP, while the remote host keeps runtime pieces isolated in Docker Compose.
+          Operations run from the operator machine. VPN hosts receive rendered Compose bundles; clients connect either directly to a VPN host or through an optional HAProxy entrypoint.
         </p>
         <div class="arch-panel" aria-label="ovpn architecture diagram">
           <div class="arch-header">
@@ -622,7 +608,7 @@
               <div class="arch-lane">Operator machine</div>
               <div class="arch-node">
                 <strong>ovpn CLI</strong>
-                <span>One Go binary for deploys, users, quotas, status, logs, backup, restore, and cleanup.</span>
+                <span>Runs deploys, user changes, quotas, status checks, logs, backup, restore, and cleanup.</span>
               </div>
               <div class="arch-node">
                 <strong>Local state</strong>
@@ -635,14 +621,14 @@
             </div>
             <div class="arch-arrow-column" aria-hidden="true"><div class="arch-arrow"></div></div>
             <div class="arch-stack">
-              <div class="arch-lane">VPN host runtime</div>
+              <div class="arch-lane">VPN hosts runtime</div>
               <div class="arch-node host">
-                <strong>/opt/ovpn</strong>
-                <span>Rendered Docker Compose bundle, runtime config, local agent database, and remote snapshots.</span>
+                <strong>VPN host A</strong>
+                <span><code>/opt/ovpn</code> contains Docker Compose, Xray on <code>443/tcp</code>, ovpn-agent, and snapshots.</span>
               </div>
               <div class="arch-node runtime">
-                <strong>Xray + ovpn-agent</strong>
-                <span>Xray serves VLESS + REALITY on <code>443/tcp</code>. The agent applies user mutations, quota sync, health, and metrics.</span>
+                <strong>VPN host B..N</strong>
+                <span>Additional hosts use the same rendered runtime model for users, quotas, health, and metrics.</span>
               </div>
               <div class="arch-node optional">
                 <strong>Monitoring</strong>
@@ -654,7 +640,7 @@
               <div class="arch-lane">Traffic path</div>
               <div class="arch-node optional">
                 <strong>HAProxy entrypoint</strong>
-                <span>Optional proxy node with country presets, local-destination bypass, foreign relay, and backend failover.</span>
+                <span>Optional proxy node with country presets, local-destination bypass, foreign relay, and backend pool failover.</span>
               </div>
               <div class="arch-node client">
                 <strong>Clients</strong>
@@ -675,7 +661,7 @@
           <div>
             <h2>Automation and maintenance</h2>
             <p class="section-lede">
-              The CLI is the operator surface. Release builds embed the Linux runtime assets, so normal deploys do not need Go, source checkout, or sidecar binaries next to <code>ovpn</code>.
+              Release builds embed the Linux runtime assets, so normal deploys do not need Go, source checkout, or sidecar binaries next to <code>ovpn</code>.
             </p>
             <ul class="tech-list">
               <li><code>server init</code> and <code>deploy</code> render the desired state and apply it through SSH/SCP.</li>

@@ -26,6 +26,11 @@ func (a *App) newUserTopCmd() *cobra.Command {
 		Short: "Show top users by total traffic",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", top.server)
+			if err != nil {
+				return err
+			}
+			top.server = server
 			srv, err := a.store.GetServerByName(a.ctx, top.server)
 			if err != nil {
 				return err
@@ -89,6 +94,11 @@ func (a *App) newUserQuotaResetCmd() *cobra.Command {
 		Short: "Clear quota block for user and re-add at runtime",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", quotaReset.username)
+			if err != nil {
+				return err
+			}
+			quotaReset.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -140,6 +150,11 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 			return fmt.Errorf("unexpected argument %q; use --monthly-gb 400 or --monthly-bytes <bytes>", args[0])
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", quotaSet.username)
+			if err != nil {
+				return err
+			}
+			quotaSet.username = username
 			monthlyByte, err := quotaBytesFromFlags(
 				quotaSet.monthlyByte,
 				quotaSet.monthlyGB,
@@ -214,6 +229,16 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 		Short: "Generate vless:// link",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", link.server)
+			if err != nil {
+				return err
+			}
+			username, err := requiredFlagValue("--username", link.username)
+			if err != nil {
+				return err
+			}
+			link.server = server
+			link.username = username
 			srv, err := a.store.GetServerByName(a.ctx, link.server)
 			if err != nil {
 				return err
