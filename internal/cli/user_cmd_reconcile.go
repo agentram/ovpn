@@ -28,6 +28,7 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reconcile",
 		Short: "Reconcile users from one server to others (dry-run by default)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(reconcile.fromServer) == "" {
 				return fmt.Errorf("--from-server is required")

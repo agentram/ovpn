@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -27,18 +28,53 @@ func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any)
 	cfg := sshFromServer(srv)
 	var cmd string
 	if payload == nil {
-		cmd = fmt.Sprintf("curl --max-time 10 -fsS -X %s '%s'", method, url)
+		cmd = fmt.Sprintf("curl --max-time 10 -sS -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s '%s'", method, url)
 	} else {
 		b, _ := json.Marshal(payload)
 		// Send payload through stdin to avoid shell escaping bugs and leaking large JSON in logs.
-		cmd = fmt.Sprintf("cat <<'JSON' | curl --max-time 10 -fsS -X %s -H 'Content-Type: application/json' -d @- '%s'\n%s\nJSON", method, url, string(b))
+		cmd = fmt.Sprintf("cat <<'JSON' | curl --max-time 10 -sS -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s -H 'Content-Type: application/json' -d @- '%s'\n%s\nJSON", method, url, string(b))
 	}
 	a.log().Debug("calling remote agent endpoint", "server", srv.Name, "host", srv.Host, "method", method, "url", url, "has_payload", payload != nil)
 	res, err := runner.Exec(a.ctx, cfg, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("remote http call %s %s on %s failed: %w", method, url, srv.Host, err)
 	}
-	return []byte(strings.TrimSpace(res.Stdout)), nil
+	body, status, err := parseRemoteHTTPResponse(res.Stdout)
+	if err != nil {
+		return nil, fmt.Errorf("remote http call %s %s on %s returned invalid response: %w", method, url, srv.Host, err)
+	}
+	if status < 200 || status >= 300 {
+		msg := strings.TrimSpace(body)
+		if msg == "" {
+			msg = httpStatusText(status)
+		}
+		return nil, fmt.Errorf("remote http call %s %s on %s returned %d: %s", method, url, srv.Host, status, msg)
+	}
+	return []byte(strings.TrimSpace(body)), nil
+}
+
+func parseRemoteHTTPResponse(raw string) (string, int, error) {
+	const marker = "\nOVPN_HTTP_STATUS:"
+	idx := strings.LastIndex(raw, marker)
+	if idx < 0 {
+		return "", 0, fmt.Errorf("missing HTTP status marker")
+	}
+	statusText := strings.TrimSpace(raw[idx+len(marker):])
+	status, err := strconv.Atoi(statusText)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid HTTP status %q", statusText)
+	}
+	if status <= 0 {
+		return "", 0, fmt.Errorf("invalid HTTP status %d", status)
+	}
+	return raw[:idx], status, nil
+}
+
+func httpStatusText(status int) string {
+	if text := strings.TrimSpace(http.StatusText(status)); text != "" {
+		return text
+	}
+	return "HTTP error"
 }
 
 // agentHostPort returns agent host port.

@@ -27,6 +27,7 @@ func (a *App) newUserAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add user",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
@@ -105,6 +106,7 @@ func (a *App) newUserExpirySetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "expiry-set",
 		Short: "Set user expiration date",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
@@ -153,6 +155,7 @@ func (a *App) newUserExpiryClearCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "expiry-clear",
 		Short: "Clear user expiration date",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
@@ -192,6 +195,7 @@ func (a *App) newUserRemoveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rm",
 		Short: "Remove user",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
@@ -247,6 +251,7 @@ func (a *App) newUserSetEnabledCmd(enable bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: short,
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
@@ -284,6 +289,7 @@ func (a *App) newUserListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List users",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srv, err := a.store.GetServerByName(a.ctx, list.server)
 			if err != nil {
@@ -320,6 +326,7 @@ func (a *App) newUserShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show",
 		Short: "Show user",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srv, err := a.store.GetServerByName(a.ctx, show.server)
 			if err != nil {

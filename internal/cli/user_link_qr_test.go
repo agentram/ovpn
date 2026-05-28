@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/skip2/go-qrcode"
 
@@ -116,7 +117,7 @@ func TestUserLinkPrintsAndWritesQR(t *testing.T) {
 func TestTerminalQRCodeTrimsQuietZone(t *testing.T) {
 	t.Parallel()
 
-	qr, err := qrcode.New(testAliceVLESSLink, qrcode.Medium)
+	qr, err := qrcode.New(testAliceVLESSLink, qrcode.Low)
 	if err != nil {
 		t.Fatalf("build QR: %v", err)
 	}
@@ -130,6 +131,37 @@ func TestTerminalQRCodeTrimsQuietZone(t *testing.T) {
 	}
 	if len(strings.Split(strings.TrimRight(trimmed, "\n"), "\n")) >= len(strings.Split(strings.TrimRight(full, "\n"), "\n")) {
 		t.Fatalf("expected trimmed terminal QR to use fewer rows")
+	}
+	if !utf8.ValidString(trimmed) {
+		t.Fatalf("terminal QR must be valid UTF-8")
+	}
+	if strings.ContainsRune(trimmed, '\uFFFD') {
+		t.Fatalf("terminal QR must not contain replacement characters")
+	}
+}
+
+func TestTrimTerminalQRCodeQuietZoneIsRuneSafe(t *testing.T) {
+	t.Parallel()
+
+	got := trimTerminalQRCodeQuietZone("▀▀▀\n▀█▀\n▀▀▀\n", 1)
+	if got != "█\n" {
+		t.Fatalf("unexpected trimmed QR: %q", got)
+	}
+	if !utf8.ValidString(got) {
+		t.Fatalf("trimmed QR must be valid UTF-8")
+	}
+}
+
+func TestTerminalQRCodeStaysCompactForVLESSLinks(t *testing.T) {
+	t.Parallel()
+
+	qrText, err := renderTerminalQRCode(testAliceVLESSLink)
+	if err != nil {
+		t.Fatalf("renderTerminalQRCode: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(qrText, "\n"), "\n")
+	if len(lines) > 34 {
+		t.Fatalf("expected compact terminal QR, got %d rows", len(lines))
 	}
 }
 

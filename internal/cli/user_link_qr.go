@@ -11,13 +11,14 @@ import (
 )
 
 const userLinkQRCodeSize = 512
+const terminalQRCodeQuietZoneCells = 3
 
 func renderTerminalQRCode(link string) (string, error) {
-	qr, err := qrcode.New(link, qrcode.Medium)
+	qr, err := qrcode.New(link, qrcode.Low)
 	if err != nil {
 		return "", err
 	}
-	return trimTerminalQRCodeQuietZone(qr.ToSmallString(false), 2), nil
+	return trimTerminalQRCodeQuietZone(qr.ToSmallString(false), terminalQRCodeQuietZoneCells), nil
 }
 
 func trimTerminalQRCodeQuietZone(qrText string, cells int) string {
@@ -31,10 +32,11 @@ func trimTerminalQRCodeQuietZone(qrText string, cells int) string {
 	}
 	lines = lines[trimRows : len(lines)-trimRows]
 	for i, line := range lines {
-		if len(line) <= cells*2 {
+		runes := []rune(line)
+		if len(runes) <= cells*2 {
 			return qrText
 		}
-		lines[i] = line[cells : len(line)-cells]
+		lines[i] = string(runes[cells : len(runes)-cells])
 	}
 	return strings.Join(lines, "\n") + "\n"
 }

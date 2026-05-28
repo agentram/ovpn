@@ -1,18 +1,97 @@
 # ovpn
 
+[![Go Quality](https://github.com/agentram/ovpn/actions/workflows/ci.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/ci.yml)
+[![Security](https://github.com/agentram/ovpn/actions/workflows/security.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/security.yml)
+[![Release](https://github.com/agentram/ovpn/actions/workflows/release.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/release.yml)
+
 `ovpn` is a Go CLI for running self-hosted Xray (`VLESS + REALITY`) VPN servers over SSH.
 
-It is meant for small, operator-managed deployments: a local proof of concept, one VPS/VDS, or a small set of servers.
+It is built for operator-managed deployments: one VPS/VDS, a small fleet of VPN servers, or an HA proxy entrypoint in front of several backends.
+
+## Fast navigation
+
+- [Architecture](#architecture)
+- [Advantages](#advantages)
+- [Security and quota defaults](#security-and-quota-defaults)
+- [Quick start](#quick-start)
+- [Production flow](#production-flow)
+- [HA proxy rollout](#4a-optional-ha-proxy-rollout)
+- [User operations](#6-add-users-and-deliver-links)
+- [Monitoring](#7-optional-monitoring)
+- [Documentation map](#documentation-map)
 
 ## Production model
 
-- Ansible prepares the host: packages, Docker, SSH, firewall, and hardening.
-- `ovpn` manages the VPN runtime: Xray config, users, quotas, monitoring, backups, and cleanup.
-- The control plane uses SSH. There is no public admin API.
-- Xray REALITY listens on `443/tcp`.
-- SSH stays on `22/tcp` in the recommended flow.
+- Ansible prepares the host baseline: packages, Docker, SSH, firewall, unattended upgrades, and hardening.
+- `ovpn` owns the VPN runtime: Xray config, users, quotas, monitoring, backups, and cleanup.
+- Desired state stays local under `~/.ovpn`; deploys render runtime files and push them over SSH/SCP.
+- Remote services run as Docker Compose under `/opt/ovpn`, which keeps maintenance and recovery predictable.
+- Xray REALITY listens on `443/tcp`; internal agent and monitoring endpoints stay private by default.
 - Real inventory, hostnames, IPs, tokens, and private keys stay outside the public repository.
-- Public GitHub Actions validate and release the project only. Deploy, backup, and restore automation should stay local or in a private ops repository.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  classDef operator fill:#e8f5ef,stroke:#167054,stroke-width:2px,color:#17231d
+  classDef host fill:#eef4fb,stroke:#225b8d,stroke-width:2px,color:#17231d
+  classDef runtime fill:#fff7e8,stroke:#8f4f23,stroke-width:2px,color:#17231d
+  classDef optional fill:#f7f0ff,stroke:#7050a8,stroke-width:2px,color:#17231d
+  classDef client fill:#f2f2ec,stroke:#6a6f68,stroke-width:1.5px,color:#17231d
+
+  subgraph local["Operator machine"]
+    cli["ovpn CLI"]
+    state["~/.ovpn\nservers, users, quotas"]
+    ansible["Ansible inventory\nhost hardening"]
+    ci["GitHub Actions\nCI, security, release"]
+  end
+
+  subgraph vpn["VPN host"]
+    compose["/opt/ovpn\nDocker Compose"]
+    xray["Xray\nVLESS + REALITY\n443/tcp"]
+    agent["ovpn-agent\nusers, quotas, health, metrics"]
+    monitoring["optional monitoring\nPrometheus, Grafana,\nAlertmanager, Telegram bot"]
+    backups["backups + cleanup\nlocal and remote snapshots"]
+  end
+
+  subgraph ha["Optional HA entrypoint"]
+    proxy["HAProxy proxy\ncountry preset routing"]
+    backends["backend pool\nfailover targets"]
+  end
+
+  clients["Clients\nmobile / desktop\nVLESS link or QR"]
+
+  state --> cli
+  ansible -->|bootstrap| compose
+  ci -->|validated release binary| cli
+  cli -->|SSH/SCP render + deploy| compose
+  compose --> xray
+  compose --> agent
+  compose --> monitoring
+  compose --> backups
+  agent -->|sync runtime users + quotas| xray
+  proxy -->|foreign traffic relay| backends
+  backends --> xray
+  clients -->|443/tcp| proxy
+  clients -->|direct 443/tcp| xray
+
+  class cli,state,ansible,ci operator
+  class compose host
+  class xray,agent,backups runtime
+  class monitoring,proxy,backends optional
+  class clients client
+```
+
+## Advantages
+
+- Go CLI: one local binary for day-to-day operations, release archives embed the Linux runtime assets needed for deploys.
+- Local desired state: servers and users are tracked in `~/.ovpn`, which makes repeated deploys and multi-server automation straightforward.
+- Docker runtime: Xray, agent, optional proxy, and monitoring run through Docker Compose under `/opt/ovpn`.
+- SSH/SCP control path: deploys work with normal server access and do not require exposing a separate management API.
+- Multi-server user lifecycle: user add/remove/enable/disable/quota commands apply to all enabled servers by default.
+- HA proxy mode: optional HAProxy entrypoint can route local-country traffic directly and relay foreign traffic to backend VPN servers.
+- Security defaults: minimal profile blocks BitTorrent protocol traffic and public tracker domains; optional Ansible rules can block Tor exit-node traffic at host level.
+- Operational maintenance: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are first-class workflows.
 
 ## Key features
 
@@ -27,7 +106,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Versioning
 
-- Current pinned version: `1.4.2`
+- Current pinned version: `1.4.3`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -237,6 +316,7 @@ See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 ```bash
 ./ovpn user add --username <user>
 ./ovpn user add --username <user> --expiry 2026-05-01
+./ovpn user quota-set --username <user> --monthly-gb 400
 ./ovpn user quota-set --username <user> --monthly-bytes <bytes>
 ./ovpn user enable --username <user>
 ./ovpn user rm --username <user>
@@ -249,6 +329,8 @@ See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 ```
 
 Mutating user commands apply to all enabled servers by default. Link and read commands stay server-scoped. QR output is enabled by default and contains the same full client credential as the `vless://` link; treat saved QR files as secrets.
+
+Use `--monthly-gb` for human-sized quota changes. `ovpn` stores quota internally as bytes; `--monthly-gb 400` means `400 * 1024^3` bytes. `--monthly-bytes` remains available for exact automation.
 
 When `--email` is omitted, new users get stable identity `username@global`. User expiry is cluster-wide and uses UTC end-of-day semantics.
 
@@ -309,7 +391,7 @@ By default, cleanup removes remote runtime files and disables local server metad
 ./ovpn stats --server <server>
 ./ovpn user list --server <server>
 ./ovpn user add --username <user>
-./ovpn user quota-set --username <user> --monthly-bytes <bytes>
+./ovpn user quota-set --username <user> --monthly-gb 400
 ./ovpn user link --server <server> --username <user>
 ./ovpn server monitor up <server>
 ./ovpn server backup <server>

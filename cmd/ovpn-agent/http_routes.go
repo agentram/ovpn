@@ -21,7 +21,7 @@ type routeDeps struct {
 	collector   *stats.Collector
 	quota       *stats.QuotaEnforcer
 	expiry      *stats.ExpiryEnforcer
-	runtime     *runtimeGateway
+	runtime     stats.RuntimeManager
 	metrics     *agentMetrics
 	logger      *slog.Logger
 	xrayAPI     string
@@ -367,7 +367,21 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
 			return
 		}
+		req.Email = strings.TrimSpace(req.Email)
+		req.InboundTag = strings.TrimSpace(req.InboundTag)
+		if req.Email == "" {
+			d.metrics.observeRuntime("remove", "bad_request")
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required"})
+			return
+		}
 		if err := d.runtime.RemoveUser(r.Context(), req.InboundTag, req.Email); err != nil {
+			if isRuntimeUserAbsentError(err) {
+				d.metrics.observeRuntime("remove", "already_absent")
+				d.metrics.OnXrayAPIReachable(true)
+				d.logger.Info("runtime user already absent", "email", req.Email, "inbound_tag", req.InboundTag)
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "absent": true})
+				return
+			}
 			d.logger.Warn("runtime remove user failed", "email", req.Email, "inbound_tag", req.InboundTag, "error", err)
 			d.metrics.observeRuntime("remove", "error")
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
