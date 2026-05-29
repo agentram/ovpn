@@ -181,6 +181,8 @@ func (a *App) buildDeployInput(
 		TelegramOwnerUserID:          ownerUserID,
 		TelegramClientsPDFPath:       envOr("OVPN_TELEGRAM_CLIENTS_PDF_PATH", "/opt/ovpn-telegram-bot/assets/clients.pdf"),
 		TelegramClientsPDFSource:     envOr("OVPN_TELEGRAM_CLIENTS_PDF_SOURCE", "docs/clients.pdf"),
+		TelegramClientsRUPDFPath:     envOr("OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH", "/opt/ovpn-telegram-bot/assets/clients-ru.pdf"),
+		TelegramClientsRUPDFSource:   envOr("OVPN_TELEGRAM_CLIENTS_RU_PDF_SOURCE", "docs/clients-ru.pdf"),
 		TelegramAPIFallbackIPs:       envOr("OVPN_TELEGRAM_API_FALLBACK_IPS", "149.154.167.220"),
 		TelegramAdminToken:           envOr("OVPN_TELEGRAM_ADMIN_TOKEN", ""),
 		TelegramLinkAddress:          firstNonEmpty(srv.Domain, srv.Host),

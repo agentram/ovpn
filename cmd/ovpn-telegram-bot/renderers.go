@@ -48,7 +48,7 @@ func (b *bot) sendHelp(ctx context.Context, chatID int64) error {
 		"/quota - quota pressure summary",
 		"/restart <service> - owner restart with confirmation",
 		"/heal - owner auto-fix unhealthy services",
-		"/guide - send VPN client PDF guide",
+		"/guide - send VPN client PDF guides",
 		"/cancel - cancel active prompt or pending confirmation",
 		"Restart services: " + restartableServicesHelp(b.hasHAProxy()),
 	}, "\n")
@@ -57,17 +57,33 @@ func (b *bot) sendHelp(ctx context.Context, chatID int64) error {
 
 // sendGuide returns send guide.
 func (b *bot) sendGuide(ctx context.Context, chatID int64) error {
-	path := strings.TrimSpace(b.cfg.clientsPDFPath)
-	if path == "" {
-		return b.sendPlainMessage(ctx, chatID, "Guide PDF path is not configured.", mainReplyKeyboard())
+	guides := []struct {
+		path    string
+		caption string
+	}{
+		{path: b.cfg.clientsPDFPath, caption: "VPN client guide (English)"},
+		{path: b.cfg.clientsRUPDFPath, caption: "VPN client guide (Russian)"},
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return b.sendPlainMessage(ctx, chatID, "Guide PDF is unavailable on server. Ask operator to generate `docs/clients.pdf` with `make docs-pdf` and redeploy.", mainReplyKeyboard())
+
+	sent := 0
+	for _, guide := range guides {
+		path := strings.TrimSpace(guide.path)
+		if path == "" {
+			continue
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		if err := b.sendDocument(ctx, chatID, filepath.Base(path), f, guide.caption); err != nil {
+			_ = f.Close()
+			return err
+		}
+		_ = f.Close()
+		sent++
 	}
-	defer f.Close()
-	if err := b.sendDocument(ctx, chatID, filepath.Base(path), f, "VPN client guide"); err != nil {
-		return err
+	if sent == 0 {
+		return b.sendPlainMessage(ctx, chatID, "Guide PDFs are unavailable on server. Ask operator to generate client guides with `make docs-pdf` and redeploy.", mainReplyKeyboard())
 	}
 	return nil
 }

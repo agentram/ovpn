@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.5
+
+### Added
+- Split VPN client documentation into separate English and Russian guides.
+- Telegram `/guide` now sends both English and Russian client PDF guides when both assets are available.
+
+### Changed
+- `make docs-pdf` now builds both `clients.pdf` and `clients-ru.pdf`.
+
 ## 1.4.4
 
 ### Changed

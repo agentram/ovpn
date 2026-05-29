@@ -405,6 +405,39 @@ func TestSendGuideMissingFileReturnsMessage(t *testing.T) {
 	}
 }
 
+func TestSendGuideSendsEnglishAndRussianPDFs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	enPath := filepath.Join(dir, "clients.pdf")
+	ruPath := filepath.Join(dir, "clients-ru.pdf")
+	if err := os.WriteFile(enPath, []byte("en"), 0o600); err != nil {
+		t.Fatalf("write english guide: %v", err)
+	}
+	if err := os.WriteFile(ruPath, []byte("ru"), 0o600); err != nil {
+		t.Fatalf("write russian guide: %v", err)
+	}
+	var documents int
+	c := &telegramClient{
+		token: "token",
+		http: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Path != "/bottoken/sendDocument" {
+				t.Fatalf("unexpected path for guide flow: %s", req.URL.Path)
+			}
+			documents++
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"ok":true,"result":{}}`)), Header: make(http.Header)}, nil
+		})},
+	}
+	b := &bot{cfg: config{clientsPDFPath: enPath, clientsRUPDFPath: ruPath}, tg: c}
+
+	if err := b.sendGuide(context.Background(), 10); err != nil {
+		t.Fatalf("sendGuide: %v", err)
+	}
+	if documents != 2 {
+		t.Fatalf("expected 2 guide documents, got %d", documents)
+	}
+}
+
 func TestTelegramClientSendDocument(t *testing.T) {
 	t.Parallel()
 

@@ -10,6 +10,8 @@ The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime
 
 ## Fast navigation
 
+- [Project site](https://agentram.github.io/ovpn/)
+- [X / updates](https://x.com/OVPN_project)
 - [Architecture](#architecture)
 - [Design points](#design-points)
 - [Security and quota defaults](#security-and-quota-defaults)
@@ -107,7 +109,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.4.4`
+- Current pinned version: `1.4.5`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -121,6 +123,7 @@ flowchart LR
 
 ## Community
 
+- X / updates: https://x.com/OVPN_project
 - Issues: confirmed bugs and concrete feature requests
 - Discussions: questions, usage help, design ideas, and announcements
 - Security: use private vulnerability reporting, not public issues
@@ -402,11 +405,12 @@ By default, cleanup removes remote runtime files and disables local server metad
 
 ## VPN clients
 
-End-user setup instructions are in Russian and cover iOS, Android, Windows, and macOS:
+End-user setup instructions cover iOS, Android, Windows, and macOS:
 
-- [`docs/clients.md`](docs/clients.md)
+- [`docs/clients.md`](docs/clients.md): English
+- [`docs/clients-ru.md`](docs/clients-ru.md): Russian
 
-Generate the optional PDF guide locally when you need it for Telegram `/guide`:
+Generate the optional PDF guides locally when you need them for Telegram `/guide`:
 
 ```bash
 make docs-pdf
@@ -417,6 +421,8 @@ make docs-pdf
 - [`README.md`](README.md): main operator entrypoint
 - [`README.ansible.md`](README.ansible.md): host bootstrap and hardening
 - [`DEVELOPMENT.md`](DEVELOPMENT.md): contributor and architecture guide
+- [`docs/clients.md`](docs/clients.md): English client guide
+- [`docs/clients-ru.md`](docs/clients-ru.md): Russian client guide
 - [`docs/security.md`](docs/security.md): security and hardening model
 - [`docs/ha.md`](docs/ha.md): HA proxy topology and rollout
 - [`docs/monitoring.md`](docs/monitoring.md): monitoring operations
@@ -446,6 +452,7 @@ Release tags matching `*.*.*` should be protected from update and deletion.
 
 This repository includes an optional sponsor button and public donation page:
 
+- X / updates: `https://x.com/OVPN_project`
 - sponsor button config: [`.github/FUNDING.yml`](.github/FUNDING.yml)
 - donation page source: [`docs/donate/index.html`](docs/donate/index.html)
 - project page URL: `https://agentram.github.io/ovpn/donate/`
