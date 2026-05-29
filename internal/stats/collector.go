@@ -21,6 +21,15 @@ type Observer interface {
 	OnUserSpike(deltaBytes int64)
 }
 
+type xrayStatsClient interface {
+	Close() error
+	QueryStats(ctx context.Context, namePrefix string, reset bool) (map[string]int64, error)
+}
+
+var newXrayStatsClient = func(ctx context.Context, apiAddr string) (xrayStatsClient, error) {
+	return xrayapi.New(ctx, apiAddr)
+}
+
 const DefaultUserSpikeDeltaBytes int64 = 1 * 1024 * 1024 * 1024
 
 // Collector periodically reads cumulative counters from Xray and stores deltas in remote SQLite.
@@ -85,7 +94,7 @@ func (c *Collector) CollectOnce(ctx context.Context) error {
 		}
 	}()
 
-	api, err := xrayapi.New(ctx, c.APIAddr)
+	api, err := newXrayStatsClient(ctx, c.APIAddr)
 	if err != nil {
 		if c.Observer != nil {
 			c.Observer.OnXrayAPIReachable(false)

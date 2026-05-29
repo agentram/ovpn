@@ -26,6 +26,7 @@ type routeDeps struct {
 	logger      *slog.Logger
 	xrayAPI     string
 	dbPath      string
+	collectOnce func(context.Context) error
 	refreshOnce func(context.Context)
 }
 
@@ -116,7 +117,15 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 		writeJSON(w, http.StatusOK, payload)
 	})
 	mux.HandleFunc("/collect", func(w http.ResponseWriter, _ *http.Request) {
-		if err := d.collector.CollectOnce(ctx); err != nil {
+		collectOnce := d.collectOnce
+		if collectOnce == nil && d.collector != nil {
+			collectOnce = d.collector.CollectOnce
+		}
+		if collectOnce == nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "collector is not configured"})
+			return
+		}
+		if err := collectOnce(ctx); err != nil {
 			d.logger.Warn("manual collect failed", "error", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return

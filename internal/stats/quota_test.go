@@ -2,7 +2,9 @@ package stats
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,18 +13,20 @@ import (
 )
 
 type fakeRuntimeManager struct {
-	adds    []string
-	removes []string
+	adds      []string
+	removes   []string
+	addErr    error
+	removeErr error
 }
 
 func (f *fakeRuntimeManager) AddUser(_ context.Context, _ string, email, _ string) error {
 	f.adds = append(f.adds, email)
-	return nil
+	return f.addErr
 }
 
 func (f *fakeRuntimeManager) RemoveUser(_ context.Context, _ string, email string) error {
 	f.removes = append(f.removes, email)
-	return nil
+	return f.removeErr
 }
 
 func TestQuotaEnforcerBlocksAtExactQuotaBoundaryRollingWindow(t *testing.T) {
@@ -247,5 +251,81 @@ func TestQuotaEnforcerUsageBandsRollingWindow(t *testing.T) {
 	}
 	if got80 != 2 || got95 != 1 {
 		t.Fatalf("unexpected usage bands, got over80=%d over95=%d", got80, got95)
+	}
+}
+
+func TestQuotaEnforcerRuntimeErrorAndCallbackBranches(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, err := remote.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	quota := int64(100)
+	if err := store.ReplaceQuotaPolicies(ctx, []model.QuotaUserPolicy{{
+		Email:            "broken@example.com",
+		UUID:             "uuid-broken",
+		InboundTag:       "vless-reality",
+		QuotaEnabled:     true,
+		MonthlyQuotaByte: &quota,
+	}}); err != nil {
+		t.Fatalf("replace quota policies: %v", err)
+	}
+	now := time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC)
+	if err := store.AddDelta(ctx, "broken@example.com", 100, 0, now); err != nil {
+		t.Fatalf("add delta: %v", err)
+	}
+
+	var events []string
+	var blockedUsers int
+	var notifications []string
+	rt := &fakeRuntimeManager{removeErr: errors.New("xray remove failed")}
+	enforcer := &QuotaEnforcer{
+		Store:          store,
+		Runtime:        rt,
+		OnEvent:        func(action, result string) { events = append(events, action+":"+result) },
+		OnBlockedUsers: func(blocked int) { blockedUsers = blocked },
+		OnNotify:       func(event, message string) { notifications = append(notifications, event+":"+message) },
+	}
+	err = enforcer.Enforce(ctx, now)
+	if err == nil || !strings.Contains(err.Error(), "xray remove failed") {
+		t.Fatalf("expected runtime remove error, got %v", err)
+	}
+	if len(rt.removes) != 1 || rt.removes[0] != "broken@example.com" {
+		t.Fatalf("expected remove attempt, got %+v", rt.removes)
+	}
+	if len(events) != 1 || events[0] != "block:error" {
+		t.Fatalf("unexpected events: %+v", events)
+	}
+	if blockedUsers != 0 || len(notifications) != 0 {
+		t.Fatalf("unexpected blockedUsers=%d notifications=%+v", blockedUsers, notifications)
+	}
+}
+
+func TestQuotaEnforcerNilAndIncompleteRuntimeIdentity(t *testing.T) {
+	t.Parallel()
+
+	if err := (*QuotaEnforcer)(nil).Enforce(context.Background(), time.Now()); err != nil {
+		t.Fatalf("nil quota enforcer should be no-op: %v", err)
+	}
+	q := &QuotaEnforcer{}
+	if err := q.runtimeAdd(context.Background(), "", "email", "uuid"); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("expected missing runtime error, got %v", err)
+	}
+	q.Runtime = &fakeRuntimeManager{}
+	if err := q.runtimeAdd(context.Background(), "", "email", "uuid"); err == nil || !strings.Contains(err.Error(), "identity is incomplete") {
+		t.Fatalf("expected incomplete add identity error, got %v", err)
+	}
+	if err := q.runtimeRemove(context.Background(), "", "email"); err == nil || !strings.Contains(err.Error(), "identity is incomplete") {
+		t.Fatalf("expected incomplete remove identity error, got %v", err)
+	}
+	if err := combineFirst(errors.New("first"), errors.New("second")); err == nil || err.Error() != "first" {
+		t.Fatalf("unexpected combine first result: %v", err)
+	}
+	if err := combineFirst(nil, errors.New("second")); err == nil || err.Error() != "second" {
+		t.Fatalf("unexpected combine first nil result: %v", err)
 	}
 }

@@ -6,24 +6,30 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"ovpn/internal/logx"
+	"ovpn/internal/model"
+	"ovpn/internal/ssh"
 	"ovpn/internal/store/local"
 	"ovpn/internal/util"
 )
 
 type App struct {
-	ctx      context.Context
-	store    *local.Store
-	dataDir  string
-	dryRun   bool
-	repoRoot string
-	logger   *slog.Logger
-	logLevel string
-	debug    bool
-	verbose  bool
+	ctx            context.Context
+	store          *local.Store
+	dataDir        string
+	dryRun         bool
+	repoRoot       string
+	logger         *slog.Logger
+	logLevel       string
+	debug          bool
+	verbose        bool
+	remoteHTTPHook func(model.Server, string, string, any) ([]byte, error)
+	remoteExecHook func(ssh.Config, time.Duration, string) (ssh.Result, error)
+	sleepHook      func(time.Duration)
 }
 
 var errRuntimeQuotaBlocked = errors.New("runtime add skipped: user is blocked by quota")

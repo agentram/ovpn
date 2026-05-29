@@ -107,7 +107,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.4.3`
+- Current pinned version: `1.4.4`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`

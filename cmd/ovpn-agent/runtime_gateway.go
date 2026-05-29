@@ -9,6 +9,16 @@ import (
 	"ovpn/internal/xrayapi"
 )
 
+type runtimeXrayClient interface {
+	Close() error
+	AddUser(ctx context.Context, inboundTag, email, uuid string) error
+	RemoveUser(ctx context.Context, inboundTag, email string) error
+}
+
+var newRuntimeXrayClient = func(ctx context.Context, apiAddr string) (runtimeXrayClient, error) {
+	return xrayapi.New(ctx, apiAddr)
+}
+
 type runtimeGateway struct {
 	apiAddr  string
 	mu       *sync.Mutex
@@ -23,7 +33,7 @@ func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid st
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	client, err := xrayapi.New(ctx, g.apiAddr)
+	client, err := newRuntimeXrayClient(ctx, g.apiAddr)
 	if err != nil {
 		g.observer.OnXrayAPIReachable(false)
 		return err
@@ -43,7 +53,7 @@ func (g *runtimeGateway) RemoveUser(ctx context.Context, inboundTag, email strin
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	client, err := xrayapi.New(ctx, g.apiAddr)
+	client, err := newRuntimeXrayClient(ctx, g.apiAddr)
 	if err != nil {
 		g.observer.OnXrayAPIReachable(false)
 		return err

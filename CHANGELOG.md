@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.4
+
+### Changed
+- Added focused unit coverage across CLI, agent, Telegram bot, stores, stats, SSH, backup, runtime assets, and version helpers.
+
+### Fixed
+- Release self-contained dry-run deploy smoke no longer calls remote agent HTTP endpoints while `--dry-run` is active.
+- Dry-run deploy rendering no longer reads remote quota state from an already deployed server, keeping dry-run preview local-only.
+
 ## 1.4.3
 
 ### Added
