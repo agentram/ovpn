@@ -4,8 +4,6 @@ set -euo pipefail
 repo_root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$repo_root"
 
-src="docs/clients.md"
-out="${1:-docs/clients.pdf}"
 chrome="${CHROME_BIN:-}"
 
 if [ -z "$chrome" ]; then
@@ -21,12 +19,30 @@ if [ -z "$chrome" ]; then
   done
 fi
 
-mkdir -p "$(dirname "$out")"
+build_pdf() {
+  local src="$1"
+  local out="$2"
 
-if [ -n "$chrome" ]; then
-  npx -y md-to-pdf "$src" --dest "$out" --launch-options "{\"executablePath\":\"$chrome\"}"
+  mkdir -p "$(dirname "$out")"
+  local generated="${src%.md}.pdf"
+  rm -f "$generated"
+
+  if [ -n "$chrome" ]; then
+    npx -y md-to-pdf "$src" --launch-options "{\"executablePath\":\"$chrome\"}"
+  else
+    npx -y md-to-pdf "$src"
+  fi
+
+  if [ "$generated" != "$out" ]; then
+    mv "$generated" "$out"
+  fi
+
+  echo "built $out"
+}
+
+if [ "$#" -gt 0 ]; then
+  build_pdf "${OVPN_CLIENTS_MD:-docs/clients.md}" "$1"
 else
-  npx -y md-to-pdf "$src" --dest "$out"
+  build_pdf docs/clients.md docs/clients.pdf
+  build_pdf docs/clients-ru.md docs/clients-ru.pdf
 fi
-
-echo "built $out"

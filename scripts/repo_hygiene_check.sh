@@ -13,7 +13,7 @@ report_blocker() {
 
 tracked_forbidden="$({
   git ls-files -- \
-    .env .envrc coverage.out test-report.jsonl trivy-results.sarif 'docs/*.pdf' '*.pem' '*.key' '*.crt' '*.db' '*.sqlite' '*.tgz' 'monitoring/secrets/*' 'ansible/inventories/production/*' \
+    .env .envrc coverage.out test-report.jsonl trivy-results.sarif 'docs/*.pdf' '*.pem' '*.key' '*.crt' '*.db' '*.sqlite' '*.tgz' 'monitoring/secrets/*' 'monitoring/secrets/**' 'ansible/inventories/production/*' 'ansible/inventories/production/**' \
     ':!monitoring/secrets/.gitkeep' ':!monitoring/secrets/README.md' ':!ansible/inventories/production/.gitkeep' ':!ansible/inventories/production/README.md' \
     | while IFS= read -r path; do
         [ -e "$path" ] && printf '%s\n' "$path"

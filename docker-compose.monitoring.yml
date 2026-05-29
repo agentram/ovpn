@@ -65,6 +65,7 @@ services:
       - --notify-chat-ids=${OVPN_TELEGRAM_NOTIFY_CHAT_IDS}
       - --owner-user-id=${OVPN_TELEGRAM_OWNER_USER_ID}
       - --clients-pdf-path=${OVPN_TELEGRAM_CLIENTS_PDF_PATH}
+      - --clients-ru-pdf-path=${OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH}
       - --link-config-file=/opt/ovpn-telegram-bot/link-config.json
       - --telegram-api-fallback-ips=${OVPN_TELEGRAM_API_FALLBACK_IPS:-149.154.167.220}
     ports:

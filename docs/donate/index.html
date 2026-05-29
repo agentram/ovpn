@@ -6,39 +6,55 @@
     <title>Support ovpn</title>
     <meta
       name="description"
-      content="Support ovpn development with BTC, ETH, USDT TRC20, or TON."
+      content="Support ovpn development with BTC, ETH, SOL, TON, USDT ERC20, or USDT TRC20."
+    >
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
     >
     <style>
       :root {
-        --bg: #f6f3ee;
-        --panel: #fffdf8;
-        --ink: #17231d;
-        --muted: #5b665f;
-        --accent: #1d7257;
-        --accent-strong: #0e4936;
-        --accent-soft: #dcefe7;
-        --border: #d9d2c3;
-        --warning: #7a4b12;
-        --warning-bg: #fff3dc;
+        --bg: #030404;
+        --panel: #0b0d0e;
+        --panel-2: #111417;
+        --ink: #f3f4f1;
+        --muted: #a8aaa5;
+        --quiet: #757a78;
+        --line: #25292b;
+        --line-strong: #42474a;
+        --silver: #d8d9d4;
+        --accent: #8fb7c4;
+        --green: #8bb99a;
+        --warn: #d2a65f;
       }
 
       * { box-sizing: border-box; }
 
-      body {
-        margin: 0;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at top left, rgba(29, 114, 87, 0.16), transparent 24rem),
-          linear-gradient(180deg, #fbf9f4 0%, var(--bg) 100%);
+      html {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
       }
 
-      a { color: var(--accent-strong); }
+      body {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        overflow-x: hidden;
+        color: var(--ink);
+        background:
+          linear-gradient(180deg, rgba(3, 4, 4, 0.7), var(--bg) 360px),
+          url("../assets/ovpn-hero.png") top center / 1680px auto no-repeat,
+          var(--bg);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      a { color: var(--silver); }
 
       .wrap {
         width: min(1120px, calc(100% - 32px));
         margin: 0 auto;
-        padding: 28px 0 64px;
+        padding: 24px 0 64px;
       }
 
       .topbar {
@@ -46,39 +62,57 @@
         align-items: center;
         justify-content: space-between;
         gap: 18px;
-        margin-bottom: 18px;
+        margin-bottom: 34px;
       }
 
       .brand {
+        display: inline-flex;
+        align-items: center;
+        color: var(--ink);
         font-size: 1rem;
-        font-weight: 800;
-        letter-spacing: 0.02em;
+        font-weight: 900;
+        letter-spacing: 0.12em;
         text-decoration: none;
+        text-transform: uppercase;
       }
 
       .nav {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        gap: 10px;
+        gap: 8px;
       }
 
-      .nav a {
-        padding: 9px 12px;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: rgba(255, 253, 248, 0.72);
+      .nav a,
+      .button {
+        min-width: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        padding: 9px 13px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: rgba(12, 14, 15, 0.82);
+        color: var(--ink);
         font-size: 0.9rem;
-        font-weight: 700;
+        font-weight: 800;
+        line-height: 1;
         text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .button.primary {
+        border-color: rgba(216, 217, 212, 0.62);
+        background: var(--silver);
+        color: #080909;
       }
 
       .hero {
-        padding: 30px;
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        background: linear-gradient(135deg, rgba(220, 239, 231, 0.9), rgba(255, 253, 248, 0.98));
-        box-shadow: 0 20px 60px rgba(23, 35, 29, 0.08);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: center;
+        padding: 34px 0 18px;
       }
 
       h1, h2, h3, p { margin-top: 0; }
@@ -86,60 +120,65 @@
       h1 {
         max-width: 760px;
         margin-bottom: 12px;
-        font-size: clamp(2rem, 5vw, 4.15rem);
-        line-height: 1.04;
+        color: var(--ink);
+        font-size: clamp(2.3rem, 6vw, 5.2rem);
+        line-height: 0.98;
+        letter-spacing: 0;
       }
 
       .lede {
         max-width: 760px;
         margin-bottom: 0;
         color: var(--muted);
-        font-size: 1.08rem;
-        line-height: 1.65;
+        font-size: 1.06rem;
+        line-height: 1.64;
       }
 
       .callout {
-        margin-top: 20px;
+        max-width: 100%;
+        margin-top: 22px;
         padding: 14px 16px;
-        border: 1px solid rgba(122, 75, 18, 0.22);
-        border-left: 4px solid var(--warning);
-        border-radius: 12px;
-        background: var(--warning-bg);
-        color: #3f2f1b;
+        border: 1px solid rgba(210, 166, 95, 0.38);
+        border-left: 4px solid var(--warn);
+        border-radius: 8px;
+        background: rgba(210, 166, 95, 0.08);
+        color: #e2d4bf;
+        line-height: 1.5;
       }
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 18px;
-        margin-top: 24px;
+        grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+        gap: 12px;
+        margin-top: 28px;
       }
 
       .card {
-        padding: 20px;
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        background: var(--panel);
-        box-shadow: 0 12px 34px rgba(23, 35, 29, 0.06);
+        min-width: 0;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(11, 13, 14, 0.96);
       }
 
       .chain {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent-strong);
-        font-size: 0.78rem;
-        font-weight: 800;
-        text-transform: uppercase;
+        padding: 6px 9px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 900;
         letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .card h2 {
         margin: 14px 0 8px;
-        font-size: 1.45rem;
+        color: var(--ink);
+        font-size: 1.55rem;
       }
 
       .card p {
@@ -149,51 +188,57 @@
       }
 
       .qr {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
         display: grid;
         place-items: center;
-        min-height: 242px;
+        min-height: 238px;
         margin-top: 16px;
         padding: 16px;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f8f8f4;
       }
 
       .qr img {
-        width: min(100%, 212px);
+        width: min(100%, 204px);
+        max-width: 100%;
         height: auto;
+        display: block;
         image-rendering: pixelated;
       }
 
       .label {
         display: block;
         margin-top: 16px;
-        font-size: 0.78rem;
-        font-weight: 800;
+        color: var(--quiet);
+        font-size: 0.76rem;
+        font-weight: 900;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: var(--muted);
       }
 
       code {
         display: block;
         margin-top: 8px;
-        padding: 12px 14px;
+        padding: 11px 12px;
         overflow-wrap: anywhere;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        background: #f8f5ef;
+        word-break: break-all;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #050606;
+        color: var(--silver);
         font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
-        font-size: 0.93rem;
-        color: var(--ink);
+        font-size: 0.9rem;
       }
 
       .notes {
-        margin-top: 30px;
+        margin-top: 28px;
         padding: 22px;
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        background: rgba(255, 253, 248, 0.92);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(17, 20, 23, 0.94);
       }
 
       .notes h2 { margin-bottom: 10px; }
@@ -201,19 +246,29 @@
       .notes ul {
         margin: 14px 0 0 20px;
         padding: 0;
+        color: var(--muted);
+        line-height: 1.55;
       }
 
       .notes li + li { margin-top: 8px; }
 
       .footer {
         margin-top: 22px;
-        color: var(--muted);
+        color: var(--quiet);
         font-size: 0.92rem;
       }
 
-      @media (max-width: 640px) {
+      .footer code {
+        display: inline;
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
+
+      @media (max-width: 700px) {
         .wrap {
-          width: min(100% - 20px, 1120px);
+          width: calc(100% - 20px);
+          max-width: 1120px;
           padding-top: 18px;
         }
 
@@ -222,8 +277,50 @@
           flex-direction: column;
         }
 
-        .nav { justify-content: flex-start; }
-        .hero, .card, .notes { border-radius: 14px; }
+        .nav {
+          display: grid;
+          grid-template-columns: 1fr;
+          justify-content: stretch;
+          width: 100%;
+        }
+
+        .nav a { width: 100%; }
+
+        .nav a,
+        .button {
+          white-space: normal;
+          text-align: center;
+        }
+
+        code {
+          font-size: 0.84rem;
+        }
+
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .card,
+        .callout,
+        .notes,
+        .qr,
+        code {
+          max-width: 100%;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 460px) {
+        .qr {
+          padding: 10px;
+        }
+
+        .qr img {
+          width: min(100%, 184px);
+        }
       }
     </style>
   </head>
@@ -234,16 +331,19 @@
         <nav class="nav" aria-label="Donation navigation">
           <a href="../">Project</a>
           <a href="https://github.com/agentram/ovpn">GitHub</a>
+          <a href="https://x.com/OVPN_project">X</a>
         </nav>
       </header>
 
       <section class="hero">
-        <h1>Support ovpn</h1>
-        <p class="lede">
-          Donations help fund maintenance, bug fixes, documentation, release work, and operator tooling for the self-hosted Xray VPN management project.
-        </p>
-        <div class="callout">
-          Always match the coin and network shown here before sending funds. Exchange or wallet recovery for a wrong network transfer may be impossible.
+        <div>
+          <h1>Support ovpn</h1>
+          <p class="lede">
+            Donations help fund maintenance, bug fixes, documentation, release work, and operator tooling for the self-hosted Xray VPN management project.
+          </p>
+          <div class="callout">
+            Match the coin and network before sending funds. A transfer to the wrong network may be impossible to recover.
+          </div>
         </div>
       </section>
 
@@ -256,7 +356,7 @@
             <img src="assets/btc-qr.png" alt="BTC donation QR code">
           </div>
           <span class="label">Address</span>
-          <code>1JSew7XfG5h5Xsz8FX1WAJo2GGh6c2pdvM</code>
+          <code>bc1q3qmz2lhefkrtyvh2rhz20gm94u8cy595avzwrg</code>
         </article>
 
         <article class="card">
@@ -264,25 +364,25 @@
           <h2>ETH</h2>
           <p>Send only ETH on Ethereum mainnet.</p>
           <div class="qr">
-            <img src="assets/eth-erc20-qr.png" alt="ETH ERC20 donation QR code">
+            <img src="assets/eth-erc20-qr.png" alt="ETH donation QR code">
           </div>
           <span class="label">Network</span>
-          <code>ERC20 / Ethereum mainnet</code>
+          <code>Ethereum mainnet</code>
           <span class="label">Address</span>
-          <code>0x1c115ce77acd2f0512c0fe7b036753f8ed843c12</code>
+          <code>0xd327c5bC86c49116398bb7E063564fc91F872650</code>
         </article>
 
         <article class="card">
-          <span class="chain">Tether</span>
-          <h2>USDT</h2>
-          <p>Send only USDT on TRC20 / Tron.</p>
+          <span class="chain">Solana</span>
+          <h2>SOL</h2>
+          <p>Send only SOL on Solana.</p>
           <div class="qr">
-            <img src="assets/usdt-trc20-qr.png" alt="USDT TRC20 donation QR code">
+            <img src="assets/sol-qr.png" alt="SOL donation QR code">
           </div>
           <span class="label">Network</span>
-          <code>TRC20 / Tron</code>
+          <code>Solana</code>
           <span class="label">Address</span>
-          <code>TCEB1UQR1jSkbhWAyccgxBTMgYgDNn4eS7</code>
+          <code>cxnECrtTpgBk4XL2Jy9DKBPu4kscrMTNPt1Nyr15sWQ</code>
         </article>
 
         <article class="card">
@@ -293,7 +393,33 @@
             <img src="assets/ton-qr.png" alt="TON donation QR code">
           </div>
           <span class="label">Address</span>
-          <code>UQBOEvsxmCX3sL9nK0MopD2MVAPwJvBPLuLTCreHTVw3-Hcm</code>
+          <code>UQAuILzH7xJDYZlMpO0XFvr1-FvmEH-c5VFRwqiZGME_JnsK</code>
+        </article>
+
+        <article class="card">
+          <span class="chain">Tether</span>
+          <h2>USDT ERC20</h2>
+          <p>Send only USDT on Ethereum / ERC20.</p>
+          <div class="qr">
+            <img src="assets/usdt-erc20-qr.png" alt="USDT ERC20 donation QR code">
+          </div>
+          <span class="label">Network</span>
+          <code>ERC20 / Ethereum</code>
+          <span class="label">Address</span>
+          <code>0xd327c5bC86c49116398bb7E063564fc91F872650</code>
+        </article>
+
+        <article class="card">
+          <span class="chain">Tether</span>
+          <h2>USDT TRC20</h2>
+          <p>Send only USDT on Tron / TRC20.</p>
+          <div class="qr">
+            <img src="assets/usdt-trc20-qr.png" alt="USDT TRC20 donation QR code">
+          </div>
+          <span class="label">Network</span>
+          <code>TRC20 / Tron</code>
+          <span class="label">Address</span>
+          <code>TXFGaN9tNkHsUjbLXv4AJCoZ9z3DdcF4J2</code>
         </article>
       </section>
 
@@ -301,8 +427,8 @@
         <h2>Before sending</h2>
         <ul>
           <li>Check that the selected wallet network exactly matches the network label on this page.</li>
-          <li>For USDT, use TRC20 / Tron only for the address listed here.</li>
-          <li>For ETH, use Ethereum mainnet only.</li>
+          <li>USDT ERC20 and ETH share the same Ethereum address, but the selected asset/network still matters.</li>
+          <li>USDT TRC20 uses a separate Tron address.</li>
           <li>Consider sending a small test transaction first if your wallet or exchange supports it.</li>
         </ul>
       </section>

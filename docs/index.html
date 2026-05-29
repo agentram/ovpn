@@ -3,141 +3,179 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ovpn - self-hosted Xray operations for engineers</title>
+    <title>ovpn - self-hosted Xray operations</title>
     <meta
       name="description"
-      content="ovpn is a Go CLI, remote agent, and release pipeline for operating self-hosted Xray VLESS + REALITY servers over SSH."
+      content="ovpn is a Go CLI and Docker Compose runtime for operating self-hosted Xray VLESS + REALITY servers over SSH."
+    >
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests"
     >
     <style>
       :root {
-        --bg: #f7f5f0;
-        --surface: #fffdf8;
-        --surface-2: #eef5f2;
-        --ink: #17231d;
-        --muted: #5d6861;
-        --line: #d9d2c3;
-        --green: #167054;
-        --green-dark: #0e4736;
-        --blue: #225b8d;
-        --rust: #8f4f23;
+        --bg: #030404;
+        --panel: #0b0d0e;
+        --panel-2: #111417;
+        --ink: #f3f4f1;
+        --muted: #a8aaa5;
+        --quiet: #757a78;
+        --line: #25292b;
+        --line-strong: #42474a;
+        --silver: #d8d9d4;
+        --accent: #8fb7c4;
+        --green: #8bb99a;
+        --warn: #d2a65f;
       }
 
       * { box-sizing: border-box; }
-
-      html { scroll-behavior: smooth; }
-
-      body {
-        margin: 0;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: var(--ink);
-        background: linear-gradient(180deg, #fbfaf6 0%, var(--bg) 72%);
+      html {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+        scroll-behavior: smooth;
       }
 
-      body { overflow-x: hidden; }
+      body {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        overflow-x: hidden;
+        color: var(--ink);
+        background: var(--bg);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
 
-      a { color: var(--green-dark); }
+      a { color: var(--silver); }
 
       .wrap {
-        width: min(1140px, calc(100% - 32px));
+        width: min(1160px, calc(100% - 32px));
         margin: 0 auto;
       }
 
       .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(3, 4, 4, 0.84);
+        backdrop-filter: blur(16px);
+      }
+
+      .topbar-inner {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 20px;
-        padding: 22px 0;
+        min-height: 72px;
       }
 
       .brand {
+        display: inline-flex;
+        align-items: center;
         color: var(--ink);
-        font-size: 1.05rem;
         font-weight: 900;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.12em;
         text-decoration: none;
+        text-transform: uppercase;
       }
 
       .nav {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-end;
-        gap: 10px;
-        max-width: 100%;
+        gap: 8px;
       }
 
       .nav a,
       .button {
+        min-width: 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 40px;
-        padding: 10px 14px;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        background: rgba(255, 253, 248, 0.76);
+        min-height: 38px;
+        padding: 9px 13px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: rgba(12, 14, 15, 0.82);
         color: var(--ink);
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         font-weight: 800;
+        line-height: 1;
         text-decoration: none;
         white-space: nowrap;
       }
 
       .button.primary {
-        border-color: var(--green-dark);
-        background: var(--green-dark);
-        color: #fff;
+        border-color: rgba(216, 217, 212, 0.62);
+        background: var(--silver);
+        color: #080909;
+      }
+
+      .hero-shell {
+        position: relative;
+        min-height: calc(100vh - 72px);
+        overflow: hidden;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(90deg, rgba(3, 4, 4, 0.98) 0%, rgba(3, 4, 4, 0.72) 42%, rgba(3, 4, 4, 0.24) 100%),
+          linear-gradient(180deg, rgba(3, 4, 4, 0.12) 0%, rgba(3, 4, 4, 0.94) 100%),
+          url("assets/ovpn-hero.png") center center / cover no-repeat;
       }
 
       .hero {
-        min-height: min(680px, calc(100vh - 92px));
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         align-items: center;
-        padding: 38px 0 58px;
+        min-height: calc(100vh - 72px);
+        padding: 64px 0 86px;
       }
 
       .eyebrow {
         margin-bottom: 14px;
-        color: var(--green-dark);
-        font-size: 0.82rem;
+        color: var(--accent);
+        font-size: 0.78rem;
         font-weight: 900;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
 
       h1, h2, h3, p { margin-top: 0; }
 
       h1 {
-        max-width: 880px;
+        max-width: 760px;
         margin-bottom: 18px;
-        font-size: clamp(2.35rem, 6vw, 5.35rem);
-        line-height: 1.02;
+        color: var(--ink);
+        font-size: clamp(4rem, 12vw, 9.6rem);
+        line-height: 0.86;
+        letter-spacing: 0;
+        text-transform: uppercase;
       }
 
       .lede {
-        max-width: 780px;
+        max-width: 760px;
         margin-bottom: 26px;
         color: var(--muted);
-        font-size: clamp(1.05rem, 2vw, 1.28rem);
-        line-height: 1.65;
+        font-size: clamp(1.04rem, 1.8vw, 1.22rem);
+        line-height: 1.62;
       }
 
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-
+      .actions,
       .quick-nav {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
+        max-width: 100%;
+      }
+
+      .quick-nav {
         margin-top: 24px;
       }
 
       .quick-nav a {
-        color: var(--green-dark);
-        font-size: 0.92rem;
+        min-width: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
         font-weight: 800;
         text-decoration: none;
       }
@@ -146,62 +184,105 @@
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 1px;
-        margin-top: 38px;
+        margin-top: -50px;
+        position: relative;
+        z-index: 2;
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 16px;
+        border-radius: 8px;
         background: var(--line);
       }
 
       .stat {
-        min-height: 96px;
+        min-height: 106px;
         padding: 18px;
-        background: rgba(255, 253, 248, 0.88);
+        background: rgba(11, 13, 14, 0.94);
       }
 
       .stat strong {
         display: block;
-        margin-bottom: 6px;
+        margin-bottom: 7px;
         color: var(--ink);
-        font-size: 1.08rem;
+        font-size: 1rem;
       }
 
       .stat span {
         color: var(--muted);
-        font-size: 0.92rem;
-        line-height: 1.45;
+        font-size: 0.9rem;
+        line-height: 1.46;
         overflow-wrap: anywhere;
       }
 
-      .tech-list {
-        display: grid;
-        gap: 10px;
-        padding: 0;
-        margin: 0;
-        list-style: none;
+      section {
+        padding: 66px 0;
+        border-top: 1px solid var(--line);
       }
 
-      .tech-list li {
-        padding: 12px 14px;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: rgba(255, 253, 248, 0.76);
+      h2 {
+        max-width: 800px;
+        margin-bottom: 14px;
+        color: var(--ink);
+        font-size: clamp(1.75rem, 3.4vw, 3rem);
+        line-height: 1.06;
+      }
+
+      .section-lede {
+        max-width: 820px;
+        margin-bottom: 26px;
         color: var(--muted);
-        line-height: 1.5;
+        font-size: 1.04rem;
+        line-height: 1.64;
       }
 
-      .tech-list code {
-        color: var(--green-dark);
-        font-weight: 800;
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(245px, 100%), 1fr));
+        gap: 12px;
+      }
+
+      .card,
+      .arch-node,
+      .arch-note,
+      .doc-list a,
+      .support {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .card {
+        padding: 20px;
+      }
+
+      .card h3 {
+        margin-bottom: 8px;
+        color: var(--silver);
+        font-size: 1.08rem;
+      }
+
+      .card p,
+      .arch-node span,
+      .doc-list span,
+      .support p {
+        color: var(--muted);
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+      }
+
+      code {
+        color: var(--silver);
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+        overflow-wrap: anywhere;
+        word-break: break-all;
       }
 
       .arch-panel {
         margin-top: 24px;
-        padding: 22px;
+        padding: 18px;
         border: 1px solid var(--line);
-        border-radius: 18px;
-        background: rgba(255, 253, 248, 0.9);
-        box-shadow: 0 18px 42px rgba(23, 35, 29, 0.07);
+        border-radius: 8px;
+        background: #070809;
       }
 
       .arch-header {
@@ -214,9 +295,10 @@
 
       .arch-title {
         margin: 0;
-        font-size: 0.86rem;
+        color: var(--quiet);
+        font-size: 0.82rem;
         font-weight: 900;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
@@ -230,7 +312,7 @@
       .arch-tags span {
         padding: 6px 9px;
         border: 1px solid var(--line);
-        border-radius: 999px;
+        border-radius: 8px;
         color: var(--muted);
         font-size: 0.78rem;
         font-weight: 800;
@@ -238,7 +320,7 @@
 
       .arch-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1.18fr) 52px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1.18fr) 48px minmax(0, 1fr);
         gap: 12px;
         align-items: stretch;
       }
@@ -250,43 +332,28 @@
       }
 
       .arch-lane {
-        color: var(--muted);
-        font-size: 0.8rem;
+        color: var(--quiet);
+        font-size: 0.78rem;
         font-weight: 900;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
       }
 
       .arch-node {
-        min-height: 94px;
-        padding: 14px 15px;
-        border: 1px solid var(--line);
-        border-left: 5px solid var(--green);
-        border-radius: 12px;
-        background: #fffefb;
+        min-height: 96px;
+        padding: 14px;
+        border-left: 4px solid var(--green);
       }
 
-      .arch-node.host { border-left-color: var(--blue); }
-      .arch-node.runtime { border-left-color: var(--rust); }
-      .arch-node.optional { border-left-color: #7050a8; }
-      .arch-node.client { border-left-color: #6a6f68; }
+      .arch-node.host { border-left-color: var(--accent); }
+      .arch-node.runtime { border-left-color: var(--warn); }
+      .arch-node.optional { border-left-color: #9b92cf; }
+      .arch-node.client { border-left-color: var(--silver); }
 
       .arch-node strong {
         display: block;
         margin-bottom: 6px;
-        font-size: 1.04rem;
-      }
-
-      .arch-node span {
-        color: var(--muted);
-        font-size: 0.94rem;
-        line-height: 1.48;
-        overflow-wrap: anywhere;
-      }
-
-      .arch-node code {
-        color: var(--green-dark);
-        font-weight: 800;
+        color: var(--ink);
       }
 
       .arch-arrow-column {
@@ -297,7 +364,7 @@
       .arch-arrow {
         position: relative;
         height: 2px;
-        background: var(--green-dark);
+        background: var(--line-strong);
       }
 
       .arch-arrow::after {
@@ -307,8 +374,8 @@
         right: -1px;
         width: 10px;
         height: 10px;
-        border-top: 2px solid var(--green-dark);
-        border-right: 2px solid var(--green-dark);
+        border-top: 2px solid var(--line-strong);
+        border-right: 2px solid var(--line-strong);
         transform: translateY(-50%) rotate(45deg);
       }
 
@@ -321,96 +388,61 @@
 
       .arch-note {
         padding: 12px;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: var(--surface-2);
         color: var(--muted);
         font-size: 0.9rem;
         line-height: 1.45;
-      }
-
-      section {
-        padding: 50px 0;
-        border-top: 1px solid rgba(217, 210, 195, 0.78);
-      }
-
-      h2 {
-        max-width: 760px;
-        margin-bottom: 14px;
-        font-size: clamp(1.8rem, 3vw, 2.6rem);
-        line-height: 1.1;
-      }
-
-      .section-lede {
-        max-width: 760px;
-        margin-bottom: 24px;
-        color: var(--muted);
-        font-size: 1.04rem;
-        line-height: 1.65;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
-        gap: 16px;
-      }
-
-      .card {
-        padding: 20px;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        background: var(--surface);
-        box-shadow: 0 12px 34px rgba(23, 35, 29, 0.05);
-      }
-
-      .card h3 {
-        margin-bottom: 8px;
-        font-size: 1.12rem;
-      }
-
-      .card p {
-        margin-bottom: 0;
-        color: var(--muted);
-        line-height: 1.55;
-        overflow-wrap: anywhere;
+        background: var(--panel-2);
       }
 
       .split {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 440px);
         gap: 26px;
         align-items: start;
       }
 
+      .tech-list {
+        display: grid;
+        gap: 10px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .tech-list li {
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
       .terminal {
+        max-width: 100%;
         overflow: auto;
         padding: 18px;
-        border: 1px solid #20382f;
-        border-radius: 14px;
-        background: #111c18;
-        color: #e8f3ee;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #050606;
+        color: #e7e8e3;
         font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
         font-size: 0.86rem;
         line-height: 1.65;
       }
 
-      .terminal code {
-        white-space: pre;
-      }
+      .terminal code { white-space: pre; }
 
       .doc-list {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
         gap: 12px;
       }
 
       .doc-list a {
         display: block;
-        min-height: 74px;
+        min-height: 78px;
         padding: 16px;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: rgba(255, 253, 248, 0.88);
         color: var(--ink);
         font-weight: 850;
         text-decoration: none;
@@ -419,10 +451,8 @@
       .doc-list span {
         display: block;
         margin-top: 5px;
-        color: var(--muted);
         font-size: 0.9rem;
         font-weight: 500;
-        line-height: 1.45;
       }
 
       .support {
@@ -431,171 +461,215 @@
         justify-content: space-between;
         gap: 24px;
         padding: 28px;
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        background: linear-gradient(135deg, var(--surface-2), var(--surface));
+        background:
+          linear-gradient(90deg, rgba(143, 183, 196, 0.11), rgba(216, 217, 212, 0.04)),
+          var(--panel);
       }
 
       .support p {
         max-width: 720px;
         margin-bottom: 0;
-        color: var(--muted);
-        line-height: 1.6;
       }
 
       footer {
         padding: 26px 0 44px;
-        color: var(--muted);
+        color: var(--quiet);
         font-size: 0.92rem;
       }
 
-      @media (max-width: 780px) {
-        .wrap { width: min(100% - 20px, 1140px); }
+      @media (max-width: 860px) {
+        .wrap {
+          width: calc(100% - 20px);
+          max-width: 1160px;
+        }
 
-        .topbar {
+        .topbar-inner {
           align-items: flex-start;
           flex-direction: column;
+          padding: 14px 0;
         }
 
         .nav {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          grid-template-columns: 1fr;
           justify-content: stretch;
-          overflow-x: visible;
-          padding-bottom: 2px;
           width: 100%;
         }
-        .nav a {
+
+        .nav a { width: 100%; }
+
+        .actions {
+          display: grid;
+          grid-template-columns: 1fr;
           width: 100%;
         }
-        .hero { min-height: auto; padding-top: 20px; }
-        .status-strip { grid-template-columns: 1fr; }
+
+        .quick-nav {
+          display: grid;
+          grid-template-columns: 1fr;
+          width: 100%;
+        }
+
+        .nav a,
+        .button {
+          white-space: normal;
+          text-align: center;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+          min-height: auto;
+          padding-top: 48px;
+        }
+
+        .status-strip,
+        .arch-notes {
+          grid-template-columns: 1fr;
+        }
+
         .split { grid-template-columns: 1fr; }
+
         .arch-header {
           align-items: flex-start;
           flex-direction: column;
         }
-        .arch-tags {
-          justify-content: flex-start;
-        }
-        .arch-grid {
-          grid-template-columns: 1fr;
-        }
-        .arch-arrow-column {
-          min-height: 28px;
-        }
+
+        .arch-tags { justify-content: flex-start; }
+
+        .arch-grid { grid-template-columns: 1fr; }
+
+        .arch-arrow-column { min-height: 28px; }
+
         .arch-arrow {
           width: 2px;
           height: 28px;
           justify-self: center;
         }
+
         .arch-arrow::after {
           top: auto;
           right: 50%;
           bottom: -1px;
           transform: translateX(50%) rotate(135deg);
         }
-        .arch-notes {
-          grid-template-columns: 1fr;
+
+        .support {
+          align-items: flex-start;
+          flex-direction: column;
         }
-        .support { align-items: flex-start; flex-direction: column; }
       }
 
       @media (max-width: 460px) {
-        .status-strip { grid-template-columns: 1fr; }
+        .actions {
+          grid-template-columns: 1fr;
+        }
+
         .button { width: 100%; }
-        .actions, .nav { width: 100%; }
+
+        h1 { font-size: clamp(3.2rem, 23vw, 5.2rem); }
       }
     </style>
   </head>
   <body>
-    <header class="wrap topbar">
-      <a class="brand" href="./">ovpn</a>
-      <nav class="nav" aria-label="Primary navigation">
-        <a href="https://github.com/agentram/ovpn">GitHub</a>
-        <a href="#design">Design</a>
-        <a href="#architecture">Architecture</a>
-        <a href="#docs">Docs</a>
-        <a href="donate/">Donate</a>
-      </nav>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <a class="brand" href="./">ovpn</a>
+        <nav class="nav" aria-label="Primary navigation">
+          <a href="https://github.com/agentram/ovpn">GitHub</a>
+          <a href="https://x.com/OVPN_project">X</a>
+          <a href="#design">Design</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#docs">Docs</a>
+          <a href="donate/">Donate</a>
+        </nav>
+      </div>
     </header>
 
     <main>
-      <section class="wrap hero">
-        <div>
-          <div class="eyebrow">For operators and engineers</div>
-          <h1>Self-hosted Xray operations controlled over SSH</h1>
-          <p class="lede">
-            ovpn operates Xray VLESS + REALITY from local state. The CLI stores servers and users in <code>~/.ovpn</code>, renders Docker Compose files, and applies them to Linux hosts over SSH/SCP.
-          </p>
-          <div class="actions">
-            <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
-            <a class="button" href="#architecture">View architecture</a>
-            <a class="button" href="#quick-commands">Quick commands</a>
+      <div class="hero-shell">
+        <section class="wrap hero">
+          <div>
+            <div class="eyebrow">For operators and engineers</div>
+            <h1>ovpn</h1>
+            <p class="lede">
+              A source-available Go CLI for operating self-hosted Xray VLESS + REALITY servers. State stays local, deploys go over SSH/SCP, and the runtime runs as Docker Compose on Linux hosts.
+            </p>
+            <div class="actions">
+              <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
+              <a class="button" href="https://x.com/OVPN_project">Follow on X</a>
+              <a class="button" href="#architecture">Architecture</a>
+            </div>
+            <div class="quick-nav" aria-label="Fast navigation">
+              <a href="#design">design</a>
+              <a href="#automation">automation</a>
+              <a href="doc.html?doc=ha.md">HA guide</a>
+              <a href="doc.html?doc=security.md">security</a>
+              <a href="doc.html?doc=monitoring.md">monitoring</a>
+            </div>
           </div>
-          <div class="quick-nav" aria-label="Fast navigation">
-            <a href="#design">design</a>
-            <a href="#architecture">architecture</a>
-            <a href="#automation">automation</a>
-            <a href="#docs">docs</a>
-            <a href="doc.html?doc=ha.md">HA guide</a>
-            <a href="doc.html?doc=security.md">security</a>
-          </div>
+        </section>
+      </div>
 
-          <div class="status-strip">
-            <div class="stat">
-              <strong>Local state</strong>
-              <span><code>~/.ovpn</code> stores server, user, quota, and deploy metadata.</span>
-            </div>
-            <div class="stat">
-              <strong>Docker runtime</strong>
-              <span>Xray, agent, optional proxy, and monitoring run under Compose in <code>/opt/ovpn</code>.</span>
-            </div>
-            <div class="stat">
-              <strong>SSH deploy</strong>
-              <span>The CLI renders files locally and pushes runtime bundles over SSH/SCP.</span>
-            </div>
-            <div class="stat">
-              <strong>Proxy role</strong>
-              <span>HAProxy can front several VPN backends and apply country preset routing.</span>
-            </div>
-          </div>
+      <div class="wrap status-strip" aria-label="Project properties">
+        <div class="stat">
+          <strong>Local state</strong>
+          <span><code>~/.ovpn</code> stores servers, users, quotas, and deploy metadata.</span>
         </div>
-      </section>
+        <div class="stat">
+          <strong>SSH deploy</strong>
+          <span>The CLI renders runtime bundles locally and applies them over SSH/SCP.</span>
+        </div>
+        <div class="stat">
+          <strong>Docker runtime</strong>
+          <span>Xray, agent, proxy, and monitoring run under Compose in <code>/opt/ovpn</code>.</span>
+        </div>
+        <div class="stat">
+          <strong>HA option</strong>
+          <span>HAProxy can front several VPN backends and apply country preset routing.</span>
+        </div>
+      </div>
 
       <section class="wrap" id="design">
-        <h2>Design points</h2>
+        <h2>Control plane without a public admin API</h2>
         <p class="section-lede">
-          The project keeps the control plane local. It uses Go for the operator CLI, Docker Compose for the remote runtime, and Ansible for host bootstrap and hardening.
+          ovpn is built around files, SSH access, and reproducible deploys. The public repository contains the tool and templates; real inventory, hostnames, tokens, keys, and local state stay outside it.
         </p>
         <div class="grid">
           <article class="card">
-            <h3>Local desired state</h3>
-            <p>Servers, users, quotas, and runtime intent are stored locally, then rendered into remote files when deploy runs.</p>
+            <h3>Desired state on the operator machine</h3>
+            <p>Servers, users, quotas, and deploy metadata live under <code>~/.ovpn</code>. Deploy renders that state into the remote runtime.</p>
           </article>
           <article class="card">
-            <h3>Scriptable CLI</h3>
-            <p>Commands cover deploy, users, quotas, doctor checks, logs, backup, restore, cleanup, and monitoring setup.</p>
+            <h3>Go CLI, Linux runtime</h3>
+            <p>The operator uses one CLI. Release builds embed Linux runtime assets for <code>ovpn-agent</code> and the Telegram bot.</p>
           </article>
           <article class="card">
-            <h3>Security baseline</h3>
-            <p>Ansible handles host hardening. The minimal Xray profile blocks BitTorrent and public trackers; optional host rules block Tor exit traffic.</p>
+            <h3>Docker Compose on hosts</h3>
+            <p>Xray, the agent, monitoring, optional proxy, and backups are kept under <code>/opt/ovpn</code> for predictable maintenance.</p>
           </article>
           <article class="card">
-            <h3>Multiple VPN hosts</h3>
-            <p>User mutations can apply to all enabled VPN hosts. A proxy host can route traffic to a backend pool when HA is needed.</p>
+            <h3>Multi-host operations</h3>
+            <p>User add/remove/enable/disable, expiry, and quota commands can apply to all enabled VPN hosts by default.</p>
+          </article>
+          <article class="card">
+            <h3>Security defaults</h3>
+            <p>The minimal Xray profile blocks BitTorrent and public tracker domains. Ansible can add host-level Tor exit filtering.</p>
+          </article>
+          <article class="card">
+            <h3>Operational checks</h3>
+            <p><code>doctor</code>, status, logs, backup, restore, cleanup, monitoring, and release smoke checks are first-class workflows.</p>
           </article>
         </div>
       </section>
 
       <section class="wrap" id="architecture">
-        <h2>Highlighted architecture</h2>
+        <h2>Architecture</h2>
         <p class="section-lede">
-          Operations run from the operator machine. VPN hosts receive rendered Compose bundles; clients connect either directly to a VPN host or through an optional HAProxy entrypoint.
+          Operations start from the operator machine. VPN hosts receive rendered Compose bundles. Clients connect directly to one or more VPN hosts, or through an optional HA entrypoint.
         </p>
         <div class="arch-panel" aria-label="ovpn architecture diagram">
           <div class="arch-header">
-            <p class="arch-title">Control plane stays local</p>
+            <p class="arch-title">local control / remote runtime</p>
             <div class="arch-tags" aria-label="architecture properties">
               <span>SSH/SCP</span>
               <span>Docker Compose</span>
@@ -608,27 +682,27 @@
               <div class="arch-lane">Operator machine</div>
               <div class="arch-node">
                 <strong>ovpn CLI</strong>
-                <span>Runs deploys, user changes, quotas, status checks, logs, backup, restore, and cleanup.</span>
+                <span>Deploys, user changes, quotas, status checks, logs, backup, restore, cleanup, and monitoring setup.</span>
               </div>
               <div class="arch-node">
                 <strong>Local state</strong>
-                <span><code>~/.ovpn</code> stores servers, users, quotas, and rendered intent. Private inventory stays outside the public repo.</span>
+                <span><code>~/.ovpn</code> stores desired state and metadata. Private operational data stays local.</span>
               </div>
               <div class="arch-node">
                 <strong>Ansible baseline</strong>
-                <span>Bootstrap and maintenance playbooks handle Docker, firewall, unattended upgrades, SSH, and host hardening.</span>
+                <span>Bootstrap and maintenance playbooks handle Docker, firewall, SSH, unattended upgrades, and host hardening.</span>
               </div>
             </div>
             <div class="arch-arrow-column" aria-hidden="true"><div class="arch-arrow"></div></div>
             <div class="arch-stack">
-              <div class="arch-lane">VPN hosts runtime</div>
+              <div class="arch-lane">VPN hosts</div>
               <div class="arch-node host">
                 <strong>VPN host A</strong>
-                <span><code>/opt/ovpn</code> contains Docker Compose, Xray on <code>443/tcp</code>, ovpn-agent, and snapshots.</span>
+                <span><code>/opt/ovpn</code> contains Docker Compose, Xray on <code>443/tcp</code>, ovpn-agent, config, and snapshots.</span>
               </div>
               <div class="arch-node runtime">
                 <strong>VPN host B..N</strong>
-                <span>Additional hosts use the same rendered runtime model for users, quotas, health, and metrics.</span>
+                <span>Additional hosts use the same runtime model for users, quotas, health, and metrics.</span>
               </div>
               <div class="arch-node optional">
                 <strong>Monitoring</strong>
@@ -644,14 +718,14 @@
               </div>
               <div class="arch-node client">
                 <strong>Clients</strong>
-                <span>Mobile and desktop clients import the VLESS link or QR. Runtime traffic uses the public <code>443/tcp</code> endpoint.</span>
+                <span>Mobile and desktop clients import a VLESS link or QR and use the public <code>443/tcp</code> endpoint.</span>
               </div>
             </div>
           </div>
           <div class="arch-notes">
-            <div class="arch-note">Operations use authenticated SSH/SCP, which keeps the management surface aligned with normal server access.</div>
-            <div class="arch-note">Release builds embed Linux runtime assets, so deploys do not need Go or source checkout.</div>
-            <div class="arch-note">Security defaults block BitTorrent and public trackers; Ansible can add Tor exit-node filtering.</div>
+            <div class="arch-note">Release archives contain only <code>ovpn</code>; embedded runtime assets are materialized during deploy.</div>
+            <div class="arch-note">Runtime mutations use the agent fast path and fall back to full deploy when needed.</div>
+            <div class="arch-note">The public workflows validate Go, Ansible, security scans, docs, and release packaging.</div>
           </div>
         </div>
       </section>
@@ -659,21 +733,18 @@
       <section class="wrap" id="automation">
         <div class="split">
           <div>
-            <h2>Automation and maintenance</h2>
+            <h2>Automation surface</h2>
             <p class="section-lede">
-              Release builds embed the Linux runtime assets, so normal deploys do not need Go, source checkout, or sidecar binaries next to <code>ovpn</code>.
+              The CLI is the operator surface for initial bootstrap, normal deploys, user lifecycle, quotas, monitoring, and recovery.
             </p>
             <ul class="tech-list">
-              <li><code>server init</code> and <code>deploy</code> render the desired state and apply it through SSH/SCP.</li>
+              <li><code>server init</code> and <code>deploy</code> render desired state and apply it through SSH/SCP.</li>
               <li><code>user add</code>, <code>user rm</code>, <code>quota-set</code>, and expiry commands mirror users across enabled servers.</li>
               <li><code>doctor</code>, <code>status</code>, logs, backups, restore, cleanup, and monitoring are built-in workflows.</li>
-              <li>GitHub Actions validate Go, Ansible, security scans, and self-contained release packaging.</li>
+              <li>GitHub Actions cover Go quality, Ansible quality, security scans, and self-contained release packaging.</li>
             </ul>
           </div>
-          <pre class="terminal" id="quick-commands"><code># Use a release archive, or build from source for development.
-# Release archives contain one executable: ovpn.
-# go build -o ovpn ./cmd/ovpn
-./ovpn version
+          <pre class="terminal" id="quick-commands"><code>./ovpn version
 
 ./ovpn server add \
   --name &lt;server&gt; \
@@ -693,11 +764,12 @@
       <section class="wrap" id="docs">
         <h2>Documentation</h2>
         <p class="section-lede">
-          Start with the README for setup. Documentation links below open in the site renderer so Markdown files are readable on GitHub Pages.
+          Documentation links open in the GitHub Pages renderer so Markdown files remain readable outside GitHub.
         </p>
         <div class="doc-list">
           <a href="https://github.com/agentram/ovpn#readme">README <span>Operator entrypoint and quick start.</span></a>
-          <a href="doc.html?doc=clients.md">Client guide <span>End-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
+          <a href="doc.html?doc=clients.md">Client guide EN <span>End-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
+          <a href="doc.html?doc=clients-ru.md">Client guide RU <span>Russian end-user VLESS setup for iOS, Android, Windows, and macOS.</span></a>
           <a href="doc.html?doc=monitoring.md">Monitoring <span>Prometheus, Grafana, alerts, and Telegram bot operations.</span></a>
           <a href="doc.html?doc=ha.md">HA topology <span>Proxy role, backend pools, split routing, and failure model.</span></a>
           <a href="doc.html?doc=security.md">Security model <span>Threat surface, REALITY guidance, host hardening, and secrets handling.</span></a>
@@ -710,12 +782,15 @@
       <section class="wrap">
         <div class="support">
           <div>
-            <h2>Support maintenance</h2>
+            <h2>Project updates and support</h2>
             <p>
-              Donations help fund bug fixes, documentation, release work, and operator tooling for the project.
+              Follow development notes on X, or support maintenance through the donation page.
             </p>
           </div>
-          <a class="button primary" href="donate/">Donate</a>
+          <div class="actions">
+            <a class="button" href="https://x.com/OVPN_project">Follow on X</a>
+            <a class="button primary" href="donate/">Donate</a>
+          </div>
         </div>
       </section>
     </main>
