@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.4.3
+
+### Added
+- Added `ovpn user quota-set --monthly-gb <gb>` for human-sized rolling `30d` quota changes.
+- Added stronger unit coverage for quota parsing, user command argument validation, terminal QR rendering, remote agent HTTP parsing, and runtime user removal.
+
+### Changed
+- Refreshed README and GitHub Pages content for engineer-focused operations: Docker runtime, local desired state, SSH/SCP automation, HA proxy topology, security defaults, Ansible hardening, CI badges, fast navigation, and architecture diagrams.
+- Terminal QR output now uses a smaller QR encoding and trims the quiet zone without corrupting multi-byte terminal characters.
+- Remote agent HTTP calls now parse HTTP status explicitly so fallback-capable runtime mutations do not surface agent `500` responses as SSH command failures.
+
+### Fixed
+- Runtime user removal is idempotent when the user is already absent from Xray, avoiding unnecessary scary errors before deploy fallback.
+- User subcommands now reject unexpected positional arguments instead of silently ignoring mistyped input.
+
 ## 1.4.2
 
 ### Fixed

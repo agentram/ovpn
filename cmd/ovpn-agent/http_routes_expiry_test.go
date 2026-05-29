@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,7 +18,25 @@ import (
 	"ovpn/internal/store/remote"
 )
 
+type testRuntime struct {
+	removeErr error
+	removes   []string
+}
+
+func (r *testRuntime) AddUser(context.Context, string, string, string) error {
+	return nil
+}
+
+func (r *testRuntime) RemoveUser(_ context.Context, _ string, email string) error {
+	r.removes = append(r.removes, email)
+	return r.removeErr
+}
+
 func newTestAgentMux(t *testing.T) (*remote.Store, *http.ServeMux) {
+	return newTestAgentMuxWithRuntime(t, nil)
+}
+
+func newTestAgentMuxWithRuntime(t *testing.T, runtime *testRuntime) (*remote.Store, *http.ServeMux) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -30,6 +49,7 @@ func newTestAgentMux(t *testing.T) (*remote.Store, *http.ServeMux) {
 	mux := http.NewServeMux()
 	registerHTTPRoutes(ctx, mux, routeDeps{
 		store:       store,
+		runtime:     runtime,
 		metrics:     newAgentMetrics(prometheus.NewRegistry()),
 		logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		xrayAPI:     "127.0.0.1:0",
@@ -173,6 +193,81 @@ func TestRuntimeAddRejectsDisabledUser(t *testing.T) {
 	}
 	if !bytes.Contains(rec.Body.Bytes(), []byte("disabled or expired")) {
 		t.Fatalf("unexpected response body: %s", rec.Body.String())
+	}
+}
+
+func TestRuntimeRemoveTreatsMissingUserAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	runtime := &testRuntime{removeErr: errors.New("failed to remove user: not found")}
+	_, mux := newTestAgentMuxWithRuntime(t, runtime)
+
+	body := `{"email":" alice@global ","inbound_tag":"vless-reality"}`
+	req := httptest.NewRequest(http.MethodPost, "/runtime/user/remove", bytes.NewBufferString(body))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d want=%d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if len(runtime.removes) != 1 || runtime.removes[0] != "alice@global" {
+		t.Fatalf("unexpected runtime removes: %+v", runtime.removes)
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"absent":true`)) {
+		t.Fatalf("expected absent=true response, got %s", rec.Body.String())
+	}
+}
+
+func TestRuntimeRemoveRequiresEmail(t *testing.T) {
+	t.Parallel()
+
+	runtime := &testRuntime{}
+	_, mux := newTestAgentMuxWithRuntime(t, runtime)
+
+	req := httptest.NewRequest(http.MethodPost, "/runtime/user/remove", bytes.NewBufferString(`{"email":" "}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want=%d body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if len(runtime.removes) != 0 {
+		t.Fatalf("expected no runtime remove, got %+v", runtime.removes)
+	}
+}
+
+func TestRuntimeRemoveReturnsErrorForUnexpectedRuntimeFailure(t *testing.T) {
+	t.Parallel()
+
+	runtime := &testRuntime{removeErr: errors.New("xray api unavailable")}
+	_, mux := newTestAgentMuxWithRuntime(t, runtime)
+
+	req := httptest.NewRequest(http.MethodPost, "/runtime/user/remove", bytes.NewBufferString(`{"email":"alice@global"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status=%d want=%d body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte("xray api unavailable")) {
+		t.Fatalf("unexpected response body: %s", rec.Body.String())
+	}
+}
+
+func TestRuntimeUserAbsentErrorMatching(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		err  error
+		want bool
+	}{
+		{err: nil, want: false},
+		{err: errors.New("user not found"), want: true},
+		{err: errors.New("user does not exist"), want: true},
+		{err: errors.New("failed to remove user: xray returned 500"), want: true},
+		{err: errors.New("xray api unavailable"), want: false},
+	}
+	for _, tc := range cases {
+		if got := isRuntimeUserAbsentError(tc.err); got != tc.want {
+			t.Fatalf("isRuntimeUserAbsentError(%v)=%v want %v", tc.err, got, tc.want)
+		}
 	}
 }
 

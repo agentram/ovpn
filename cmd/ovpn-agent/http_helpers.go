@@ -49,6 +49,16 @@ func handleQuotaPolicies(store quotaPolicyLister, logger *slog.Logger, metrics *
 	}
 }
 
+func isRuntimeUserAbsentError(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(text, "not found") ||
+		strings.Contains(text, "not exist") ||
+		strings.Contains(text, "failed to remove") && strings.Contains(text, "user")
+}
+
 // postNotifyEvent handles post notify event HTTP behavior for this service.
 func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error {
 	raw, err := json.Marshal(payload)

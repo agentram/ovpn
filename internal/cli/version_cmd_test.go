@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"ovpn/internal/version"
 )
 
 func TestVersionCommandPrintsPinnedVersion(t *testing.T) {
@@ -29,7 +31,11 @@ func TestVersionCommandPrintsPinnedVersion(t *testing.T) {
 		t.Fatalf("read output: %v", err)
 	}
 	got := strings.TrimSpace(buf.String())
-	if got != "1.4.2" {
-		t.Fatalf("version output = %q, want %q", got, "1.4.2")
+	want, err := version.ReadVersionFile("")
+	if err != nil {
+		t.Fatalf("read version file: %v", err)
+	}
+	if got != want {
+		t.Fatalf("version output = %q, want %q", got, want)
 	}
 }

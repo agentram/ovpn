@@ -21,7 +21,13 @@ func (a *App) configCmd() *cobra.Command {
 	render := &cobra.Command{
 		Use:   "render",
 		Short: "Render xray config JSON",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			trimmedServer, err := requiredFlagValue("--server", server)
+			if err != nil {
+				return err
+			}
+			server = trimmedServer
 			srv, err := a.store.GetServerByName(a.ctx, server)
 			if err != nil {
 				return err
@@ -49,7 +55,13 @@ func (a *App) configCmd() *cobra.Command {
 	validate := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate rendered config (JSON + optional docker xray test)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			trimmedServer, err := requiredFlagValue("--server", server)
+			if err != nil {
+				return err
+			}
+			server = trimmedServer
 			srv, err := a.store.GetServerByName(a.ctx, server)
 			if err != nil {
 				return err

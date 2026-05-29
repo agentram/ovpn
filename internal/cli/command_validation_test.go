@@ -111,6 +111,70 @@ func TestServerMonitorTelegramSetupUsesNotifyChatIDsAsOwnerFallback(t *testing.T
 	}
 }
 
+func TestConfigCommandsRejectUnexpectedArgs(t *testing.T) {
+	t.Parallel()
+
+	cases := [][]string{
+		{"render", "--server", "main", "extra"},
+		{"validate", "--server", "main", "extra"},
+	}
+	for _, args := range cases {
+		t.Run(args[0], func(t *testing.T) {
+			cmd := (&App{}).configCmd()
+			cmd.SetArgs(args)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), "unknown command") {
+				t.Fatalf("expected unexpected arg error for %v, got %v", args, err)
+			}
+		})
+	}
+}
+
+func TestConfigCommandsRejectBlankServerBeforeStoreLookup(t *testing.T) {
+	t.Parallel()
+
+	cases := [][]string{
+		{"render", "--server", " "},
+		{"validate", "--server", " "},
+	}
+	for _, args := range cases {
+		t.Run(args[0], func(t *testing.T) {
+			cmd := (&App{}).configCmd()
+			cmd.SetArgs(args)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), "--server is required") {
+				t.Fatalf("expected server validation error for %v, got %v", args, err)
+			}
+		})
+	}
+}
+
+func TestStatsCommandsRejectBadInputBeforeStoreLookup(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "stats blank server", args: []string{"--server", " "}, want: "--server is required"},
+		{name: "stats extra arg", args: []string{"--server", "main", "extra"}, want: "unknown command"},
+		{name: "stats user blank server", args: []string{"user", "--server", " "}, want: "--server is required"},
+		{name: "stats user bad date", args: []string{"user", "--server", "main", "--date", "2026/12/31"}, want: "--date must be YYYY-MM-DD"},
+		{name: "stats sync blank server", args: []string{"sync", "--server", " "}, want: "--server is required"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := (&App{}).statsCmd()
+			cmd.SetArgs(tc.args)
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %q for %v, got %v", tc.want, tc.args, err)
+			}
+		})
+	}
+}
+
 func TestServerMonitorTelegramSetupRejectsInvalidNotifyChatIDsBeforeStoreLookup(t *testing.T) {
 	clearTelegramSetupEnv(t)
 	t.Setenv("OVPN_TELEGRAM_BOT_TOKEN", "token")
