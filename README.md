@@ -1,18 +1,98 @@
 # ovpn
 
-`ovpn` is a Go CLI for running self-hosted Xray (`VLESS + REALITY`) VPN servers over SSH.
+[![Go Quality](https://github.com/agentram/ovpn/actions/workflows/ci.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/ci.yml)
+[![Security](https://github.com/agentram/ovpn/actions/workflows/security.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/security.yml)
+[![Release](https://github.com/agentram/ovpn/actions/workflows/release.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/release.yml)
 
-It is meant for small, operator-managed deployments: a local proof of concept, one VPS/VDS, or a small set of servers.
+`ovpn` operates self-hosted Xray (`VLESS + REALITY`) VPN servers from a local Go CLI over SSH.
+
+The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
+
+## Fast navigation
+
+- [Architecture](#architecture)
+- [Design points](#design-points)
+- [Security and quota defaults](#security-and-quota-defaults)
+- [Quick start](#quick-start)
+- [Production flow](#production-flow)
+- [HA proxy rollout](#4a-optional-ha-proxy-rollout)
+- [User operations](#6-add-users-and-deliver-links)
+- [Monitoring](#7-optional-monitoring)
+- [Documentation map](#documentation-map)
 
 ## Production model
 
-- Ansible prepares the host: packages, Docker, SSH, firewall, and hardening.
-- `ovpn` manages the VPN runtime: Xray config, users, quotas, monitoring, backups, and cleanup.
-- The control plane uses SSH. There is no public admin API.
-- Xray REALITY listens on `443/tcp`.
-- SSH stays on `22/tcp` in the recommended flow.
+- Ansible prepares the host baseline: packages, Docker, SSH, firewall, unattended upgrades, and hardening.
+- `ovpn` owns the VPN runtime: Xray config, users, quotas, monitoring, backups, and cleanup.
+- Desired state stays local under `~/.ovpn`; deploys render runtime files and push them over SSH/SCP.
+- Remote services run as Docker Compose under `/opt/ovpn`, which keeps maintenance and recovery predictable.
+- Xray REALITY listens on `443/tcp`; internal agent and monitoring endpoints stay private by default.
 - Real inventory, hostnames, IPs, tokens, and private keys stay outside the public repository.
-- Public GitHub Actions validate and release the project only. Deploy, backup, and restore automation should stay local or in a private ops repository.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  classDef operator fill:#e8f5ef,stroke:#167054,stroke-width:2px,color:#17231d
+  classDef host fill:#eef4fb,stroke:#225b8d,stroke-width:2px,color:#17231d
+  classDef runtime fill:#fff7e8,stroke:#8f4f23,stroke-width:2px,color:#17231d
+  classDef optional fill:#f7f0ff,stroke:#7050a8,stroke-width:2px,color:#17231d
+  classDef client fill:#f2f2ec,stroke:#6a6f68,stroke-width:1.5px,color:#17231d
+
+  subgraph local["Operator machine"]
+    cli["ovpn CLI"]
+    state["~/.ovpn\nservers, users, quotas"]
+    ansible["Ansible inventory\nhost hardening"]
+    ci["GitHub Actions\nCI, security, release"]
+  end
+
+  subgraph vpn["VPN host(s)"]
+    hostA["VPN host A\n/opt/ovpn\nXray 443 + agent"]
+    hostN["VPN host B..N\nsame runtime model"]
+    monitoring["optional monitoring\nPrometheus/Grafana\nTelegram bot"]
+    backups["backup + cleanup\nsnapshots"]
+  end
+
+  subgraph ha["Optional HA entrypoint"]
+    proxy["HAProxy proxy\ncountry preset routing"]
+    backends["VPN backend pool\nhost A..N"]
+  end
+
+  clients["Clients\nmobile / desktop\nVLESS link or QR"]
+
+  state --> cli
+  ansible -->|bootstrap| hostA
+  ansible -->|bootstrap| hostN
+  ci -->|validated release binary| cli
+  cli -->|SSH/SCP deploy| hostA
+  cli -->|SSH/SCP deploy| hostN
+  hostA --> monitoring
+  hostN --> monitoring
+  hostA --> backups
+  hostN --> backups
+  proxy -->|foreign relay| backends
+  backends --> hostA
+  backends --> hostN
+  clients -->|443/tcp| proxy
+  clients -->|direct 443/tcp| hostA
+  clients -->|direct 443/tcp| hostN
+
+  class cli,state,ansible,ci operator
+  class hostA,hostN host
+  class backups runtime
+  class monitoring,proxy,backends optional
+  class clients client
+```
+
+## Design points
+
+- Local state: `~/.ovpn` stores servers, users, quotas, and metadata used for rendering.
+- SSH/SCP deploy path: commands render files locally and apply them through normal server access.
+- Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
+- Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
+- Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
+- Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering.
+- Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
 
 ## Key features
 
@@ -27,7 +107,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 
 ## Versioning
 
-- Current pinned version: `1.4.2`
+- Current pinned version: `1.4.3`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -50,7 +130,7 @@ It is meant for small, operator-managed deployments: a local proof of concept, o
 - Release binary, or Go `1.26.2+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
-- Clean VPS/VDS recommended
+- Clean Linux host recommended
 - Root SSH access is the simplest supported setup
 - Docker/Compose on the host, usually installed by the Ansible bootstrap
 
@@ -76,7 +156,7 @@ See [`docs/security.md`](docs/security.md) for the full security model.
 - Remote server backups: keep latest `7`
 - Local backups: keep latest `7`
 - Remote pre-deploy snapshots: keep latest `7`
-- Monitoring defaults are sized for small VPS/VDS hosts:
+- Monitoring defaults are sized for small hosts:
   - Prometheus scrape/evaluation interval: `30s`
   - Prometheus retention: `10d`
   - cAdvisor housekeeping: `30s`
@@ -237,6 +317,7 @@ See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 ```bash
 ./ovpn user add --username <user>
 ./ovpn user add --username <user> --expiry 2026-05-01
+./ovpn user quota-set --username <user> --monthly-gb 400
 ./ovpn user quota-set --username <user> --monthly-bytes <bytes>
 ./ovpn user enable --username <user>
 ./ovpn user rm --username <user>
@@ -249,6 +330,8 @@ See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 ```
 
 Mutating user commands apply to all enabled servers by default. Link and read commands stay server-scoped. QR output is enabled by default and contains the same full client credential as the `vless://` link; treat saved QR files as secrets.
+
+Use `--monthly-gb` for human-sized quota changes. `ovpn` stores quota internally as bytes; `--monthly-gb 400` means `400 * 1024^3` bytes. `--monthly-bytes` remains available for exact automation.
 
 When `--email` is omitted, new users get stable identity `username@global`. User expiry is cluster-wide and uses UTC end-of-day semantics.
 
@@ -309,7 +392,7 @@ By default, cleanup removes remote runtime files and disables local server metad
 ./ovpn stats --server <server>
 ./ovpn user list --server <server>
 ./ovpn user add --username <user>
-./ovpn user quota-set --username <user> --monthly-bytes <bytes>
+./ovpn user quota-set --username <user> --monthly-gb 400
 ./ovpn user link --server <server> --username <user>
 ./ovpn server monitor up <server>
 ./ovpn server backup <server>

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	neturl "net/url"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,7 +20,13 @@ func (a *App) statsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stats",
 		Short: "Show/sync traffic stats",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			trimmedServer, err := requiredFlagValue("--server", server)
+			if err != nil {
+				return err
+			}
+			server = trimmedServer
 			srv, err := a.store.GetServerByName(a.ctx, server)
 			if err != nil {
 				return err
@@ -45,13 +52,22 @@ func (a *App) statsCmd() *cobra.Command {
 	userCmd := &cobra.Command{
 		Use:   "user",
 		Short: "Show daily per-user traffic",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv, err := a.store.GetServerByName(a.ctx, server)
+			trimmedServer, err := requiredFlagValue("--server", server)
 			if err != nil {
 				return err
 			}
+			server = trimmedServer
+			day = strings.TrimSpace(day)
 			if day == "" {
 				day = time.Now().UTC().Format("2006-01-02")
+			} else if _, err := time.Parse("2006-01-02", day); err != nil {
+				return fmt.Errorf("--date must be YYYY-MM-DD")
+			}
+			srv, err := a.store.GetServerByName(a.ctx, server)
+			if err != nil {
+				return err
 			}
 			url := a.agentURL("/stats/daily?date=" + neturl.QueryEscape(day))
 			body, err := a.fetchRemoteAgent(*srv, "GET", url, nil)
@@ -76,7 +92,13 @@ func (a *App) statsCmd() *cobra.Command {
 	syncCmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Collect remote totals and cache in local SQLite",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			trimmedServer, err := requiredFlagValue("--server", server)
+			if err != nil {
+				return err
+			}
+			server = trimmedServer
 			srv, err := a.store.GetServerByName(a.ctx, server)
 			if err != nil {
 				return err

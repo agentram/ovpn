@@ -28,6 +28,7 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reconcile",
 		Short: "Reconcile users from one server to others (dry-run by default)",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(reconcile.fromServer) == "" {
 				return fmt.Errorf("--from-server is required")
@@ -35,6 +36,8 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 			if strings.TrimSpace(reconcile.toServer) != "" && reconcile.all {
 				return fmt.Errorf("cannot use --to-server and --all together")
 			}
+			reconcile.fromServer = strings.TrimSpace(reconcile.fromServer)
+			reconcile.toServer = strings.TrimSpace(reconcile.toServer)
 
 			source, err := a.store.GetServerByName(a.ctx, reconcile.fromServer)
 			if err != nil {

@@ -30,9 +30,7 @@
         margin: 0;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: var(--ink);
-        background:
-          radial-gradient(circle at 15% 5%, rgba(22, 112, 84, 0.16), transparent 24rem),
-          linear-gradient(180deg, #fbfaf6 0%, var(--bg) 72%);
+        background: linear-gradient(180deg, #fbfaf6 0%, var(--bg) 72%);
       }
 
       body { overflow-x: hidden; }
@@ -130,6 +128,20 @@
         gap: 12px;
       }
 
+      .quick-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .quick-nav a {
+        color: var(--green-dark);
+        font-size: 0.92rem;
+        font-weight: 800;
+        text-decoration: none;
+      }
+
       .status-strip {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -158,6 +170,7 @@
         color: var(--muted);
         font-size: 0.92rem;
         line-height: 1.45;
+        overflow-wrap: anywhere;
       }
 
       .tech-list {
@@ -180,6 +193,140 @@
       .tech-list code {
         color: var(--green-dark);
         font-weight: 800;
+      }
+
+      .arch-panel {
+        margin-top: 24px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 253, 248, 0.9);
+        box-shadow: 0 18px 42px rgba(23, 35, 29, 0.07);
+      }
+
+      .arch-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .arch-title {
+        margin: 0;
+        font-size: 0.86rem;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .arch-tags {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .arch-tags span {
+        padding: 6px 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      .arch-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1.18fr) 52px minmax(0, 1fr);
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .arch-stack {
+        display: grid;
+        align-content: start;
+        gap: 12px;
+      }
+
+      .arch-lane {
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .arch-node {
+        min-height: 94px;
+        padding: 14px 15px;
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--green);
+        border-radius: 12px;
+        background: #fffefb;
+      }
+
+      .arch-node.host { border-left-color: var(--blue); }
+      .arch-node.runtime { border-left-color: var(--rust); }
+      .arch-node.optional { border-left-color: #7050a8; }
+      .arch-node.client { border-left-color: #6a6f68; }
+
+      .arch-node strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 1.04rem;
+      }
+
+      .arch-node span {
+        color: var(--muted);
+        font-size: 0.94rem;
+        line-height: 1.48;
+        overflow-wrap: anywhere;
+      }
+
+      .arch-node code {
+        color: var(--green-dark);
+        font-weight: 800;
+      }
+
+      .arch-arrow-column {
+        display: grid;
+        align-items: center;
+      }
+
+      .arch-arrow {
+        position: relative;
+        height: 2px;
+        background: var(--green-dark);
+      }
+
+      .arch-arrow::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -1px;
+        width: 10px;
+        height: 10px;
+        border-top: 2px solid var(--green-dark);
+        border-right: 2px solid var(--green-dark);
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .arch-notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .arch-note {
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-2);
+        color: var(--muted);
+        font-size: 0.9rem;
+        line-height: 1.45;
       }
 
       section {
@@ -225,6 +372,7 @@
         margin-bottom: 0;
         color: var(--muted);
         line-height: 1.55;
+        overflow-wrap: anywhere;
       }
 
       .split {
@@ -310,13 +458,46 @@
         }
 
         .nav {
-          justify-content: flex-start;
-          overflow-x: auto;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          justify-content: stretch;
+          overflow-x: visible;
           padding-bottom: 2px;
+          width: 100%;
+        }
+        .nav a {
+          width: 100%;
         }
         .hero { min-height: auto; padding-top: 20px; }
-        .status-strip { grid-template-columns: 1fr 1fr; }
+        .status-strip { grid-template-columns: 1fr; }
         .split { grid-template-columns: 1fr; }
+        .arch-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .arch-tags {
+          justify-content: flex-start;
+        }
+        .arch-grid {
+          grid-template-columns: 1fr;
+        }
+        .arch-arrow-column {
+          min-height: 28px;
+        }
+        .arch-arrow {
+          width: 2px;
+          height: 28px;
+          justify-self: center;
+        }
+        .arch-arrow::after {
+          top: auto;
+          right: 50%;
+          bottom: -1px;
+          transform: translateX(50%) rotate(135deg);
+        }
+        .arch-notes {
+          grid-template-columns: 1fr;
+        }
         .support { align-items: flex-start; flex-direction: column; }
       }
 
@@ -332,8 +513,9 @@
       <a class="brand" href="./">ovpn</a>
       <nav class="nav" aria-label="Primary navigation">
         <a href="https://github.com/agentram/ovpn">GitHub</a>
-        <a href="doc.html?doc=clients.md">Clients</a>
-        <a href="doc.html?doc=monitoring.md">Monitoring</a>
+        <a href="#design">Design</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#docs">Docs</a>
         <a href="donate/">Donate</a>
       </nav>
     </header>
@@ -344,75 +526,151 @@
           <div class="eyebrow">For operators and engineers</div>
           <h1>Self-hosted Xray operations controlled over SSH</h1>
           <p class="lede">
-            ovpn is a Go CLI, remote agent, and release pipeline for running Xray VLESS + REALITY on your own hosts. It keeps desired state local, renders deployable runtime bundles, and avoids a public management API.
+            ovpn operates Xray VLESS + REALITY from local state. The CLI stores servers and users in <code>~/.ovpn</code>, renders Docker Compose files, and applies them to Linux hosts over SSH/SCP.
           </p>
           <div class="actions">
             <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
-            <a class="button" href="doc.html?doc=monitoring.md">Read monitoring docs</a>
-            <a class="button" href="donate/">Support development</a>
+            <a class="button" href="#architecture">View architecture</a>
+            <a class="button" href="#quick-commands">Quick commands</a>
+          </div>
+          <div class="quick-nav" aria-label="Fast navigation">
+            <a href="#design">design</a>
+            <a href="#architecture">architecture</a>
+            <a href="#automation">automation</a>
+            <a href="#docs">docs</a>
+            <a href="doc.html?doc=ha.md">HA guide</a>
+            <a href="doc.html?doc=security.md">security</a>
           </div>
 
           <div class="status-strip">
             <div class="stat">
-              <strong>SSH control plane</strong>
-              <span>Operations run through authenticated SSH, not an exposed control endpoint.</span>
+              <strong>Local state</strong>
+              <span><code>~/.ovpn</code> stores server, user, quota, and deploy metadata.</span>
             </div>
             <div class="stat">
-              <strong>Embedded runtime assets</strong>
-              <span>Release CLI embeds Linux agent and Telegram bot binaries for deploys.</span>
+              <strong>Docker runtime</strong>
+              <span>Xray, agent, optional proxy, and monitoring run under Compose in <code>/opt/ovpn</code>.</span>
             </div>
             <div class="stat">
-              <strong>Xray on 443</strong>
-              <span>VLESS + REALITY entrypoint with rendered server configuration.</span>
+              <strong>SSH deploy</strong>
+              <span>The CLI renders files locally and pushes runtime bundles over SSH/SCP.</span>
             </div>
             <div class="stat">
-              <strong>Optional monitoring</strong>
-              <span>Prometheus, Grafana, Alertmanager, and owner-only Telegram operations.</span>
+              <strong>Proxy role</strong>
+              <span>HAProxy can front several VPN backends and apply country preset routing.</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="wrap">
-        <h2>What the system actually manages</h2>
+      <section class="wrap" id="design">
+        <h2>Design points</h2>
         <p class="section-lede">
-          The project is not a hosted VPN product. It is a self-hosted operations toolchain: CLI state, runtime rendering, remote deployment, sidecar APIs, monitoring bundles, and release automation.
+          The project keeps the control plane local. It uses Go for the operator CLI, Docker Compose for the remote runtime, and Ansible for host bootstrap and hardening.
         </p>
         <div class="grid">
           <article class="card">
             <h3>Local desired state</h3>
-            <p>Server and user records live under <code>~/.ovpn</code>. The CLI renders runtime files from that state and pushes them over SSH.</p>
+            <p>Servers, users, quotas, and runtime intent are stored locally, then rendered into remote files when deploy runs.</p>
           </article>
           <article class="card">
-            <h3>Runtime agent boundary</h3>
-            <p><code>ovpn-agent</code> exposes local health, stats, quota, and user mutation endpoints inside the deployed host runtime.</p>
+            <h3>Scriptable CLI</h3>
+            <p>Commands cover deploy, users, quotas, doctor checks, logs, backup, restore, cleanup, and monitoring setup.</p>
           </article>
           <article class="card">
-            <h3>User and quota workflow</h3>
-            <p>Users can be mirrored across enabled servers, exported as VLESS links or QR codes, expired, disabled, and quota-limited.</p>
+            <h3>Security baseline</h3>
+            <p>Ansible handles host hardening. The minimal Xray profile blocks BitTorrent and public trackers; optional host rules block Tor exit traffic.</p>
           </article>
           <article class="card">
-            <h3>HA proxy topology</h3>
-            <p>Optional proxy nodes route local-country traffic directly and relay foreign traffic to backend VPN servers through HAProxy.</p>
+            <h3>Multiple VPN hosts</h3>
+            <p>User mutations can apply to all enabled VPN hosts. A proxy host can route traffic to a backend pool when HA is needed.</p>
           </article>
         </div>
       </section>
 
-      <section class="wrap">
+      <section class="wrap" id="architecture">
+        <h2>Highlighted architecture</h2>
+        <p class="section-lede">
+          Operations run from the operator machine. VPN hosts receive rendered Compose bundles; clients connect either directly to a VPN host or through an optional HAProxy entrypoint.
+        </p>
+        <div class="arch-panel" aria-label="ovpn architecture diagram">
+          <div class="arch-header">
+            <p class="arch-title">Control plane stays local</p>
+            <div class="arch-tags" aria-label="architecture properties">
+              <span>SSH/SCP</span>
+              <span>Docker Compose</span>
+              <span>Desired state</span>
+              <span>Optional HA</span>
+            </div>
+          </div>
+          <div class="arch-grid">
+            <div class="arch-stack">
+              <div class="arch-lane">Operator machine</div>
+              <div class="arch-node">
+                <strong>ovpn CLI</strong>
+                <span>Runs deploys, user changes, quotas, status checks, logs, backup, restore, and cleanup.</span>
+              </div>
+              <div class="arch-node">
+                <strong>Local state</strong>
+                <span><code>~/.ovpn</code> stores servers, users, quotas, and rendered intent. Private inventory stays outside the public repo.</span>
+              </div>
+              <div class="arch-node">
+                <strong>Ansible baseline</strong>
+                <span>Bootstrap and maintenance playbooks handle Docker, firewall, unattended upgrades, SSH, and host hardening.</span>
+              </div>
+            </div>
+            <div class="arch-arrow-column" aria-hidden="true"><div class="arch-arrow"></div></div>
+            <div class="arch-stack">
+              <div class="arch-lane">VPN hosts runtime</div>
+              <div class="arch-node host">
+                <strong>VPN host A</strong>
+                <span><code>/opt/ovpn</code> contains Docker Compose, Xray on <code>443/tcp</code>, ovpn-agent, and snapshots.</span>
+              </div>
+              <div class="arch-node runtime">
+                <strong>VPN host B..N</strong>
+                <span>Additional hosts use the same rendered runtime model for users, quotas, health, and metrics.</span>
+              </div>
+              <div class="arch-node optional">
+                <strong>Monitoring</strong>
+                <span>Optional Prometheus, Grafana, Alertmanager, cAdvisor, node-exporter, and Telegram operator bot.</span>
+              </div>
+            </div>
+            <div class="arch-arrow-column" aria-hidden="true"><div class="arch-arrow"></div></div>
+            <div class="arch-stack">
+              <div class="arch-lane">Traffic path</div>
+              <div class="arch-node optional">
+                <strong>HAProxy entrypoint</strong>
+                <span>Optional proxy node with country presets, local-destination bypass, foreign relay, and backend pool failover.</span>
+              </div>
+              <div class="arch-node client">
+                <strong>Clients</strong>
+                <span>Mobile and desktop clients import the VLESS link or QR. Runtime traffic uses the public <code>443/tcp</code> endpoint.</span>
+              </div>
+            </div>
+          </div>
+          <div class="arch-notes">
+            <div class="arch-note">Operations use authenticated SSH/SCP, which keeps the management surface aligned with normal server access.</div>
+            <div class="arch-note">Release builds embed Linux runtime assets, so deploys do not need Go or source checkout.</div>
+            <div class="arch-note">Security defaults block BitTorrent and public trackers; Ansible can add Tor exit-node filtering.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="automation">
         <div class="split">
           <div>
-            <h2>Technical shape</h2>
+            <h2>Automation and maintenance</h2>
             <p class="section-lede">
-              The main design boundary is a small public surface, reproducible release artifacts, deploy-time runtime materialization, and enough diagnostics to operate a small fleet without a separate control plane.
+              Release builds embed the Linux runtime assets, so normal deploys do not need Go, source checkout, or sidecar binaries next to <code>ovpn</code>.
             </p>
             <ul class="tech-list">
-              <li><code>ovpn</code> release archives contain one executable; deploy-time Linux runtime binaries are embedded into the CLI.</li>
-              <li>Remote runtime is Docker Compose under <code>/opt/ovpn</code>; internal agent and monitoring ports stay private by default.</li>
-              <li><code>doctor</code>, logs, status, backup, restore, cleanup, and monitoring commands are first-class operator workflows.</li>
-              <li>GitHub Actions build self-contained releases, run a no-Go deploy smoke, and keep private host inventory outside the public repo.</li>
+              <li><code>server init</code> and <code>deploy</code> render the desired state and apply it through SSH/SCP.</li>
+              <li><code>user add</code>, <code>user rm</code>, <code>quota-set</code>, and expiry commands mirror users across enabled servers.</li>
+              <li><code>doctor</code>, <code>status</code>, logs, backups, restore, cleanup, and monitoring are built-in workflows.</li>
+              <li>GitHub Actions validate Go, Ansible, security scans, and self-contained release packaging.</li>
             </ul>
           </div>
-          <pre class="terminal"><code># Use a release archive, or build from source for development.
+          <pre class="terminal" id="quick-commands"><code># Use a release archive, or build from source for development.
 # Release archives contain one executable: ovpn.
 # go build -o ovpn ./cmd/ovpn
 ./ovpn version
@@ -427,11 +685,12 @@
 ./ovpn server init &lt;server&gt;
 ./ovpn deploy &lt;server&gt;
 ./ovpn doctor &lt;server&gt;
+./ovpn user quota-set --username &lt;user&gt; --monthly-gb 400
 ./ovpn user link --server &lt;server&gt; --username &lt;user&gt;</code></pre>
         </div>
       </section>
 
-      <section class="wrap">
+      <section class="wrap" id="docs">
         <h2>Documentation</h2>
         <p class="section-lede">
           Start with the README for setup. Documentation links below open in the site renderer so Markdown files are readable on GitHub Pages.

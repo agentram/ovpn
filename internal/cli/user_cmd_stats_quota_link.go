@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"ovpn/internal/model"
 	"ovpn/internal/xraycfg"
 )
+
+const quotaGBBytes int64 = 1024 * 1024 * 1024
 
 // newUserTopCmd initializes user top cmd with the required dependencies.
 func (a *App) newUserTopCmd() *cobra.Command {
@@ -21,7 +24,13 @@ func (a *App) newUserTopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
 		Short: "Show top users by total traffic",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", top.server)
+			if err != nil {
+				return err
+			}
+			top.server = server
 			srv, err := a.store.GetServerByName(a.ctx, top.server)
 			if err != nil {
 				return err
@@ -83,7 +92,13 @@ func (a *App) newUserQuotaResetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "quota-reset",
 		Short: "Clear quota block for user and re-add at runtime",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", quotaReset.username)
+			if err != nil {
+				return err
+			}
+			quotaReset.username = username
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -119,12 +134,36 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 	var quotaSet struct {
 		username    string
 		monthlyByte int64
+		monthlyGB   int64
 		enabled     bool
 	}
 	cmd := &cobra.Command{
 		Use:   "quota-set",
 		Short: "Set per-user rolling 30d quota policy",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if len(args) == 1 && strings.EqualFold(args[0], "gb") && cmd.Flags().Changed("monthly-gb") {
+				return nil
+			}
+			return fmt.Errorf("unexpected argument %q; use --monthly-gb 400 or --monthly-bytes <bytes>", args[0])
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			username, err := requiredFlagValue("--username", quotaSet.username)
+			if err != nil {
+				return err
+			}
+			quotaSet.username = username
+			monthlyByte, err := quotaBytesFromFlags(
+				quotaSet.monthlyByte,
+				quotaSet.monthlyGB,
+				cmd.Flags().Changed("monthly-bytes"),
+				cmd.Flags().Changed("monthly-gb"),
+			)
+			if err != nil {
+				return err
+			}
 			targets, err := a.resolveUserMutationServers()
 			if err != nil {
 				return err
@@ -138,7 +177,7 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 				}
 			}
 			for _, srv := range targets {
-				if err := a.setUserQuotaOnServer(srv, quotaSet.username, quotaSet.monthlyByte, quotaSet.enabled); err != nil {
+				if err := a.setUserQuotaOnServer(srv, quotaSet.username, monthlyByte, quotaSet.enabled); err != nil {
 					return fmt.Errorf("quota set on %s: %w", srv.Name, err)
 				}
 			}
@@ -152,9 +191,29 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&quotaSet.username, "username", "", "Username")
 	cmd.Flags().Int64Var(&quotaSet.monthlyByte, "monthly-bytes", 0, "Rolling 30d quota in bytes (0 uses default 300GB)")
+	cmd.Flags().Int64Var(&quotaSet.monthlyGB, "monthly-gb", 0, "Rolling 30d quota in GB, using 1024^3 bytes per GB (0 uses default 300GB)")
 	cmd.Flags().BoolVar(&quotaSet.enabled, "enabled", true, "Enable rolling 30d quota enforcement for this user")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
+}
+
+func quotaBytesFromFlags(monthlyBytes int64, monthlyGB int64, monthlyBytesSet bool, monthlyGBSet bool) (int64, error) {
+	if monthlyBytes < 0 {
+		return 0, fmt.Errorf("--monthly-bytes must be >= 0")
+	}
+	if monthlyGB < 0 {
+		return 0, fmt.Errorf("--monthly-gb must be >= 0")
+	}
+	if monthlyBytesSet && monthlyGBSet {
+		return 0, fmt.Errorf("use only one of --monthly-bytes or --monthly-gb")
+	}
+	if monthlyGBSet {
+		if monthlyGB > (1<<63-1)/quotaGBBytes {
+			return 0, fmt.Errorf("--monthly-gb is too large")
+		}
+		return monthlyGB * quotaGBBytes, nil
+	}
+	return monthlyBytes, nil
 }
 
 // newUserLinkCmd initializes user link cmd with the required dependencies.
@@ -168,7 +227,18 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "link",
 		Short: "Generate vless:// link",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", link.server)
+			if err != nil {
+				return err
+			}
+			username, err := requiredFlagValue("--username", link.username)
+			if err != nil {
+				return err
+			}
+			link.server = server
+			link.username = username
 			srv, err := a.store.GetServerByName(a.ctx, link.server)
 			if err != nil {
 				return err
