@@ -24,6 +24,9 @@ func (a *App) fetchRemoteAgent(srv model.Server, method, url string, payload any
 
 // fetchRemoteHTTP returns remote http for callers.
 func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any) ([]byte, error) {
+	if a.remoteHTTPHook != nil {
+		return a.remoteHTTPHook(srv, method, url, payload)
+	}
 	runner := a.newRunner("agent_http")
 	cfg := sshFromServer(srv)
 	var cmd string
@@ -206,10 +209,18 @@ func (a *App) waitForRemoteHTTPReady(srv model.Server, url string, timeout time.
 		if time.Now().After(deadline) {
 			break
 		}
-		time.Sleep(2 * time.Second)
+		a.sleep(2 * time.Second)
 	}
 	if lastErr == nil {
 		lastErr = errors.New("service did not become ready before timeout")
 	}
 	return lastErr
+}
+
+func (a *App) sleep(d time.Duration) {
+	if a.sleepHook != nil {
+		a.sleepHook(d)
+		return
+	}
+	time.Sleep(d)
 }

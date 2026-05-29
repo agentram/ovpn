@@ -1,6 +1,7 @@
 package backup
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -8,6 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ovpn/internal/model"
+	"ovpn/internal/ssh"
 )
 
 func TestLocalBackupRestore(t *testing.T) {
@@ -156,5 +160,24 @@ func TestPruneMatchingBackupsKeepsNewestN(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(tmp, "note.txt")); err != nil {
 		t.Fatalf("non-backup file should remain untouched: %v", err)
+	}
+}
+
+func TestRemoteBackupRestoreUseRunnerAndWrapErrors(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	cfg := ssh.Config{Host: "vpn.example.com"}
+	server := model.Server{Name: "main"}
+	runner := &ssh.Runner{DryRun: true}
+	remotePath, err := RemoteBackup(ctx, runner, cfg, server)
+	if err != nil {
+		t.Fatalf("remote backup: %v", err)
+	}
+	if !strings.HasPrefix(remotePath, "/opt/ovpn-backups/main-") {
+		t.Fatalf("unexpected remote backup path=%q", remotePath)
+	}
+	if err := RemoteRestore(ctx, runner, cfg, remotePath); err != nil {
+		t.Fatalf("remote restore: %v", err)
 	}
 }

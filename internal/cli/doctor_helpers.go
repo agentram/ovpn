@@ -10,6 +10,9 @@ import (
 
 // execRemote executes exec remote against remote hosts over SSH.
 func (a *App) execRemote(runner *ssh.Runner, cfg ssh.Config, timeout time.Duration, cmd string) (ssh.Result, error) {
+	if a.remoteExecHook != nil {
+		return a.remoteExecHook(cfg, timeout, cmd)
+	}
 	ctx, cancel := ssh.TimeoutCtx(a.ctx, timeout)
 	defer cancel()
 	return runner.Exec(ctx, cfg, cmd)

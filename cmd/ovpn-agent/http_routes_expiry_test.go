@@ -15,16 +15,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"ovpn/internal/model"
+	"ovpn/internal/stats"
 	"ovpn/internal/store/remote"
 )
 
 type testRuntime struct {
+	addErr    error
 	removeErr error
+	adds      []string
 	removes   []string
 }
 
-func (r *testRuntime) AddUser(context.Context, string, string, string) error {
-	return nil
+func (r *testRuntime) AddUser(_ context.Context, _ string, email string, _ string) error {
+	r.adds = append(r.adds, email)
+	return r.addErr
 }
 
 func (r *testRuntime) RemoveUser(_ context.Context, _ string, email string) error {
@@ -45,12 +49,18 @@ func newTestAgentMuxWithRuntime(t *testing.T, runtime *testRuntime) (*remote.Sto
 		t.Fatalf("open store: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
+	if runtime == nil {
+		runtime = &testRuntime{}
+	}
 
 	mux := http.NewServeMux()
+	metrics := newAgentMetrics(prometheus.NewRegistry())
 	registerHTTPRoutes(ctx, mux, routeDeps{
 		store:       store,
+		quota:       &stats.QuotaEnforcer{Store: store, Runtime: runtime},
+		expiry:      &stats.ExpiryEnforcer{Store: store, Runtime: runtime},
 		runtime:     runtime,
-		metrics:     newAgentMetrics(prometheus.NewRegistry()),
+		metrics:     metrics,
 		logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		xrayAPI:     "127.0.0.1:0",
 		dbPath:      ":memory:",
