@@ -38,14 +38,15 @@ type config struct {
 	pollInterval    time.Duration
 	logLevel        string
 
-	ownerUserID    int64
-	clientsPDFPath string
-	linkConfigFile string
-	linkAddress    string
-	linkServerName string
-	linkPublicKey  string
-	linkShortID    string
-	linkConfigErr  string
+	ownerUserID      int64
+	clientsPDFPath   string
+	clientsRUPDFPath string
+	linkConfigFile   string
+	linkAddress      string
+	linkServerName   string
+	linkPublicKey    string
+	linkShortID      string
+	linkConfigErr    string
 
 	telegramAPIFallbackIPs []string
 }

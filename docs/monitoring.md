@@ -131,7 +131,7 @@ Telegram <-> ovpn-telegram-bot (long polling)
                   +-> cAdvisor (/healthz)
                   +-> optional HAProxy (/metrics on proxy nodes)
                   +-> Docker API (/var/run/docker.sock, optional)
-                  +-> local clients.pdf (Guide PDF sendDocument, generated from docs/clients.md)
+                  +-> local clients.pdf + clients-ru.pdf (Guide PDF sendDocument, generated from docs/clients*.md)
 ```
 
 ## Start and check
@@ -175,6 +175,7 @@ export OVPN_TELEGRAM_NOTIFY_CHAT_IDS=<chat-id-1>
 
 # Optional custom PDF path inside container
 # export OVPN_TELEGRAM_CLIENTS_PDF_PATH=/opt/ovpn/monitoring/telegram-bot/assets/clients.pdf
+# export OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=/opt/ovpn/monitoring/telegram-bot/assets/clients-ru.pdf
 
 # Optional when using non-default bot host port:
 # export OVPN_TELEGRAM_NOTIFY_URL=http://127.0.0.1:19002/notify
@@ -261,7 +262,7 @@ Slash command fallback:
 - `/quota`
 - `/restart <service>`
 - `/heal`
-- `/guide`
+- `/guide` sends English and Russian client PDF guides when both assets are present
 - `/help`
 - `/cancel`
 

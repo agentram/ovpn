@@ -44,7 +44,7 @@ trivy-results.sarif
 monitoring/secrets/*
 !monitoring/secrets/.gitkeep
 !monitoring/secrets/README.md
-ansible/inventories/production/*
+ansible/inventories/production/**
 !ansible/inventories/production/.gitkeep
 !ansible/inventories/production/README.md
 

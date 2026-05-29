@@ -1,31 +1,31 @@
-# Руководство по подключению VPN (iOS, Android, Windows, macOS)
+# VPN client guide (iOS, Android, Windows, macOS)
 
-Документ описывает подключение по персональной ссылке `vless://` для сервиса `ovpn`.
+This guide describes client setup with a personal `vless://` link for the `ovpn` service.
 
-## Оглавление
+## Table of contents
 
-- [1. Безопасность: используйте только официальные клиенты](#section-1)
-- [2. Что нужно от администратора](#section-2)
-- [3. iPhone (iOS): Streisand](#section-3)
-- [4. Если приложения нет в App Store: смена региона Apple ID на US](#section-4)
-- [5. Android: v2rayNG или Hiddify](#section-5)
-- [6. Windows: v2rayN или Hiddify](#section-6)
-- [7. macOS: Hiddify](#section-7)
-- [8. Частые вопросы](#section-8)
-- [9. Практические заметки из сообществ](#section-9)
-- [10. Официальные источники](#section-10)
+- [1. Security: use official clients only](#en-section-1)
+- [2. What to ask from the administrator](#en-section-2)
+- [3. iPhone (iOS): Streisand](#en-section-3)
+- [4. If the app is not available in the App Store: Apple Account region](#en-section-4)
+- [5. Android: v2rayNG or Hiddify](#en-section-5)
+- [6. Windows: v2rayN or Hiddify](#en-section-6)
+- [7. macOS: Hiddify](#en-section-7)
+- [8. FAQ](#en-section-8)
+- [9. Practical community notes](#en-section-9)
+- [10. Official sources](#en-section-10)
 
-<a id="section-1"></a>
-## 1. Безопасность: используйте только официальные клиенты
+<a id="en-section-1"></a>
+## 1. Security: use official clients only
 
-В магазинах и на сайтах часто встречаются подделки с похожими названиями.
-Устанавливайте приложения только по официальным ссылкам:
+App stores and download sites may contain apps with similar names.
+Install clients only from official links:
 
 - iOS: Streisand (App Store)
   `https://apps.apple.com/us/app/streisand/id6450534064`
 - Android: v2rayNG (GitHub Releases)
   `https://github.com/2dust/v2rayNG/releases`
-- Android / iOS / Windows / macOS: Hiddify (официальный GitHub)
+- Android / iOS / Windows / macOS: Hiddify (official GitHub)
   `https://github.com/hiddify/hiddify-app`
 - iOS / macOS: Hiddify (App Store)
   `https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532`
@@ -33,107 +33,105 @@
   `https://play.google.com/store/apps/details?id=app.hiddify.com`
 - Android / iOS / Windows / macOS: Hiddify (GitHub Releases)
   `https://github.com/hiddify/hiddify-app/releases`
-- Windows / Linux / macOS: v2rayN (официальный GitHub)
+- Windows / Linux / macOS: v2rayN (official GitHub)
   `https://github.com/2dust/v2rayN`
 - Windows / Linux / macOS: v2rayN (GitHub Releases)
   `https://github.com/2dust/v2rayN/releases`
 
-Перед установкой всегда проверяйте:
+Before installing, check:
 
-1. Ссылка открывает App Store / Google Play / GitHub-репозиторий проекта.
-2. Название приложения и разработчика совпадает с официальным источником.
-3. Вы не используете APK/EXE со сторонних сайтов-агрегаторов.
+1. The link opens App Store, Google Play, or the official project GitHub repository.
+2. The app name and developer match the official source.
+3. You are not using APK/EXE files from third-party download aggregators.
 
-<a id="section-2"></a>
-## 2. Что нужно от администратора
+<a id="en-section-2"></a>
+## 2. What to ask from the administrator
 
-Запросите у администратора:
+Ask the administrator for:
 
-- персональную ссылку `<ваша ссылка VPN>` (формат `vless://...`)
-- QR-код этой же ссылки для быстрого импорта на мобильных устройствах
+- your personal VPN link in `vless://...` format
+- a QR code for the same link for quick mobile import
 
-Важно:
+Important:
 
-- не публикуйте ссылку в мессенджерах и соцсетях
-- не пересылайте ссылку посторонним людям
+- treat the link and QR code as a secret credential
+- do not post the link in public chats or social networks
+- do not forward the link to people who should not use your VPN account
 
-<a id="section-3"></a>
+<a id="en-section-3"></a>
 ## 3. iPhone (iOS): Streisand
 
-### Шаг 1. Установка
+### Step 1. Install
 
-1. Откройте App Store.
-2. Откройте официальную ссылку Streisand:
+1. Open the App Store.
+2. Open the official Streisand link:
    `https://apps.apple.com/us/app/streisand/id6450534064`
-3. Нажмите `Get` / `Загрузить`.
+3. Tap `Get`.
 
-### Шаг 2. Импорт ссылки
+### Step 2. Import the link
 
-1. Скопируйте `<ваша ссылка VPN>` в буфер обмена.
-2. Откройте Streisand.
-3. Нажмите `+` (добавить профиль).
-4. Выберите импорт из буфера/ссылки (или импорт по QR, если у вас QR-код).
-5. Сохраните профиль.
+1. Copy your VPN link to the clipboard.
+2. Open Streisand.
+3. Tap `+` to add a profile.
+4. Import from clipboard/link, or scan the QR code if you have it.
+5. Save the profile.
 
-### Шаг 3. Подключение
+### Step 3. Connect
 
-1. Откройте созданный профиль.
-2. Нажмите `Connect`.
-3. Подтвердите системный запрос iOS на добавление VPN-конфигурации.
+1. Open the created profile.
+2. Tap `Connect`.
+3. Confirm the iOS system request to add a VPN configuration.
 
-### Шаг 4. Проверка
+### Step 4. Check
 
-1. Откройте браузер.
-2. Перейдите на `https://ifconfig.me` или `https://ipinfo.io`.
-3. Убедитесь, что IP-адрес изменился.
+1. Open a browser.
+2. Visit `https://ifconfig.me` or `https://ipinfo.io`.
+3. Check that the IP address changed.
 
-### Шаг 5. Если не подключается
+### Step 5. If it does not connect
 
-1. Полностью закройте и откройте Streisand.
-2. Удалите профиль и импортируйте ссылку повторно.
-3. Проверьте, что дата/время на iPhone выставлены автоматически.
-4. Отключите и снова включите Wi-Fi/мобильную сеть.
-5. Запросите у администратора новую ссылку.
+1. Fully close and reopen Streisand.
+2. Delete the profile and import the link again.
+3. Check that iPhone date and time are set automatically.
+4. Disable and re-enable Wi-Fi or mobile data.
+5. Ask the administrator for a fresh link.
 
-<a id="section-4"></a>
-## 4. Если приложения нет в App Store: смена региона Apple ID на US
+<a id="en-section-4"></a>
+## 4. If the app is not available in the App Store: Apple Account region
 
-Ниже шаги по официальной инструкции Apple.
+Follow Apple official instructions if you decide to change your Apple Account region.
 
-### Что проверить до смены региона
+Before changing the region, check:
 
-1. Баланс Apple Account должен быть `0`.
-2. Активные подписки должны быть отменены и завершены.
-3. Не должно быть незавершённых покупок/предзаказов/возвратов.
-4. Если вы в Family Sharing, может потребоваться выйти из семейной группы.
+1. Apple Account balance is `0`.
+2. Active subscriptions are cancelled and fully ended.
+3. There are no pending purchases, preorders, rentals, or refunds.
+4. If you are in Family Sharing, you may need to leave the family group first.
 
-### Путь в iPhone
+Path on iPhone:
 
 1. `Settings`.
-2. Нажмите на своё имя (Apple ID).
+2. Tap your name.
 3. `Media & Purchases`.
 4. `View Account`.
 5. `Country/Region`.
 6. `Change Country or Region`.
-7. Выберите `United States`.
-8. Примите Terms & Conditions.
-9. Заполните Payment Method + Billing Address.
+7. Select the target country.
+8. Accept Terms & Conditions.
+9. Fill in payment method and billing/contact details accepted by Apple for that region.
 
-### Как заполнять адрес и телефон
+Use valid billing/contact information that Apple accepts for the selected region.
+Do not use someone else's address or invented personal details.
 
-Формат полей (пример структуры):
+Field format:
 
-- Street: `<номер дома и улица>`
-- City: `<город>`
-- State: `<2-буквенный код штата, например CA>`
-- ZIP: `<5 цифр, например 10001>`
-- Phone: `+1` + `<10 цифр>`
+- Street: `<street and house number>`
+- City: `<city>`
+- State: `<2-letter state code, for example CA>`
+- ZIP: `<5 digits, for example 10001>`
+- Phone: `+1` + `<10 digits>`
 
-### Примеры dummy-данных (если выбран способ оплаты `None`)
-
-Если вы меняете регион только для установки бесплатных приложений и в форме доступен способ оплаты `None` (`No Payment Method`), обычно достаточно корректного формата контактных полей.
-
-Примеры:
+Examples of the expected field format when payment method `None` (`No Payment Method`) is available:
 
 1. New York, NY
    - Street: `123 Main St`
@@ -148,191 +146,186 @@
    - ZIP: `90001`
    - Phone: `+1 213 555 0142`
 
-Важно:
+<a id="en-section-5"></a>
+## 5. Android: v2rayNG or Hiddify
 
-- эти примеры подходят как шаблоны формата
+### Option A: v2rayNG
 
-<a id="section-5"></a>
-## 5. Android: v2rayNG или Hiddify
+#### Install
 
-### Вариант A: v2rayNG
-
-#### Установка
-
-1. Откройте официальный репозиторий:
+1. Open the official repository:
    `https://github.com/2dust/v2rayNG`
-2. Для прямой загрузки из GitHub используйте:
+2. Use GitHub Releases for direct downloads:
    `https://github.com/2dust/v2rayNG/releases`
-3. Установите актуальную официальную версию.
+3. Install the current official version.
 
-#### Импорт и подключение
+#### Import and connect
 
-1. Скопируйте `<ваша ссылка VPN>`.
-2. Откройте v2rayNG.
-3. Нажмите `+`.
-4. Выберите импорт из буфера/ссылки (или QR).
-5. Выберите профиль и нажмите подключение.
-6. Подтвердите системный VPN-запрос Android.
+1. Copy your VPN link.
+2. Open v2rayNG.
+3. Tap `+`.
+4. Import from clipboard/link, or scan the QR code.
+5. Select the profile and connect.
+6. Confirm the Android system VPN request.
 
-### Вариант B: Hiddify
+### Option B: Hiddify
 
-#### Установка
+#### Install
 
-1. Откройте Google Play или официальный GitHub:
+1. Open Google Play or the official GitHub repository:
    `https://github.com/hiddify/hiddify-app`
-2. Google Play (прямая ссылка):
+2. Google Play:
    `https://play.google.com/store/apps/details?id=app.hiddify.com`
-3. GitHub Releases (прямая ссылка):
+3. GitHub Releases:
    `https://github.com/hiddify/hiddify-app/releases`
-4. Установите официальную версию.
+4. Install the official version.
 
-#### Импорт и подключение
+#### Import and connect
 
-1. Скопируйте `<ваша ссылка VPN>`.
-2. Откройте Hiddify.
-3. Выберите импорт ссылки/буфера (или QR).
-4. Сохраните профиль.
-5. Нажмите `Connect`.
-6. Подтвердите системный VPN-запрос.
+1. Copy your VPN link.
+2. Open Hiddify.
+3. Import from link/clipboard, or scan the QR code.
+4. Save the profile.
+5. Tap `Connect`.
+6. Confirm the system VPN request.
 
-### Проверка
+### Check
 
-1. Откройте `https://ifconfig.me`.
-2. Проверьте, что IP-адрес изменился.
+1. Open `https://ifconfig.me`.
+2. Check that the IP address changed.
 
-### Если приложение недоступно в Google Play
+### If the app is not available in Google Play
 
-Google указывает, что доступ зависит от страны профиля Google Play.
-Смена страны в Google Play требует:
+Google says Play country availability depends on your Google Play country.
+Changing the country may require:
 
-1. Фактического нахождения в новой стране.
-2. Способа оплаты из новой страны.
-3. Ожидания между сменами страны (обычно не чаще, чем раз в 90 дней).
+1. Being physically located in the new country.
+2. A payment method from the new country.
+3. Waiting between country changes.
 
-<a id="section-6"></a>
-## 6. Windows: v2rayN или Hiddify
+<a id="en-section-6"></a>
+## 6. Windows: v2rayN or Hiddify
 
-### Вариант A: v2rayN
+### Option A: v2rayN
 
-#### Шаг 1. Установка
+#### Step 1. Install
 
-1. Откройте официальный репозиторий:
+1. Open the official repository:
    `https://github.com/2dust/v2rayN`
-2. Прямая ссылка на релизы:
+2. Open Releases:
    `https://github.com/2dust/v2rayN/releases`
-3. Скачайте архив с ядром (обычно `v2rayN-With-Core...zip`).
-4. Распакуйте в отдельную папку.
-5. Запустите `v2rayN.exe`.
+3. Download the archive with the core, usually named like `v2rayN-With-Core...zip`.
+4. Extract it to a separate folder.
+5. Run `v2rayN.exe`.
 
-#### Шаг 2. Импорт ссылки
+#### Step 2. Import the link
 
-1. Скопируйте `<ваша ссылка VPN>`.
-2. В v2rayN выполните импорт из буфера/ссылки.
-3. Проверьте, что профиль появился в списке.
+1. Copy your VPN link.
+2. Import it from clipboard/link in v2rayN.
+3. Check that the profile appeared in the list.
 
-#### Шаг 3. Подключение
+#### Step 3. Connect
 
-1. Выберите профиль активным.
-2. Включите подключение.
-3. При необходимости включите `System Proxy` или `TUN`.
+1. Select the profile.
+2. Enable the connection.
+3. If needed, enable `System Proxy` or `TUN`.
 
-#### Шаг 4. Проверка
+#### Step 4. Check
 
-1. Откройте `https://ifconfig.me`.
-2. Убедитесь, что IP изменился.
+1. Open `https://ifconfig.me`.
+2. Check that the IP address changed.
 
-#### Шаг 5. Если не работает
+#### Step 5. If it does not work
 
-1. Запустите v2rayN от имени администратора.
-2. Убедитесь, что используется core `Xray`.
-3. Если не открываются отдельные сайты (например, YouTube/Instagram), сначала проверьте режим `TUN`.
-4. Переключите режим `System Proxy`/`TUN`.
-5. Повторно импортируйте ссылку.
+1. Run v2rayN as administrator.
+2. Check that the `Xray` core is used.
+3. If only some sites do not open, check `TUN` first.
+4. Switch `System Proxy` / `TUN` mode and test again.
+5. Import the link again.
 
-### Вариант B: Hiddify (Windows)
+### Option B: Hiddify (Windows)
 
-#### Шаг 1. Установка
+#### Step 1. Install
 
-1. Откройте официальный репозиторий:
+1. Open the official repository:
    `https://github.com/hiddify/hiddify-app`
-2. Прямая ссылка на релизы:
+2. Open Releases:
    `https://github.com/hiddify/hiddify-app/releases`
-3. Скачайте и установите Windows-версию.
+3. Download and install the Windows version.
 
-#### Шаг 2. Импорт и подключение
+#### Step 2. Import and connect
 
-1. Скопируйте `<ваша ссылка VPN>`.
-2. Откройте Hiddify.
-3. Выберите импорт ссылки/буфера (или QR).
-4. Сохраните профиль.
-5. Нажмите `Connect`.
+1. Copy your VPN link.
+2. Open Hiddify.
+3. Import from link/clipboard, or scan the QR code.
+4. Save the profile.
+5. Tap `Connect`.
 
-#### Шаг 3. Проверка
+#### Step 3. Check
 
-1. Откройте `https://ipinfo.io` или `https://ifconfig.me`.
-2. Проверьте, что IP-адрес изменился.
+1. Open `https://ipinfo.io` or `https://ifconfig.me`.
+2. Check that the IP address changed.
 
-<a id="section-7"></a>
+<a id="en-section-7"></a>
 ## 7. macOS: Hiddify
 
-### Шаг 1. Установка
+### Step 1. Install
 
-1. Откройте официальный репозиторий:
+1. Open the official repository:
    `https://github.com/hiddify/hiddify-app`
-2. Прямая ссылка на релизы:
+2. Open Releases:
    `https://github.com/hiddify/hiddify-app/releases`
-3. Для версии из App Store (если нужна) используйте:
+3. If you prefer the App Store version, use:
    `https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532`
-4. Установите приложение.
+4. Install the app.
 
-### Шаг 2. Импорт ссылки
+### Step 2. Import the link
 
-1. Скопируйте `<ваша ссылка VPN>`.
-2. Откройте Hiddify.
-3. Выберите импорт из буфера/ссылки.
-4. Сохраните профиль.
+1. Copy your VPN link.
+2. Open Hiddify.
+3. Import from clipboard/link.
+4. Save the profile.
 
-### Шаг 3. Подключение
+### Step 3. Connect
 
-1. Выберите профиль.
-2. Нажмите `Connect`.
-3. Подтвердите системные разрешения macOS (VPN/network extension).
+1. Select the profile.
+2. Tap `Connect`.
+3. Confirm macOS system permissions for VPN/network extension.
 
-### Шаг 4. Проверка
+### Step 4. Check
 
-1. Откройте `https://ipinfo.io`.
-2. Проверьте, что IP изменился.
+1. Open `https://ipinfo.io`.
+2. Check that the IP address changed.
 
-<a id="section-8"></a>
-## 8. Частые вопросы
+<a id="en-section-8"></a>
+## 8. FAQ
 
-### Почему в ссылке есть `encryption=none`?
+### Why does the link contain `encryption=none`?
 
-Для `VLESS` это нормально. Защита обеспечивается транспортом `REALITY/TLS`.
+This is normal for `VLESS`. Protection is provided by the `REALITY/TLS` transport.
 
-### Нужно ли менять SNI вручную?
+### Do I need to change SNI manually?
 
-Обычно нет. Если администратор выдал готовую ссылку, параметры уже настроены.
+Usually no. If the administrator gave you a ready link, the parameters are already set.
 
-### Почему иногда подключается, но сайты не открываются?
+### Why does the VPN connect but some sites do not open?
 
-Обычно причина в режиме маршрутизации или системном прокси в клиенте.
-Для `v2rayN` на Windows в первую очередь проверьте `TUN` (в реальном кейсе это сразу восстановило доступ к YouTube/Instagram), затем переключите режим (`System Proxy`/`TUN`) и повторите проверку IP.
-Подробный чеклист: `docs/troubleshooting-v2rayn-youtube-instagram-ru.md`.
+The usual reason is routing mode or the system proxy setting in the client.
+For `v2rayN` on Windows, check `TUN` first, then switch `System Proxy` / `TUN` mode and test the IP again.
 
-<a id="section-9"></a>
-## 9. Практические заметки из сообществ
+<a id="en-section-9"></a>
+## 9. Practical community notes
 
-По обсуждениям в Apple Community и Reddit чаще всего встречаются такие причины проблем:
+Based on common Apple Community and Reddit discussions, users most often hit these issues:
 
-1. Не удаётся сменить регион App Store из-за активных подписок или остатка баланса.
-2. Ошибка `payment method is not valid in this store` при несовпадении страны карты/адреса.
-3. Смена страны в Google Play недоступна сразу и может потребовать ожидания.
+1. App Store region cannot be changed because of active subscriptions or remaining account balance.
+2. Payment method is rejected because the card/address country does not match the selected store.
+3. Google Play country change is not immediately available and may require waiting.
 
-Это не официальные правила, но типовые кейсы пользователей совпадают с ограничениями из официальных справок Apple/Google.
+These are not official project rules, but they match the limitations described in Apple and Google help pages.
 
-<a id="section-10"></a>
-## 10. Официальные источники
+<a id="en-section-10"></a>
+## 10. Official sources
 
 - Apple: Change your Apple Account country or region
   `https://support.apple.com/en-us/118283`
@@ -340,10 +333,10 @@ Google указывает, что доступ зависит от страны 
   `https://support.apple.com/en-us/111741`
 - Google Play Help: How to change your Google Play country
   `https://support.google.com/googleplay/answer/7431675`
-- Project X (официальный клиентский раздел)
-  `https://xtls.github.io/ru/document/level-0/ch08-xray-clients.html`
+- Project X client documentation
+  `https://xtls.github.io/document/level-0/ch08-xray-clients.html`
 
-Официальные страницы клиентов:
+Official client pages:
 
 - Streisand (iOS)
   `https://apps.apple.com/us/app/streisand/id6450534064`
@@ -364,11 +357,4 @@ Google указывает, что доступ зависит от страны 
 - Hiddify (Releases)
   `https://github.com/hiddify/hiddify-app/releases`
 
-Полезные обсуждения (сообщества):
-
-- Apple Community: проблемы смены региона
-  `https://discussions.apple.com/thread/256239483`
-- Apple Community: частые причины блокировки смены региона
-  `https://discussions.apple.com/thread/255055483`
-- Reddit (Google Play): сложности смены страны
-  `https://www.reddit.com/r/googleplay/comments/terz1a/changing_country_on_google_play_store_account/`
+Russian version: [`docs/clients-ru.md`](clients-ru.md).

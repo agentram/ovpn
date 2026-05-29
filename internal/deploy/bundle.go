@@ -51,6 +51,8 @@ type Input struct {
 	TelegramOwnerUserID          string
 	TelegramClientsPDFPath       string
 	TelegramClientsPDFSource     string
+	TelegramClientsRUPDFPath     string
+	TelegramClientsRUPDFSource   string
 	TelegramAPIFallbackIPs       string
 	TelegramAdminToken           string
 	TelegramLinkAddress          string
@@ -87,6 +89,8 @@ func (in *Input) applyDefaults() {
 	in.GrafanaPort = defaultString(in.GrafanaPort, "3000")
 	in.TelegramClientsPDFPath = defaultString(in.TelegramClientsPDFPath, "/opt/ovpn-telegram-bot/assets/clients.pdf")
 	in.TelegramClientsPDFSource = defaultString(in.TelegramClientsPDFSource, "docs/clients.pdf")
+	in.TelegramClientsRUPDFPath = defaultString(in.TelegramClientsRUPDFPath, "/opt/ovpn-telegram-bot/assets/clients-ru.pdf")
+	in.TelegramClientsRUPDFSource = defaultString(in.TelegramClientsRUPDFSource, "docs/clients-ru.pdf")
 	in.TelegramAPIFallbackIPs = defaultString(in.TelegramAPIFallbackIPs, "149.154.167.220")
 	in.TelegramLinkAddress = defaultString(in.TelegramLinkAddress, firstNonEmpty(in.Server.Domain, in.Server.Host))
 	in.TelegramLinkServerName = defaultString(in.TelegramLinkServerName, strings.TrimSpace(in.Server.RealityServerName))
@@ -184,7 +188,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	envContent := fmt.Sprintf(
-		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
+		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
 		in.XrayImage,
 		in.AgentImage,
 		in.TelegramBotImage,
@@ -205,6 +209,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		in.TelegramNotifyChatIDs,
 		in.TelegramOwnerUserID,
 		in.TelegramClientsPDFPath,
+		in.TelegramClientsRUPDFPath,
 		in.TelegramAPIFallbackIPs,
 		proxyTelegramHAProxyURL(in.Server),
 	)
@@ -278,6 +283,13 @@ func RenderBundle(in Input) (*Bundle, error) {
 	if src := strings.TrimSpace(in.TelegramClientsPDFSource); src != "" {
 		if st, err := os.Stat(src); err == nil && !st.IsDir() {
 			if err := copyFile(src, filepath.Join(tmpDir, "monitoring", "telegram-bot", "assets", "clients.pdf"), 0o644); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if src := strings.TrimSpace(in.TelegramClientsRUPDFSource); src != "" {
+		if st, err := os.Stat(src); err == nil && !st.IsDir() {
+			if err := copyFile(src, filepath.Join(tmpDir, "monitoring", "telegram-bot", "assets", "clients-ru.pdf"), 0o644); err != nil {
 				return nil, err
 			}
 		}

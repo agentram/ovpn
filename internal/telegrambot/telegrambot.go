@@ -119,7 +119,7 @@ func RenderHelp() string {
 		"/quota - rolling 30d quota summary (local server)",
 		"/restart <service> - owner restart with confirmation",
 		"/heal - owner auto-heal unhealthy services",
-		"/guide - send VPN client PDF guide",
+		"/guide - send VPN client PDF guides",
 		"/cancel - cancel active prompt",
 	}, "\n")
 }

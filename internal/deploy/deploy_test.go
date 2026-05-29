@@ -83,6 +83,15 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if err := os.WriteFile(tmpBot, []byte("fake-bot"), 0o755); err != nil {
 		t.Fatalf("write bot: %v", err)
 	}
+	tmpDocs := t.TempDir()
+	tmpClientsPDF := filepath.Join(tmpDocs, "clients.pdf")
+	tmpClientsRUPDF := filepath.Join(tmpDocs, "clients-ru.pdf")
+	if err := os.WriteFile(tmpClientsPDF, []byte("english guide"), 0o644); err != nil {
+		t.Fatalf("write english guide: %v", err)
+	}
+	if err := os.WriteFile(tmpClientsRUPDF, []byte("russian guide"), 0o644); err != nil {
+		t.Fatalf("write russian guide: %v", err)
+	}
 
 	override := []byte(`{"inbounds":[{"tag":"vless-reality","port":8443}]}`)
 	bundle, err := RenderBundle(Input{
@@ -94,11 +103,13 @@ func TestRenderBundleWithOverride(t *testing.T) {
 			RealityTarget:     "www.microsoft.com:443",
 			RealityShortIDs:   "abcd",
 		},
-		AgentBinaryPath:       tmpAgent,
-		TelegramBotBinaryPath: tmpBot,
-		RenderedOverride:      override,
-		XrayImage:             "ghcr.io/xtls/xray-core:26.3.27",
-		AgentImage:            "alpine:3.23.4",
+		AgentBinaryPath:            tmpAgent,
+		TelegramBotBinaryPath:      tmpBot,
+		TelegramClientsPDFSource:   tmpClientsPDF,
+		TelegramClientsRUPDFSource: tmpClientsRUPDF,
+		RenderedOverride:           override,
+		XrayImage:                  "ghcr.io/xtls/xray-core:26.3.27",
+		AgentImage:                 "alpine:3.23.4",
 	})
 	if err != nil {
 		t.Fatalf("render bundle: %v", err)
@@ -186,6 +197,14 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(bundle.Dir, "monitoring/telegram-bot/ovpn-telegram-bot")); err != nil {
 		t.Fatalf("expected bundled telegram bot binary: %v", err)
 	}
+	for _, p := range []string{
+		"monitoring/telegram-bot/assets/clients.pdf",
+		"monitoring/telegram-bot/assets/clients-ru.pdf",
+	} {
+		if _, err := os.Stat(filepath.Join(bundle.Dir, p)); err != nil {
+			t.Fatalf("expected bundled client guide %s: %v", p, err)
+		}
+	}
 	alertCfg, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring/alertmanager/alertmanager.yml"))
 	if err != nil {
 		t.Fatalf("read alertmanager config: %v", err)
@@ -234,6 +253,8 @@ func TestRenderBundleAppliesMonitoringAndTelegramDefaults(t *testing.T) {
 		"OVPN_AGENT_HOST_PORT=19000",
 		"OVPN_TELEGRAM_BOT_IMAGE=alpine:3.23.4",
 		"OVPN_TELEGRAM_BOT_HOST_PORT=19001",
+		"OVPN_TELEGRAM_CLIENTS_PDF_PATH=/opt/ovpn-telegram-bot/assets/clients.pdf",
+		"OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=/opt/ovpn-telegram-bot/assets/clients-ru.pdf",
 	} {
 		if !strings.Contains(env, want) {
 			t.Fatalf("missing expected default in .env: %q", want)
