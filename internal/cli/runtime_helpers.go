@@ -326,6 +326,10 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 
 // syncQuotaPolicy executes quota policy flow and returns the first error.
 func (a *App) syncQuotaPolicy(srv model.Server) error {
+	if a.dryRun {
+		a.log().Info("dry-run: skipping remote quota policy sync", "server", srv.Name)
+		return nil
+	}
 	// Only effectively enabled users are synced to quota policy so expired/manual-disabled users
 	// stay disabled even after automatic rolling-window quota unblocks.
 	users, err := a.store.ListUsers(a.ctx, srv.ID)
@@ -349,7 +353,7 @@ func (a *App) syncQuotaPolicy(srv model.Server) error {
 	for attempt := 1; attempt <= 15; attempt++ {
 		if _, err := a.fetchRemoteAgent(srv, "POST", a.agentURL("/quota/sync"), map[string]any{"users": policies}); err != nil {
 			lastErr = err
-			time.Sleep(3 * time.Second)
+			a.sleep(3 * time.Second)
 			continue
 		}
 		a.log().Info("quota policy synced", "server", srv.Name, "enabled_users", len(policies), "attempt", attempt)
@@ -367,6 +371,10 @@ func (a *App) syncQuotaPolicy(srv model.Server) error {
 
 // syncUserPolicies mirrors full user state to ovpn-agent for expiry enforcement and bot views.
 func (a *App) syncUserPolicies(srv model.Server) error {
+	if a.dryRun {
+		a.log().Info("dry-run: skipping remote user policy sync", "server", srv.Name)
+		return nil
+	}
 	users, err := a.store.ListUsers(a.ctx, srv.ID)
 	if err != nil {
 		return err
@@ -386,7 +394,7 @@ func (a *App) syncUserPolicies(srv model.Server) error {
 	for attempt := 1; attempt <= 15; attempt++ {
 		if _, err := a.fetchRemoteAgent(srv, "POST", a.agentURL("/users/sync"), map[string]any{"users": policies}); err != nil {
 			lastErr = err
-			time.Sleep(3 * time.Second)
+			a.sleep(3 * time.Second)
 			continue
 		}
 		a.log().Info("user policy synced", "server", srv.Name, "users", len(policies), "attempt", attempt)
@@ -429,8 +437,9 @@ func (a *App) isUserBlockedByQuota(srv model.Server, email string) (bool, error)
 
 // usersForRuntimeConfig returns users for runtime config.
 func (a *App) usersForRuntimeConfig(srv model.Server, users []model.User) ([]model.User, error) {
-	// First deploy has no remote quota_state yet. Use local desired state as-is.
-	if srv.LastDeployAt == nil {
+	// First deploy and dry-run deploys have no safe remote quota_state source.
+	// Use local desired state only, preserving the preview contract for --dry-run.
+	if srv.LastDeployAt == nil || a.dryRun {
 		filtered := make([]model.User, 0, len(users))
 		for _, u := range users {
 			if !effectiveUserEnabled(u) {
