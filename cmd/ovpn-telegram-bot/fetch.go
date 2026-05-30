@@ -13,7 +13,7 @@ import (
 	"ovpn/internal/model"
 )
 
-// fetchHealth returns health for callers.
+// fetchHealth retrieves the ovpn-agent health snapshot.
 func (b *bot) fetchHealth(ctx context.Context) (agentHealth, error) {
 	var health agentHealth
 	if err := b.fetchJSON(ctx, strings.TrimRight(b.cfg.agentURL, "/")+"/health", &health); err != nil {
@@ -22,7 +22,7 @@ func (b *bot) fetchHealth(ctx context.Context) (agentHealth, error) {
 	return health, nil
 }
 
-// fetchSelfHealth returns bot self-health for callers.
+// fetchSelfHealth retrieves the bot's own health endpoint.
 func (b *bot) fetchSelfHealth(ctx context.Context) (selfHealthResponse, error) {
 	var out selfHealthResponse
 	if err := b.fetchJSON(ctx, strings.TrimSpace(b.cfg.selfURL), &out); err != nil {
@@ -51,7 +51,7 @@ func (b *bot) fetchActiveAlerts(ctx context.Context) (int, error) {
 	return len(rows), nil
 }
 
-// fetchTotals returns totals for callers.
+// fetchTotals retrieves cumulative per-user traffic totals from the agent.
 func (b *bot) fetchTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	var rows []model.UserTraffic
 	if err := b.fetchJSON(ctx, strings.TrimRight(b.cfg.agentURL, "/")+"/stats/total", &rows); err != nil {
@@ -60,7 +60,7 @@ func (b *bot) fetchTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	return rows, nil
 }
 
-// fetchDaily returns daily for callers.
+// fetchDaily retrieves per-user traffic for the given day from the agent.
 func (b *bot) fetchDaily(ctx context.Context, day time.Time) ([]model.UserTraffic, error) {
 	var rows []model.UserTraffic
 	url := strings.TrimRight(b.cfg.agentURL, "/") + "/stats/daily?date=" + day.UTC().Format("2006-01-02")
@@ -70,7 +70,7 @@ func (b *bot) fetchDaily(ctx context.Context, day time.Time) ([]model.UserTraffi
 	return rows, nil
 }
 
-// fetchQuotaStatus returns quota status for callers.
+// fetchQuotaStatus retrieves the rolling-window quota status for all users from the agent.
 func (b *bot) fetchQuotaStatus(ctx context.Context) (model.QuotaStatusResponse, error) {
 	var out model.QuotaStatusResponse
 	if err := b.fetchJSON(ctx, strings.TrimRight(b.cfg.agentURL, "/")+"/quota/status", &out); err != nil {
@@ -79,7 +79,7 @@ func (b *bot) fetchQuotaStatus(ctx context.Context) (model.QuotaStatusResponse, 
 	return out, nil
 }
 
-// fetchUserStatus returns mirrored user status for callers.
+// fetchUserStatus retrieves per-user enabled/expiry status from the agent.
 func (b *bot) fetchUserStatus(ctx context.Context) (model.UserStatusResponse, error) {
 	var out model.UserStatusResponse
 	if err := b.fetchJSON(ctx, strings.TrimRight(b.cfg.agentURL, "/")+"/users/status", &out); err != nil {
@@ -88,7 +88,7 @@ func (b *bot) fetchUserStatus(ctx context.Context) (model.UserStatusResponse, er
 	return out, nil
 }
 
-// fetchQuotaPolicies returns quota policies for callers.
+// fetchQuotaPolicies retrieves the configured quota policies from the agent.
 func (b *bot) fetchQuotaPolicies(ctx context.Context) ([]model.QuotaUserPolicy, error) {
 	var out []model.QuotaUserPolicy
 	if err := b.fetchJSON(ctx, strings.TrimRight(b.cfg.agentURL, "/")+"/quota/policies", &out); err != nil {
@@ -115,7 +115,7 @@ func (b *bot) fetchJSON(ctx context.Context, url string, out any) error {
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// probe handles probe HTTP behavior for this service.
+// probe issues a short GET to url and reports whether the named dependency is reachable.
 func (b *bot) probe(ctx context.Context, name, url string) monitorStatus {
 	pctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()

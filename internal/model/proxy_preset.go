@@ -7,7 +7,7 @@ const (
 	ProxyPresetCN = "cn"
 )
 
-// NormalizeProxyPreset normalizes proxy preset and applies fallback defaults.
+// NormalizeProxyPreset canonicalizes a proxy preset name, returning "" when unsupported.
 func NormalizeProxyPreset(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", ProxyPresetRU:

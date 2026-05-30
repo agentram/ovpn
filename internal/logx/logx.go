@@ -12,7 +12,7 @@ var vlessURLPattern = regexp.MustCompile(`vless://\S+`)
 var kvSecretPattern = regexp.MustCompile(`(?i)\b((?:smtp_)?password|token|secret|private_key)\s*=\s*([^\s,;]+)`)
 var jsonSecretPattern = regexp.MustCompile(`(?i)"((?:smtp_)?password|token|secret|private_key)"\s*:\s*"[^"]*"`)
 
-// ParseLevel parses level and returns normalized values.
+// ParseLevel maps debug|info|warn|error to an slog.Level, defaulting to info when empty.
 func ParseLevel(raw string) (slog.Level, error) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "info":
@@ -28,7 +28,7 @@ func ParseLevel(raw string) (slog.Level, error) {
 	}
 }
 
-// NewTextLogger initializes text logger with the required dependencies.
+// NewTextLogger builds a text slog.Logger that redacts sensitive attribute values.
 func NewTextLogger(level slog.Level) *slog.Logger {
 	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:       level,
@@ -37,7 +37,7 @@ func NewTextLogger(level slog.Level) *slog.Logger {
 	return slog.New(handler)
 }
 
-// replaceSensitiveAttr applies sensitive attr and returns an error on failure.
+// replaceSensitiveAttr redacts attribute values that look like secrets before they are logged.
 func replaceSensitiveAttr(_ []string, attr slog.Attr) slog.Attr {
 	key := strings.ToLower(strings.TrimSpace(attr.Key))
 	if isSensitiveKey(key) {
@@ -73,7 +73,7 @@ func isSensitiveKey(key string) bool {
 	return false
 }
 
-// sanitizeSensitiveString returns sanitize sensitive string.
+// sanitizeSensitiveString masks secret-looking substrings (such as VLESS links) within a value.
 func sanitizeSensitiveString(v string) string {
 	if strings.TrimSpace(v) == "" {
 		return v

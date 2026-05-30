@@ -13,7 +13,7 @@ import (
 	"ovpn/internal/version"
 )
 
-// ensureAgentBinary executes agent binary flow and returns the first error.
+// ensureAgentBinary resolves a linux ovpn-agent binary to ship: an override path, an embedded asset, or a source build.
 func (a *App) ensureAgentBinary() (string, error) {
 	return a.ensureRuntimeBinary(runtimeBinarySpec{
 		Name:       "ovpn-agent",
@@ -23,7 +23,7 @@ func (a *App) ensureAgentBinary() (string, error) {
 	})
 }
 
-// ensureTelegramBotBinary executes telegram bot binary flow and returns the first error.
+// ensureTelegramBotBinary resolves a linux ovpn-telegram-bot binary to ship: an override path, an embedded asset, or a source build.
 func (a *App) ensureTelegramBotBinary() (string, error) {
 	return a.ensureRuntimeBinary(runtimeBinarySpec{
 		Name:       "ovpn-telegram-bot",

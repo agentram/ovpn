@@ -87,7 +87,14 @@ func main() {
 	mux.HandleFunc("/alertmanager", b.handleAlertmanagerWebhook)
 	mux.HandleFunc("/notify", b.handleNotifyEvent)
 
-	srv := &http.Server{Addr: cfg.listenAddr, Handler: withRequestLogging(logger, mux)}
+	srv := &http.Server{
+		Addr:              cfg.listenAddr,
+		Handler:           withRequestLogging(logger, mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

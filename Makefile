@@ -1,4 +1,4 @@
-.PHONY: fmt-check vet test test-cover test-race lint gosec docker-validate ansible-lint ansible-syntax repo-hygiene templates-validate actionlint docs-pdf ci-local
+.PHONY: fmt-check vet test test-cover test-race lint gosec govulncheck docker-validate ansible-lint ansible-syntax repo-hygiene templates-validate actionlint docs-pdf ci-local
 
 fmt-check:
 	@files="$$(gofmt -l $$(git ls-files '*.go'))"; \
@@ -27,12 +27,15 @@ lint:
 gosec:
 	gosec ./...
 
+govulncheck:
+	govulncheck ./...
+
+# docker-compose.yml and docker-compose.monitoring.yml are kept byte-identical to the embedded
+# deploy templates under internal/deploy/templates, so validating them here validates what ships.
 docker-validate:
 	cp .env.example .env
 	docker compose --env-file .env -f docker-compose.yml config -q
 	docker compose --env-file .env -f docker-compose.monitoring.yml config -q
-	docker compose --env-file .env -f deploy/compose/docker-compose.yml.tmpl config -q
-	docker compose --env-file .env -f deploy/compose/docker-compose.monitoring.yml.tmpl config -q
 
 ansible-lint:
 	ANSIBLE_CONFIG=ansible/ansible.cfg ansible-lint -c .ansible-lint ansible

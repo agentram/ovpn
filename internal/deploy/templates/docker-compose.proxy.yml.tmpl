@@ -45,6 +45,8 @@ services:
     container_name: ovpn-agent
     restart: unless-stopped
     command: ["/usr/local/bin/ovpn-agent", "--listen", ":9090", "--xray-api", "xray:10085", "--db-path", "/var/lib/ovpn-agent", "--poll-interval", "30s", "--log-level", "${OVPN_AGENT_LOG_LEVEL:-info}", "--cert-file", "${OVPN_AGENT_CERT_FILE:-}"]
+    environment:
+      - OVPN_AGENT_TOKEN=${OVPN_AGENT_TOKEN:-}
     ports:
       - "127.0.0.1:${OVPN_AGENT_HOST_PORT:-19000}:9090"
     volumes:

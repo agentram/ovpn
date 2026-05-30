@@ -13,7 +13,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// newServerBackupCmd initializes server backup cmd with the required dependencies.
+// newServerBackupCmd builds the `server backup` command that snapshots the remote runtime.
 func (a *App) newServerBackupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "backup <server>",
@@ -62,7 +62,7 @@ func (a *App) newServerBackupCmd() *cobra.Command {
 	}
 }
 
-// newServerRestoreCmd initializes server restore cmd with the required dependencies.
+// newServerRestoreCmd builds the `server restore` command that restores a remote backup archive.
 func (a *App) newServerRestoreCmd() *cobra.Command {
 	var remotePath string
 	cmd := &cobra.Command{

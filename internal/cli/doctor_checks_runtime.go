@@ -13,7 +13,7 @@ import (
 	"ovpn/internal/ssh"
 )
 
-// checkAgentHealth returns check agent health.
+// checkAgentHealth verifies that ovpn-agent is reachable and that its Xray API checks pass.
 func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	agentBaseURL := a.agentBaseURL()
 	check := doctor.Check{
@@ -67,7 +67,10 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 		check.Details = append(check.Details, fmt.Sprintf("stats_total_bytes=%d", len(statsBody)))
 	}
 
-	runtimeProbeCmd := fmt.Sprintf("curl -sS -o /dev/null -w '%%{http_code}' '%s/runtime/user/add'", agentBaseURL)
+	// Authenticate the probe the same way real agent calls do (token sourced from the host .env),
+	// so a token-protected runtime route answers with 405 (GET on a POST-only endpoint) rather
+	// than 401. A bare unauthenticated probe would otherwise look unhealthy.
+	runtimeProbeCmd := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); curl -sS -o /dev/null -w '%%{http_code}' -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" '%s/runtime/user/add'", deploy.RemoteDir, agentBaseURL)
 	runtimeRes, runtimeErr := a.execRemote(runner, cfg, 10*time.Second, runtimeProbeCmd)
 	if runtimeErr != nil {
 		if check.Status == doctor.StatusPass {
@@ -79,7 +82,9 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	} else {
 		code := strings.TrimSpace(runtimeRes.Stdout)
 		check.Details = append(check.Details, "runtime_probe="+code)
-		if code != "405" && code != "200" && code != "204" {
+		// 405 is the expected liveness signal (GET on a POST-only route); 401 still proves the
+		// agent is up and the route is protected, so both count as healthy.
+		if code != "405" && code != "200" && code != "204" && code != "401" {
 			if check.Status == doctor.StatusPass {
 				check.Status = doctor.StatusWarn
 				check.Message = "runtime endpoint returned unexpected status"
@@ -91,7 +96,7 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	return check
 }
 
-// checkDisk returns check disk.
+// checkDisk verifies that disk usage on the host stays within safe thresholds.
 func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := buildDoctorDiskCommand()
 	res, err := a.execRemote(runner, cfg, 25*time.Second, cmd)
@@ -172,7 +177,7 @@ func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	}
 }
 
-// buildDoctorDiskCommand builds doctor disk command from the current inputs and defaults.
+// buildDoctorDiskCommand renders the shell command that reports root filesystem usage.
 func buildDoctorDiskCommand() string {
 	cmd := strings.Join([]string{
 		"set -u",
@@ -193,7 +198,7 @@ func buildDoctorDiskCommand() string {
 	return cmd
 }
 
-// collectDoctorLogs executes doctor logs flow and returns the first error.
+// collectDoctorLogs fetches recent logs for each runtime service, keyed by service name.
 func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	services := []string{"xray", "ovpn-agent"}
 	if srv.IsProxy() {
@@ -222,7 +227,7 @@ func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	return out
 }
 
-// addRemoteSkips applies remote skips and returns an error on failure.
+// addRemoteSkips records skipped entries for the remote checks when SSH connectivity is unavailable.
 func addRemoteSkips(report *doctor.Report, includeSSH bool) {
 	names := []string{
 		"Sudo and permissions",

@@ -9,7 +9,7 @@ import (
 	"ovpn/internal/util"
 )
 
-// AddDeployRevision writes deploy revision changes to the local database.
+// AddDeployRevision records a completed deploy revision.
 func (s *Store) AddDeployRevision(ctx context.Context, rev *model.DeployRevision) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	if rev.AppliedAt.IsZero() {
@@ -26,7 +26,7 @@ func (s *Store) AddDeployRevision(ctx context.Context, rev *model.DeployRevision
 	return err
 }
 
-// AddBackupRecord writes backup record changes to the local database.
+// AddBackupRecord records a created backup.
 func (s *Store) AddBackupRecord(ctx context.Context, rec *model.BackupRecord) error {
 	if rec.CreatedAt.IsZero() {
 		rec.CreatedAt = util.NowUTC()
@@ -42,7 +42,7 @@ func (s *Store) AddBackupRecord(ctx context.Context, rec *model.BackupRecord) er
 	return nil
 }
 
-// ListBackupRecords reads backup records from the local database.
+// ListBackupRecords returns a server's backup records, newest first.
 func (s *Store) ListBackupRecords(ctx context.Context, serverID int64) ([]model.BackupRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, server_id, type, path, sha256, created_at, created_by, remote_path
@@ -71,7 +71,7 @@ func (s *Store) ListBackupRecords(ctx context.Context, serverID int64) ([]model.
 	return out, rows.Err()
 }
 
-// UpsertStatsCache writes stats cache changes to the local database.
+// UpsertStatsCache stores or updates a cached per-user traffic row.
 func (s *Store) UpsertStatsCache(ctx context.Context, t model.UserTraffic) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
@@ -86,7 +86,7 @@ func (s *Store) UpsertStatsCache(ctx context.Context, t model.UserTraffic) error
 	return err
 }
 
-// ListStatsCache reads stats cache from the local database.
+// ListStatsCache returns cached traffic rows for a server and window type.
 func (s *Store) ListStatsCache(ctx context.Context, serverID int64, windowType string) ([]model.UserTraffic, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT server_id, email, window_start, window_type, uplink_bytes, downlink_bytes

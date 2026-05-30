@@ -12,7 +12,7 @@ import (
 	"ovpn/internal/model"
 )
 
-// sendMainMenu returns send main menu.
+// sendMainMenu sends the main menu with its reply keyboard.
 func (b *bot) sendMainMenu(ctx context.Context, chatID int64) error {
 	mode := "read-only audit"
 	if b.adminActionsEnabled() {
@@ -26,7 +26,7 @@ func (b *bot) sendMainMenu(ctx context.Context, chatID int64) error {
 	return b.sendPlainMessage(ctx, chatID, msg, mainReplyKeyboard())
 }
 
-// sendHelp returns send help.
+// sendHelp sends the command help text.
 func (b *bot) sendHelp(ctx context.Context, chatID int64) error {
 	mutating := "disabled"
 	if b.adminActionsEnabled() {
@@ -55,7 +55,7 @@ func (b *bot) sendHelp(ctx context.Context, chatID int64) error {
 	return b.sendPlainMessage(ctx, chatID, msg, mainReplyKeyboard())
 }
 
-// sendGuide returns send guide.
+// sendGuide sends the client setup guide PDFs when they are available.
 func (b *bot) sendGuide(ctx context.Context, chatID int64) error {
 	guides := []struct {
 		path    string
@@ -277,7 +277,7 @@ func (b *bot) renderUsersList(ctx context.Context) ([]string, error) {
 	return buildPreformattedMessages("Users Audit", escapeTelegramHTML(totals), escapeTelegramHTML(header), lines, telegramMessageLimit), nil
 }
 
-// renderTopUsers renders top users into the format expected by callers.
+// renderTopUsers renders the top traffic consumers, capped at limit.
 func (b *bot) renderTopUsers(ctx context.Context, limit int) (string, error) {
 	rows, err := b.fetchTotals(ctx)
 	if err != nil {
@@ -308,7 +308,7 @@ func (b *bot) renderTopUsers(ctx context.Context, limit int) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// renderTrafficTotals renders traffic totals into the format expected by callers.
+// renderTrafficTotals renders cumulative per-user traffic totals.
 func (b *bot) renderTrafficTotals(ctx context.Context) (string, error) {
 	rows, err := b.fetchTotals(ctx)
 	if err != nil {
@@ -330,7 +330,7 @@ func (b *bot) renderTrafficTotals(ctx context.Context) (string, error) {
 	}, "\n"), nil
 }
 
-// renderTrafficToday renders traffic today into the format expected by callers.
+// renderTrafficToday renders per-user traffic for the current day.
 func (b *bot) renderTrafficToday(ctx context.Context) (string, error) {
 	rows, err := b.fetchDaily(ctx, time.Now().UTC())
 	if err != nil {
@@ -353,7 +353,7 @@ func (b *bot) renderTrafficToday(ctx context.Context) (string, error) {
 	}, "\n"), nil
 }
 
-// renderQuotaSummary renders quota summary into the format expected by callers.
+// renderQuotaSummary renders an overview of rolling-window quota usage.
 func (b *bot) renderQuotaSummary(ctx context.Context) (string, error) {
 	status, err := b.fetchQuotaStatus(ctx)
 	if err != nil {
@@ -371,7 +371,7 @@ func (b *bot) renderQuotaSummary(ctx context.Context) (string, error) {
 	}, "\n"), nil
 }
 
-// renderQuotaThreshold renders quota threshold into the format expected by callers.
+// renderQuotaThreshold renders the users whose usage is at or above the given quota fraction.
 func (b *bot) renderQuotaThreshold(ctx context.Context, threshold float64, title string) (string, error) {
 	status, err := b.fetchQuotaStatus(ctx)
 	if err != nil {
@@ -399,7 +399,7 @@ func (b *bot) renderQuotaThreshold(ctx context.Context, threshold float64, title
 	return strings.Join(lines, "\n"), nil
 }
 
-// renderQuotaBlocked renders quota blocked into the format expected by callers.
+// renderQuotaBlocked renders the users currently blocked by the rolling quota.
 func (b *bot) renderQuotaBlocked(ctx context.Context) (string, error) {
 	status, err := b.fetchQuotaStatus(ctx)
 	if err != nil {

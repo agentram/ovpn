@@ -2,7 +2,7 @@ package main
 
 import "strings"
 
-// menuActionFromText returns menu action from text.
+// menuActionFromText maps a reply-keyboard button label to its internal action key, or "" when unrecognized.
 func menuActionFromText(text string) string {
 	switch strings.ToLower(strings.TrimSpace(text)) {
 	case strings.ToLower(menuHome):

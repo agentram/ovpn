@@ -13,28 +13,28 @@ import (
 	"time"
 )
 
-// HomeDir returns home dir.
+// HomeDir returns the current user's home directory, falling back to the working directory.
 func HomeDir() string {
 	h, _ := os.UserHomeDir()
 	return h
 }
 
-// DefaultDataDir normalizes data dir and applies fallback defaults.
+// DefaultDataDir returns the default ovpn local state directory (~/.ovpn).
 func DefaultDataDir() string {
 	return filepath.Join(HomeDir(), ".ovpn")
 }
 
-// EnsureDir executes dir flow and returns the first error.
+// EnsureDir creates path (and parents) if it does not already exist.
 func EnsureDir(path string) error {
 	return os.MkdirAll(path, 0o755)
 }
 
-// NowUTC returns now utc.
+// NowUTC returns the current time in UTC.
 func NowUTC() time.Time {
 	return time.Now().UTC()
 }
 
-// PrettyJSON returns pretty json.
+// PrettyJSON renders v as indented JSON, or an error placeholder on failure.
 func PrettyJSON(v any) string {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -43,7 +43,7 @@ func PrettyJSON(v any) string {
 	return string(b)
 }
 
-// SHA256File returns sha 256 file.
+// SHA256File returns the hex-encoded SHA-256 of a file's contents.
 func SHA256File(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -57,13 +57,13 @@ func SHA256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// SHA256Bytes returns sha 256 bytes.
+// SHA256Bytes returns the hex-encoded SHA-256 of b.
 func SHA256Bytes(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
 
-// ParseCSV parses csv and returns normalized values.
+// ParseCSV splits a comma-separated string into trimmed, non-empty values.
 func ParseCSV(v string) []string {
 	if strings.TrimSpace(v) == "" {
 		return nil
@@ -79,7 +79,7 @@ func ParseCSV(v string) []string {
 	return out
 }
 
-// JoinCSV returns join csv.
+// JoinCSV joins items into a comma-separated string.
 func JoinCSV(items []string) string {
 	if len(items) == 0 {
 		return ""
@@ -87,7 +87,7 @@ func JoinCSV(items []string) string {
 	return strings.Join(items, ",")
 }
 
-// RequireNonEmpty returns require non empty.
+// RequireNonEmpty returns an error when value is blank, naming the field.
 func RequireNonEmpty(name, value string) error {
 	if strings.TrimSpace(value) == "" {
 		return fmt.Errorf("%s is required", name)
@@ -95,7 +95,7 @@ func RequireNonEmpty(name, value string) error {
 	return nil
 }
 
-// CombineErrors combines input values to produce errors.
+// CombineErrors joins the non-nil errors into a single error, or returns nil when there are none.
 func CombineErrors(errs ...error) error {
 	var filtered []string
 	for _, err := range errs {

@@ -10,7 +10,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// handleHealth executes health flow and returns the first error.
+// handleHealth serves the bot's own health snapshot as JSON.
 func (b *bot) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	health := b.healthSnapshot()
 	statusCode := http.StatusOK
@@ -30,7 +30,7 @@ func (b *bot) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// handleAlertmanagerWebhook executes alertmanager webhook flow and returns the first error.
+// handleAlertmanagerWebhook renders an Alertmanager webhook payload and relays it to the notify chats.
 func (b *bot) handleAlertmanagerWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
@@ -50,7 +50,7 @@ func (b *bot) handleAlertmanagerWebhook(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// handleNotifyEvent executes notify event flow and returns the first error.
+// handleNotifyEvent renders an internal NotifyEvent and relays it to the notify chats.
 func (b *bot) handleNotifyEvent(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
@@ -70,7 +70,7 @@ func (b *bot) handleNotifyEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// sendToNotifyChats returns send to notify chats.
+// sendToNotifyChats sends text to every configured notify chat, returning the first send error.
 func (b *bot) sendToNotifyChats(ctx context.Context, text string) error {
 	if len(b.notifyChats) == 0 {
 		return errors.New("no notify chats configured")

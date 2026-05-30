@@ -22,6 +22,11 @@ const (
 	RemoteStageDir = RemoteDir + "/.incoming"
 	// SnapshotRetentionCount caps retained pre-deploy ovpn-* snapshots in remote backup dir.
 	SnapshotRetentionCount = 7
+	// XrayRuntimeGID is the GID the pinned ghcr.io/xtls/xray-core image runs as (distroless
+	// "nonroot"). config.json embeds the REALITY private key and every client UUID, so it is
+	// delivered as 0640 root:XrayRuntimeGID: readable by the xray container but not by other
+	// local users on a shared host.
+	XrayRuntimeGID = 65532
 )
 
 var (
@@ -48,7 +53,7 @@ type CleanupOptions struct {
 	RemoveBackups     bool
 }
 
-// ValidateConfigWithDocker executes config with docker flow and returns the first error.
+// ValidateConfigWithDocker runs `xray -test` against a config file using the given image, with no extra mounts.
 func ValidateConfigWithDocker(ctx context.Context, xrayImage string, configPath string) error {
 	return ValidateConfigWithDockerAndMounts(ctx, xrayImage, configPath, nil)
 }
@@ -74,7 +79,7 @@ func ValidateConfigWithDockerAndMounts(ctx context.Context, xrayImage string, co
 	return nil
 }
 
-// buildBootstrapCommand builds bootstrap command from the current inputs and defaults.
+// buildBootstrapCommand renders the script that installs Docker/Compose and prepares the runtime directories.
 func buildBootstrapCommand() string {
 	return strings.Join([]string{
 		"set -e",
@@ -86,7 +91,7 @@ func buildBootstrapCommand() string {
 	}, " && ")
 }
 
-// BootstrapRemote executes remote on the remote host in a fixed order.
+// BootstrapRemote installs Docker/Compose and prepares the runtime directories on a fresh host.
 func BootstrapRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	cmd := buildBootstrapCommand()
 	_, err := runner.Exec(ctx, cfg, cmd)
@@ -96,9 +101,15 @@ func BootstrapRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	return nil
 }
 
-// buildExtractCommand builds extract command from the current inputs and defaults.
+// buildExtractCommand renders the script that unpacks the uploaded bundle into the staging directory and locks down its secret files.
 func buildExtractCommand(remoteTar string) string {
-	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar -xzf %[2]s -C %[1]s; rm -f %[2]s; if [ -f %[1]s/.env ]; then sudo chown root:root %[1]s/.env; sudo chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown root:root %[1]s/xray/config.json; sudo chmod 644 %[1]s/xray/config.json; fi", RemoteStageDir, remoteTar)
+	// --no-same-owner makes extracted files owned by the deploying account instead of the
+	// operator's local UID/GID baked into the tar header (which maps to a phantom user on the host).
+	// .env is left owned by that account at 0600 so deploy/doctor/CLI steps that read it as the SSH
+	// user (config validation, the agent-token lookup) work for non-root deployers; root still reads
+	// it via sudo for `docker compose`. config.json instead targets the xray runtime group because
+	// only the xray container needs to read it.
+	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar --no-same-owner -xzf %[2]s -C %[1]s; rm -f %[2]s; if [ -f %[1]s/.env ]; then chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown 0:%[3]d %[1]s/xray/config.json; sudo chmod 640 %[1]s/xray/config.json; fi", RemoteStageDir, remoteTar, XrayRuntimeGID)
 }
 
 func shellQuote(v string) string {
@@ -115,7 +126,7 @@ func withRemoteTimeout(timeout time.Duration, cmd string) string {
 	return fmt.Sprintf("if command -v timeout >/dev/null 2>&1; then timeout %d sh -c %s; else sh -c %s; fi", seconds, quoted, quoted)
 }
 
-// UploadBundle executes bundle on the remote host in a fixed order.
+// UploadBundle archives the local bundle, copies it to the host, and extracts it into the staging directory.
 func UploadBundle(ctx context.Context, runner Runner, cfg ssh.Config, bundleDir string) error {
 	tarPath := filepath.Join(os.TempDir(), fmt.Sprintf("ovpn-%d.tar.gz", time.Now().UnixNano()))
 	defer os.Remove(tarPath)
@@ -138,17 +149,17 @@ func UploadBundle(ctx context.Context, runner Runner, cfg ssh.Config, bundleDir 
 	return nil
 }
 
-// buildDeployBackupCommand builds deploy backup command from the current inputs and defaults.
+// buildDeployBackupCommand renders the script that snapshots the live runtime dir and prunes old snapshots.
 func buildDeployBackupCommand(backupStamp string) string {
-	return fmt.Sprintf("set -e; if [ -d %[1]s ]; then cp -a %[1]s %[2]s/ovpn-%[3]s; fi; old_snapshots=$(find %[2]s -mindepth 1 -maxdepth 1 -name 'ovpn-*' -printf '%%T@ %%p\\n' | sort -nr | awk 'NR>%[4]d {print $2}'); if [ -n \"$old_snapshots\" ]; then printf '%%s\\n' \"$old_snapshots\" | xargs -r sudo rm -rf; fi", RemoteDir, RemoteBackupDir, backupStamp, SnapshotRetentionCount)
+	return fmt.Sprintf("set -e; if [ -d %[1]s ]; then sudo cp -a %[1]s %[2]s/ovpn-%[3]s; fi; old_snapshots=$(find %[2]s -mindepth 1 -maxdepth 1 -name 'ovpn-*' -printf '%%T@ %%p\\n' | sort -nr | awk 'NR>%[4]d {print $2}'); if [ -n \"$old_snapshots\" ]; then printf '%%s\\n' \"$old_snapshots\" | xargs -r sudo rm -rf; fi", RemoteDir, RemoteBackupDir, backupStamp, SnapshotRetentionCount)
 }
 
-// buildDeployComposeValidateCommand builds deploy compose validate command from the current inputs and defaults.
+// buildDeployComposeValidateCommand renders the `docker compose config` validation for a staged bundle.
 func buildDeployComposeValidateCommand(dir string) string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml config -q", dir)
 }
 
-// buildDeployXrayTestCommand builds deploy xray test command from the current inputs and defaults.
+// buildDeployXrayTestCommand renders the `xray -test` validation of a staged config inside the target image.
 func buildDeployXrayTestCommand(dir string) string {
 	// Validate config in the target image before compose up to catch incompatible syntax early.
 	return fmt.Sprintf("set -e; cd %s; . ./.env; extra_mounts=''; if [ -f %s/geodata/geosite.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro\"; fi; if [ -f %s/geodata/geoip.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro\"; fi; eval sudo docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", dir, dir, dir, dir, dir, dir)
@@ -169,19 +180,20 @@ func isLikelyXrayGeositeResourceError(errText string) bool {
 		(strings.Contains(text, "no such file") || strings.Contains(text, "failed") || strings.Contains(text, "not found"))
 }
 
-// buildDeployApplyCommand builds deploy apply command from the current inputs and defaults.
+// buildDeployApplyCommand renders the script that swaps the validated bundle into the live runtime directory, preserving existing secret files.
 func buildDeployApplyCommand() string {
 	// When ovpn-agent is running, truncating /opt/ovpn/agent/ovpn-agent in-place can fail with
 	// ETXTBSY ("Text file busy"). Same applies to ovpn-telegram-bot binary when monitoring is up.
 	// Unlink first, then copy staged files.
 	return fmt.Sprintf(
-		"set -e; token_file=%[1]s/monitoring/secrets/telegram_bot_token; token_backup=/tmp/ovpn-telegram-bot-token-prev; stage_token=%[2]s/monitoring/secrets/telegram_bot_token; admin_file=%[1]s/monitoring/secrets/telegram_admin_token; admin_backup=/tmp/ovpn-telegram-admin-token-prev; stage_admin=%[2]s/monitoring/secrets/telegram_admin_token; rm -f \"$token_backup\" \"$admin_backup\"; if [ -s \"$token_file\" ]; then cp -f \"$token_file\" \"$token_backup\"; fi; if [ -s \"$admin_file\" ]; then cp -f \"$admin_file\" \"$admin_backup\"; fi; mkdir -p %[1]s/agent %[1]s/monitoring/telegram-bot; rm -f %[1]s/agent/ovpn-agent %[1]s/monitoring/telegram-bot/ovpn-telegram-bot; cp -a %[2]s/. %[1]s/; mkdir -p %[1]s/monitoring/secrets; if [ ! -s \"$stage_token\" ] && [ -s \"$token_backup\" ]; then mv -f \"$token_backup\" \"$token_file\"; fi; if [ ! -s \"$stage_admin\" ] && [ -s \"$admin_backup\" ]; then mv -f \"$admin_backup\" \"$admin_file\"; fi; if [ -f %[1]s/.env ]; then sudo chown root:root %[1]s/.env; sudo chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown root:root %[1]s/xray/config.json; sudo chmod 644 %[1]s/xray/config.json; fi; if [ -f \"$token_file\" ]; then chmod 600 \"$token_file\"; fi; if [ -f \"$admin_file\" ]; then chmod 600 \"$admin_file\"; fi; rm -f \"$token_backup\" \"$admin_backup\"",
+		"set -e; token_file=%[1]s/monitoring/secrets/telegram_bot_token; token_backup=/tmp/ovpn-telegram-bot-token-prev; stage_token=%[2]s/monitoring/secrets/telegram_bot_token; admin_file=%[1]s/monitoring/secrets/telegram_admin_token; admin_backup=/tmp/ovpn-telegram-admin-token-prev; stage_admin=%[2]s/monitoring/secrets/telegram_admin_token; rm -f \"$token_backup\" \"$admin_backup\"; if [ -s \"$token_file\" ]; then cp -f \"$token_file\" \"$token_backup\"; fi; if [ -s \"$admin_file\" ]; then cp -f \"$admin_file\" \"$admin_backup\"; fi; mkdir -p %[1]s/agent %[1]s/monitoring/telegram-bot; rm -f %[1]s/agent/ovpn-agent %[1]s/monitoring/telegram-bot/ovpn-telegram-bot; sudo cp -a %[2]s/. %[1]s/; mkdir -p %[1]s/monitoring/secrets; if [ ! -s \"$stage_token\" ] && [ -s \"$token_backup\" ]; then mv -f \"$token_backup\" \"$token_file\"; fi; if [ ! -s \"$stage_admin\" ] && [ -s \"$admin_backup\" ]; then mv -f \"$admin_backup\" \"$admin_file\"; fi; if [ -f %[1]s/.env ]; then chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown 0:%[3]d %[1]s/xray/config.json; sudo chmod 640 %[1]s/xray/config.json; fi; if [ -f \"$token_file\" ]; then chmod 600 \"$token_file\"; fi; if [ -f \"$admin_file\" ]; then chmod 600 \"$admin_file\"; fi; rm -f \"$token_backup\" \"$admin_backup\"",
 		RemoteDir,
 		RemoteStageDir,
+		XrayRuntimeGID,
 	)
 }
 
-// buildDeployUpCommand builds deploy up command from the current inputs and defaults.
+// buildDeployUpCommand renders the `docker compose up` that force-recreates services, preserving an already-enabled monitoring stack.
 func buildDeployUpCommand() string {
 	// Force recreate so updated binaries/config mounts are guaranteed to be picked up
 	// by running containers on every deploy. Preserve an already-enabled monitoring stack
@@ -192,52 +204,52 @@ func buildDeployUpCommand() string {
 	)
 }
 
-// buildDeployStatusCommand builds deploy status command from the current inputs and defaults.
+// buildDeployStatusCommand renders the `docker compose ps` status command.
 func buildDeployStatusCommand() string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose ps", RemoteDir)
 }
 
-// buildMonitoringUpCommand builds monitoring up command from the current inputs and defaults.
+// buildMonitoringUpCommand renders the command that starts the monitoring stack, skipping the bot when no token is present.
 func buildMonitoringUpCommand() string {
 	return fmt.Sprintf("set -e; cd %s; if [ -s monitoring/secrets/telegram_bot_token ]; then sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml --profile monitoring up -d --remove-orphans; else echo 'telegram token file is empty: starting monitoring without ovpn-telegram-bot' >&2; sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml --profile monitoring up -d --remove-orphans --scale ovpn-telegram-bot=0; fi", RemoteDir)
 }
 
-// buildMonitoringDownCommand builds monitoring down command from the current inputs and defaults.
+// buildMonitoringDownCommand renders the command that stops and removes the monitoring services.
 func buildMonitoringDownCommand() string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml stop prometheus alertmanager grafana node-exporter cadvisor ovpn-telegram-bot || true; sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml rm -f prometheus alertmanager grafana node-exporter cadvisor ovpn-telegram-bot || true", RemoteDir)
 }
 
-// buildMonitoringStatusCommand builds monitoring status command from the current inputs and defaults.
+// buildMonitoringStatusCommand renders the monitoring-stack status command.
 func buildMonitoringStatusCommand() string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml ps prometheus alertmanager grafana node-exporter cadvisor ovpn-telegram-bot", RemoteDir)
 }
 
-// buildCleanupMonitoringCommand builds cleanup monitoring command from the current inputs and defaults.
+// buildCleanupMonitoringCommand renders the command that tears down the monitoring stack during cleanup.
 func buildCleanupMonitoringCommand() string {
 	return fmt.Sprintf("set -e; if [ ! -d %s ]; then exit 0; fi; cd %s; if [ -f docker-compose.yml ] && [ -f docker-compose.monitoring.yml ]; then sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml --profile monitoring down --remove-orphans || true; fi", RemoteDir, RemoteDir)
 }
 
-// buildCleanupRuntimeDownCommand builds cleanup runtime down command from the current inputs and defaults.
+// buildCleanupRuntimeDownCommand renders the command that stops the core runtime stack during cleanup.
 func buildCleanupRuntimeDownCommand() string {
 	return fmt.Sprintf("set -e; if [ ! -d %s ]; then exit 0; fi; cd %s; if [ -f docker-compose.yml ]; then sudo docker compose --env-file .env -f docker-compose.yml down --remove-orphans || true; fi", RemoteDir, RemoteDir)
 }
 
-// buildCleanupRemoveRuntimeDirCommand builds cleanup remove runtime dir command from the current inputs and defaults.
+// buildCleanupRemoveRuntimeDirCommand renders the command that removes the runtime directory.
 func buildCleanupRemoveRuntimeDirCommand() string {
 	return fmt.Sprintf("set -e; sudo rm -rf %s", RemoteDir)
 }
 
-// buildCleanupRemoveVolumesCommand builds cleanup remove volumes command from the current inputs and defaults.
+// buildCleanupRemoveVolumesCommand renders the command that removes the project's Docker volumes.
 func buildCleanupRemoveVolumesCommand() string {
 	return "set -e; sudo docker volume ls -q --filter label=com.docker.compose.project=ovpn | xargs -r sudo docker volume rm"
 }
 
-// buildCleanupRemoveBackupsCommand builds cleanup remove backups command from the current inputs and defaults.
+// buildCleanupRemoveBackupsCommand renders the command that removes the remote backup directory.
 func buildCleanupRemoveBackupsCommand() string {
 	return fmt.Sprintf("set -e; sudo rm -rf %s", RemoteBackupDir)
 }
 
-// DeployRemote executes remote on the remote host in a fixed order.
+// DeployRemote applies a staged bundle conservatively: snapshot, validate, apply, compose up, then status.
 func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	// Keep ordering conservative: snapshot -> validate staged bundle -> apply -> compose up.
 	// This makes deploy failures easier to recover from and avoids replacing a healthy stack
@@ -289,12 +301,12 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	return nil
 }
 
-// buildRestartCommand builds restart command from the current inputs and defaults.
+// buildRestartCommand renders the command that restarts xray and ovpn-agent.
 func buildRestartCommand() string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml restart xray ovpn-agent", RemoteDir)
 }
 
-// RestartRemote executes remote on the remote host in a fixed order.
+// RestartRemote restarts xray and ovpn-agent via docker compose.
 func RestartRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	cmd := buildRestartCommand()
 	_, err := runner.Exec(ctx, cfg, cmd)
@@ -304,7 +316,7 @@ func RestartRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	return nil
 }
 
-// RemoteStatus executes remote status against remote hosts over SSH.
+// RemoteStatus returns the remote `docker compose ps` output.
 func RemoteStatus(ctx context.Context, runner Runner, cfg ssh.Config) (string, error) {
 	res, err := runner.Exec(ctx, cfg, buildDeployStatusCommand())
 	if err != nil {
@@ -313,7 +325,7 @@ func RemoteStatus(ctx context.Context, runner Runner, cfg ssh.Config) (string, e
 	return strings.TrimSpace(res.Stdout), nil
 }
 
-// MonitoringUpRemote executes monitoring up remote against remote hosts over SSH.
+// MonitoringUpRemote starts the optional monitoring stack on the host.
 func MonitoringUpRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	if _, err := runner.Exec(ctx, cfg, buildMonitoringUpCommand()); err != nil {
 		return fmt.Errorf("bring up monitoring stack on %s: %w", cfg.Host, err)
@@ -321,7 +333,7 @@ func MonitoringUpRemote(ctx context.Context, runner Runner, cfg ssh.Config) erro
 	return nil
 }
 
-// MonitoringDownRemote executes monitoring down remote against remote hosts over SSH.
+// MonitoringDownRemote stops the optional monitoring stack on the host.
 func MonitoringDownRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	if _, err := runner.Exec(ctx, cfg, buildMonitoringDownCommand()); err != nil {
 		return fmt.Errorf("stop monitoring stack on %s: %w", cfg.Host, err)
@@ -329,7 +341,7 @@ func MonitoringDownRemote(ctx context.Context, runner Runner, cfg ssh.Config) er
 	return nil
 }
 
-// MonitoringStatusRemote executes monitoring status remote against remote hosts over SSH.
+// MonitoringStatusRemote returns the status of the monitoring services.
 func MonitoringStatusRemote(ctx context.Context, runner Runner, cfg ssh.Config) (string, error) {
 	res, err := runner.Exec(ctx, cfg, buildMonitoringStatusCommand())
 	if err != nil {
@@ -338,7 +350,7 @@ func MonitoringStatusRemote(ctx context.Context, runner Runner, cfg ssh.Config) 
 	return strings.TrimSpace(res.Stdout), nil
 }
 
-// CleanupRemote executes cleanup remote against remote hosts over SSH.
+// CleanupRemote tears down the runtime (and optionally monitoring, volumes, and backups) per opts.
 func CleanupRemote(ctx context.Context, runner Runner, cfg ssh.Config, opts CleanupOptions) error {
 	if opts.IncludeMonitoring {
 		if _, err := runner.Exec(ctx, cfg, buildCleanupMonitoringCommand()); err != nil {

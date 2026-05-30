@@ -13,7 +13,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// newServerLogsCmd initializes server logs cmd with the required dependencies.
+// newServerLogsCmd builds the `server logs` command that streams remote compose logs.
 func (a *App) newServerLogsCmd() *cobra.Command {
 	var service string
 	var tail int
@@ -63,7 +63,7 @@ func (a *App) newServerLogsCmd() *cobra.Command {
 	return cmd
 }
 
-// newServerMonitorCmd initializes server monitor cmd with the required dependencies.
+// newServerMonitorCmd builds the `server monitor` command group for the optional monitoring stack.
 func (a *App) newServerMonitorCmd() *cobra.Command {
 	monitorCmd := &cobra.Command{
 		Use:   "monitor",
@@ -78,7 +78,7 @@ func (a *App) newServerMonitorCmd() *cobra.Command {
 	return monitorCmd
 }
 
-// newServerMonitorUpCmd initializes server monitor up cmd with the required dependencies.
+// newServerMonitorUpCmd builds the `server monitor up` command that starts the monitoring stack.
 func (a *App) newServerMonitorUpCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "up <server>",
@@ -99,7 +99,7 @@ func (a *App) newServerMonitorUpCmd() *cobra.Command {
 	}
 }
 
-// newServerMonitorDownCmd initializes server monitor down cmd with the required dependencies.
+// newServerMonitorDownCmd builds the `server monitor down` command that stops the monitoring stack.
 func (a *App) newServerMonitorDownCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "down <server>",
@@ -120,7 +120,7 @@ func (a *App) newServerMonitorDownCmd() *cobra.Command {
 	}
 }
 
-// newServerMonitorStatusCmd initializes server monitor status cmd with the required dependencies.
+// newServerMonitorStatusCmd builds the `server monitor status` command.
 func (a *App) newServerMonitorStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <server>",
@@ -142,7 +142,7 @@ func (a *App) newServerMonitorStatusCmd() *cobra.Command {
 	}
 }
 
-// newServerMonitorTelegramSetupCmd initializes server monitor telegram setup cmd with the required dependencies.
+// newServerMonitorTelegramSetupCmd builds the command that installs the Telegram bot token on the host.
 func (a *App) newServerMonitorTelegramSetupCmd() *cobra.Command {
 	var setup struct {
 		token         string

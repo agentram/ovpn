@@ -44,3 +44,23 @@ func TestParseRemoteHTTPResponseRejectsInvalidStatus(t *testing.T) {
 		t.Fatalf("expected invalid status error, got %v", err)
 	}
 }
+
+func TestBuildAgentHTTPCommandSendsBearerToken(t *testing.T) {
+	t.Parallel()
+
+	get := buildAgentHTTPCommand("GET", "http://127.0.0.1:19000/health", nil)
+	if !strings.Contains(get, "OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' /opt/ovpn/.env") {
+		t.Fatalf("GET command should source the token from the host .env: %q", get)
+	}
+	if !strings.Contains(get, `-H "Authorization: Bearer ${OVPN_AGENT_TOKEN}"`) {
+		t.Fatalf("GET command should send the bearer header: %q", get)
+	}
+
+	post := buildAgentHTTPCommand("POST", "http://127.0.0.1:19000/quota/reset", map[string]string{"email": "a@b"})
+	if !strings.Contains(post, `-H "Authorization: Bearer ${OVPN_AGENT_TOKEN}"`) {
+		t.Fatalf("POST command should send the bearer header: %q", post)
+	}
+	if !strings.Contains(post, "cat <<'JSON'") || !strings.Contains(post, `{"email":"a@b"}`) {
+		t.Fatalf("POST command should stream JSON payload via stdin: %q", post)
+	}
+}

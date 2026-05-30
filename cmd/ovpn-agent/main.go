@@ -38,6 +38,7 @@ func main() {
 	flag.StringVar(&poll, "poll-interval", "30s", "stats polling interval")
 	flag.StringVar(&logLevelRaw, "log-level", strings.TrimSpace(os.Getenv("OVPN_AGENT_LOG_LEVEL")), "Log level: debug|info|warn|error (default: env OVPN_AGENT_LOG_LEVEL or info)")
 	flag.StringVar(&certFile, "cert-file", strings.TrimSpace(os.Getenv("OVPN_AGENT_CERT_FILE")), "Optional path to fullchain certificate file for expiry monitoring")
+	authToken := strings.TrimSpace(os.Getenv("OVPN_AGENT_TOKEN"))
 	flag.Int64Var(&spikeDeltaBytes, "spike-delta-bytes", envInt64("OVPN_AGENT_SPIKE_DELTA_BYTES", stats.DefaultUserSpikeDeltaBytes), "Per-user delta threshold for spike events")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging (shorthand for --log-level=debug)")
 	flag.Parse()
@@ -169,9 +170,16 @@ func main() {
 		refreshOnce: refreshMetrics,
 	})
 
-	srv := &http.Server{Addr: listen, Handler: withRequestLogging(logger, mux)}
+	srv := &http.Server{
+		Addr:              listen,
+		Handler:           withRequestLogging(logger, requireAgentToken(authToken, mux)),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	go func() {
-		logger.Info("ovpn-agent listening", "listen", listen, "xray_api", xrayAPI, "poll_interval", interval.String(), "db_path", dbPath, "cert_file", certFile, "log_level", level.String())
+		logger.Info("ovpn-agent listening", "listen", listen, "xray_api", xrayAPI, "poll_interval", interval.String(), "db_path", dbPath, "cert_file", certFile, "log_level", level.String(), "auth", authToken != "")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("http server failed", "error", err)
 			os.Exit(1)

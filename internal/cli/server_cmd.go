@@ -2,7 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
-// serverCmd builds the Cobra command for server.
+// serverCmd builds the `server` command group for managing servers.
 func (a *App) serverCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "server", Short: "Manage servers"}
 	cmd.AddCommand(
