@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
-## Unreleased
+## 1.5.0
 
 ### Security
 - `ovpn-agent` mutating endpoints (`/quota/*`, `/users/sync`, `/runtime/user/*`, `/collect`) now require a bearer token when `OVPN_AGENT_TOKEN` is set. The CLI auto-generates and persists a token under `~/.ovpn/secrets/agent-token` and renders it into the remote `.env`, so deploys enable it automatically. Read-only endpoints (`/metrics`, `/health`, stats/status) stay open for Prometheus and health checks.
