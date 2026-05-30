@@ -2,7 +2,6 @@ package cli
 
 import "github.com/spf13/cobra"
 
-// userCmd builds the Cobra command for user.
 func (a *App) userCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "user", Short: "Manage users"}
 	cmd.AddCommand(

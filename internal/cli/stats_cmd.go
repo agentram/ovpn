@@ -12,7 +12,6 @@ import (
 	"ovpn/internal/model"
 )
 
-// statsCmd builds the Cobra command for stats.
 func (a *App) statsCmd() *cobra.Command {
 	var server string
 	var day string

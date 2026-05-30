@@ -7,7 +7,6 @@ import (
 	"ovpn/internal/model"
 )
 
-// quotaPressure returns quota pressure.
 func quotaPressure(status model.QuotaStatusResponse) (int, int) {
 	over80 := 0
 	over95 := 0
@@ -26,7 +25,6 @@ func quotaPressure(status model.QuotaStatusResponse) (int, int) {
 	return over80, over95
 }
 
-// trafficSummary returns traffic summary.
 func trafficSummary(rows []model.UserTraffic) (users int, active int, total int64) {
 	users = len(rows)
 	for _, r := range rows {
@@ -39,7 +37,6 @@ func trafficSummary(rows []model.UserTraffic) (users int, active int, total int6
 	return users, active, total
 }
 
-// quotaPercent returns quota percent.
 func quotaPercent(usage int64, quota int64) float64 {
 	if usage <= 0 || quota <= 0 {
 		return 0
@@ -72,7 +69,6 @@ func renderUserState(u model.UserAccessStatus) string {
 	}
 }
 
-// formatBytes renders bytes into the format expected by callers.
 func formatBytes(v int64) string {
 	if v < 0 {
 		v = 0

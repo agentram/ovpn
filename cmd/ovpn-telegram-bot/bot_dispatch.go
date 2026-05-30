@@ -10,7 +10,6 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// pollLoop runs poll loop until context cancellation.
 func (b *bot) pollLoop(ctx context.Context) {
 	offset := int64(0)
 	for {
@@ -42,7 +41,6 @@ func (b *bot) pollLoop(ctx context.Context) {
 	}
 }
 
-// handleMessage executes message flow and returns the first error.
 func (b *bot) handleMessage(ctx context.Context, msg *telegramMessage) {
 	if msg == nil {
 		return
@@ -99,7 +97,6 @@ func (b *bot) handleMessage(ctx context.Context, msg *telegramMessage) {
 	}
 }
 
-// handleCallback executes callback flow and returns the first error.
 func (b *bot) handleCallback(ctx context.Context, cb *telegramCallbackQuery) {
 	if cb == nil || cb.Message == nil {
 		return
@@ -151,7 +148,6 @@ func formatFriendlyError(err error) string {
 	return fmt.Sprintf("Request failed: %s", strings.TrimSpace(err.Error()))
 }
 
-// dispatchCommand returns dispatch command.
 func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd string, args []string) error {
 	switch cmd {
 	case "/start", "/menu":
@@ -196,7 +192,6 @@ func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd st
 	}
 }
 
-// dispatchMenuAction returns dispatch menu action.
 func (b *bot) dispatchMenuAction(ctx context.Context, chatID int64, _ int64, action string) error {
 	switch action {
 	case "home":
@@ -232,7 +227,6 @@ func (b *bot) dispatchMenuAction(ctx context.Context, chatID int64, _ int64, act
 	}
 }
 
-// dispatchCallback returns dispatch callback.
 func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, data string) error {
 	data = strings.TrimSpace(data)
 	switch data {
@@ -328,7 +322,6 @@ func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, 
 	return b.sendPlainMessage(ctx, chatID, "Unknown action. Use /menu.", mainReplyKeyboard())
 }
 
-// handlePromptInput executes prompt input flow and returns the first error.
 func (b *bot) handlePromptInput(ctx context.Context, chatID int64, userID int64, st promptState, text string) error {
 	defer b.clearPrompt(chatID)
 	switch st.Kind {

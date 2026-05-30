@@ -9,7 +9,6 @@ import (
 	"ovpn/internal/util"
 )
 
-// AddUser writes user changes to the local database.
 func (s *Store) AddUser(ctx context.Context, u *model.User) error {
 	if !u.QuotaEnabled {
 		u.QuotaEnabled = true
@@ -34,7 +33,6 @@ func (s *Store) AddUser(ctx context.Context, u *model.User) error {
 	return s.syncTags(ctx, u)
 }
 
-// UpdateUser writes user changes to the local database.
 func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 	if err := u.Validate(); err != nil {
 		return err
@@ -50,13 +48,11 @@ func (s *Store) UpdateUser(ctx context.Context, u *model.User) error {
 	return s.syncTags(ctx, u)
 }
 
-// DeleteUser writes user changes to the local database.
 func (s *Store) DeleteUser(ctx context.Context, serverID int64, username string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE server_id=? AND username=?`, serverID, username)
 	return err
 }
 
-// GetUser reads user from the local database.
 func (s *Store) GetUser(ctx context.Context, serverID int64, username string) (*model.User, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, server_id, username, uuid, email, enabled, expiry_date, traffic_limit_byte, quota_enabled, quota_blocked, quota_blocked_at, notes, tags_csv, created_at, updated_at
@@ -65,7 +61,6 @@ func (s *Store) GetUser(ctx context.Context, serverID int64, username string) (*
 	return scanUser(row)
 }
 
-// ListUsers reads users from the local database.
 func (s *Store) ListUsers(ctx context.Context, serverID int64) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, server_id, username, uuid, email, enabled, expiry_date, traffic_limit_byte, quota_enabled, quota_blocked, quota_blocked_at, notes, tags_csv, created_at, updated_at
@@ -86,7 +81,6 @@ func (s *Store) ListUsers(ctx context.Context, serverID int64) ([]model.User, er
 	return out, rows.Err()
 }
 
-// ListEnabledUsers reads enabled users from the local database.
 func (s *Store) ListEnabledUsers(ctx context.Context, serverID int64) ([]model.User, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, server_id, username, uuid, email, enabled, expiry_date, traffic_limit_byte, quota_enabled, quota_blocked, quota_blocked_at, notes, tags_csv, created_at, updated_at
@@ -107,7 +101,6 @@ func (s *Store) ListEnabledUsers(ctx context.Context, serverID int64) ([]model.U
 	return out, rows.Err()
 }
 
-// syncTags executes tags flow and returns the first error.
 func (s *Store) syncTags(ctx context.Context, u *model.User) error {
 	if u.ID == 0 {
 		return errors.New("user ID is required")

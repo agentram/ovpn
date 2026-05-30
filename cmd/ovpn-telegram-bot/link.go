@@ -19,7 +19,6 @@ func (b *bot) isOwner(userID int64) bool {
 	return userID == b.cfg.ownerUserID
 }
 
-// buildUserLink builds user link from the current inputs and defaults.
 func (b *bot) buildUserLink(ctx context.Context, query string) (string, error) {
 	query = strings.TrimSpace(query)
 	query = strings.TrimPrefix(query, "@")
@@ -69,7 +68,6 @@ func (b *bot) sendUserLinkWithQRCode(ctx context.Context, chatID int64, link str
 	return b.sendPhoto(ctx, chatID, "ovpn-user-link.png", bytes.NewReader(png), "User link QR", replyMarkup)
 }
 
-// findPolicyForQuery returns policy for query for callers.
 func findPolicyForQuery(query string, policies []model.QuotaUserPolicy) (model.QuotaUserPolicy, string, error) {
 	query = strings.ToLower(strings.TrimSpace(query))
 	query = strings.TrimPrefix(query, "@")
@@ -101,7 +99,6 @@ func findPolicyForQuery(query string, policies []model.QuotaUserPolicy) (model.Q
 	return matches[0], usernameFromEmail(matches[0].Email), nil
 }
 
-// usernameFromEmail returns username from email.
 func usernameFromEmail(email string) string {
 	email = strings.TrimSpace(email)
 	if i := strings.Index(email, "@"); i > 0 {

@@ -9,7 +9,6 @@ import (
 	"ovpn/internal/model"
 )
 
-// scanServer reads scan server from the local database.
 func scanServer(row scanner) (*model.Server, error) {
 	srv := &model.Server{}
 	var created, updated string
@@ -45,10 +44,8 @@ func scanServer(row scanner) (*model.Server, error) {
 	return srv, nil
 }
 
-// scanServerRows returns scan server rows.
 func scanServerRows(rows *sql.Rows) (*model.Server, error) { return scanServer(rows) }
 
-// scanUser reads scan user from the local database.
 func scanUser(row scanner) (*model.User, error) {
 	u := &model.User{}
 	var created, updated string
@@ -82,14 +79,12 @@ func scanUser(row scanner) (*model.User, error) {
 	return u, nil
 }
 
-// scanUserRows returns scan user rows.
 func scanUserRows(rows *sql.Rows) (*model.User, error) { return scanUser(rows) }
 
 type scanner interface {
 	Scan(dest ...any) error
 }
 
-// boolToInt returns bool to int.
 func boolToInt(v bool) int {
 	if v {
 		return 1
@@ -97,7 +92,6 @@ func boolToInt(v bool) int {
 	return 0
 }
 
-// nullableTime returns nullable time.
 func nullableTime(t *time.Time) any {
 	if t == nil {
 		return nil

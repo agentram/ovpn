@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// envInt64 normalizes env int 64 and applies fallback defaults.
 func envInt64(key string, fallback int64) int64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -29,7 +29,6 @@ func envInt64(key string, fallback int64) int64 {
 	return v
 }
 
-// handleQuotaPolicies executes quota policies flow and returns the first error.
 func handleQuotaPolicies(store quotaPolicyLister, logger *slog.Logger, metrics *agentMetrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -59,7 +58,6 @@ func isRuntimeUserAbsentError(err error) bool {
 		strings.Contains(text, "failed to remove") && strings.Contains(text, "user")
 }
 
-// postNotifyEvent handles post notify event HTTP behavior for this service.
 func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -85,7 +83,6 @@ func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error
 	return nil
 }
 
-// writeJSON returns write json.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -97,13 +94,47 @@ type statusRecorder struct {
 	status int
 }
 
-// WriteHeader handles write header HTTP behavior for this service.
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// withRequestLogging handles with request logging HTTP behavior for this service.
+// requireAgentToken guards mutating endpoints with a bearer token when one is configured.
+//
+// The agent binds to 127.0.0.1 on the host but is reachable by every container that shares its
+// Docker network (Prometheus, Grafana, cAdvisor, the Telegram bot). Without a token, any of those
+// images could call the mutating endpoints (/runtime/user/add, /quota/reset, ...) and take over
+// VPN user state. Read-only methods stay open so Prometheus scraping and health checks keep
+// working; when no token is set the agent behaves exactly as before (backward compatible).
+func requireAgentToken(token string, next http.Handler) http.Handler {
+	token = strings.TrimSpace(token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token != "" && !isReadOnlyMethod(r.Method) && !bearerTokenMatches(r.Header.Get("Authorization"), token) {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isReadOnlyMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+func bearerTokenMatches(header, token string) bool {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(header, prefix) {
+		return false
+	}
+	got := strings.TrimSpace(strings.TrimPrefix(header, prefix))
+	return subtle.ConstantTimeCompare([]byte(got), []byte(token)) == 1
+}
+
 func withRequestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}

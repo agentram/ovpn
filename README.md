@@ -93,7 +93,7 @@ flowchart LR
 - Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
 - Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
 - Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
-- Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering.
+- Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering. The rendered Xray config (REALITY private key + client UUIDs) is stored `0640 root:<xray-gid>`, and `ovpn-agent` mutating endpoints require a bearer token (`OVPN_AGENT_TOKEN`, auto-provisioned on deploy).
 - Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
 
 ## Key features

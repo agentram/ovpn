@@ -16,7 +16,6 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open initializes open with the required dependencies.
 func Open(ctx context.Context, dataDir string) (*Store, error) {
 	if err := util.EnsureDir(dataDir); err != nil {
 		return nil, err
@@ -35,5 +34,4 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	return s, nil
 }
 
-// Close returns close.
 func (s *Store) Close() error { return s.db.Close() }

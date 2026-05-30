@@ -17,7 +17,6 @@ type reconcileAction struct {
 	details  string
 }
 
-// newUserReconcileCmd initializes user reconcile cmd with the required dependencies.
 func (a *App) newUserReconcileCmd() *cobra.Command {
 	var reconcile struct {
 		fromServer string

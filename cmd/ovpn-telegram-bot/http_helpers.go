@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// writeJSON returns write json.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -19,13 +18,11 @@ type statusRecorder struct {
 	status int
 }
 
-// WriteHeader handles write header HTTP behavior for this service.
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// withRequestLogging handles with request logging HTTP behavior for this service.
 func withRequestLogging(logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}

@@ -34,6 +34,7 @@ type Input struct {
 	TelegramBotImage             string
 	HAProxyImage                 string
 	AgentLogLevel                string
+	AgentToken                   string
 	AgentHostPort                string
 	TelegramBotHostPort          string
 	AgentCertFile                string
@@ -64,7 +65,6 @@ type Input struct {
 	RenderedOverride             []byte
 }
 
-// applyDefaults returns apply defaults.
 func (in *Input) applyDefaults() {
 	if in.XrayImage == "" {
 		in.XrayImage = defaults.DefaultXrayImage(in.Server.XrayVersion)
@@ -98,7 +98,6 @@ func (in *Input) applyDefaults() {
 	in.TelegramLinkShortID = defaultString(in.TelegramLinkShortID, firstShortID(in.Server.RealityShortIDs))
 }
 
-// defaultString normalizes string and applies fallback defaults.
 func defaultString(v string, fallback string) string {
 	if strings.TrimSpace(v) == "" {
 		return fallback
@@ -111,7 +110,6 @@ type Bundle struct {
 	ConfigRaw []byte
 }
 
-// RenderBundle renders bundle into the format expected by callers.
 func RenderBundle(in Input) (*Bundle, error) {
 	in.applyDefaults()
 
@@ -167,7 +165,9 @@ func RenderBundle(in Input) (*Bundle, error) {
 			return nil, err
 		}
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "xray", "config.json"), configRaw, 0o644); err != nil {
+	// config.json carries the REALITY private key and every client UUID, so it must stay
+	// owner-only rather than world-readable like the other rendered runtime files.
+	if err := os.WriteFile(filepath.Join(tmpDir, "xray", "config.json"), configRaw, 0o600); err != nil {
 		return nil, err
 	}
 	composeTpl, err := AssetFS.ReadFile("templates/docker-compose.yml.tmpl")
@@ -188,12 +188,13 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	envContent := fmt.Sprintf(
-		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
+		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_TOKEN=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
 		in.XrayImage,
 		in.AgentImage,
 		in.TelegramBotImage,
 		in.HAProxyImage,
 		in.AgentLogLevel,
+		in.AgentToken,
 		in.AgentHostPort,
 		in.TelegramBotHostPort,
 		in.AgentCertFile,
@@ -342,7 +343,6 @@ backend foreign_backends
 	return b.String()
 }
 
-// CleanupBundle returns cleanup bundle.
 func CleanupBundle(b *Bundle) {
 	if b == nil || b.Dir == "" {
 		return
@@ -393,7 +393,6 @@ func createTarGz(tarPath, srcDir string) error {
 	})
 }
 
-// copyFile combines input values to produce file.
 func copyFile(src, dst string, mode os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {

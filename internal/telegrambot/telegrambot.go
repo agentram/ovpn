@@ -40,7 +40,6 @@ type NotifyEvent struct {
 	Message  string `json:"message"`
 }
 
-// ParseIDSetCSV parses id set csv and returns normalized values.
 func ParseIDSetCSV(raw string) (map[int64]struct{}, error) {
 	out := map[int64]struct{}{}
 	raw = strings.TrimSpace(raw)
@@ -62,7 +61,6 @@ func ParseIDSetCSV(raw string) (map[int64]struct{}, error) {
 	return out, nil
 }
 
-// ParseIDSliceCSV parses id slice csv and returns normalized values.
 func ParseIDSliceCSV(raw string) ([]int64, error) {
 	set, err := ParseIDSetCSV(raw)
 	if err != nil {
@@ -90,7 +88,6 @@ func IsAllowed(chatID int64, userID int64, allowedChatIDs map[int64]struct{}, al
 	return false
 }
 
-// ParseCommand parses command and returns normalized values.
 func ParseCommand(text string) (string, []string, error) {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
@@ -105,7 +102,6 @@ func ParseCommand(text string) (string, []string, error) {
 	return cmd, fields[1:], nil
 }
 
-// RenderHelp renders help into the format expected by callers.
 func RenderHelp() string {
 	return strings.Join([]string{
 		"ovpn telegram commands:",
@@ -124,7 +120,6 @@ func RenderHelp() string {
 	}, "\n")
 }
 
-// RenderNotifyMessage renders notify message into the format expected by callers.
 func RenderNotifyMessage(ev NotifyEvent) string {
 	event := defaultText(ev.Event, "event")
 	status := strings.ToUpper(defaultText(ev.Status, "info"))
@@ -141,7 +136,6 @@ func RenderNotifyMessage(ev NotifyEvent) string {
 	return strings.Join(lines, "\n")
 }
 
-// RenderAlertmanagerMessage renders alertmanager message into the format expected by callers.
 func RenderAlertmanagerMessage(in AlertmanagerWebhook) string {
 	status := strings.ToUpper(defaultText(in.Status, "firing"))
 	name := firstNonEmpty(in.CommonLabels["alertname"], in.GroupLabels["alertname"], "alert")
@@ -263,7 +257,6 @@ func renderAlertmanagerURL(raw string) string {
 	return u.String()
 }
 
-// defaultText normalizes text and applies fallback defaults.
 func defaultText(v, fallback string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
@@ -272,7 +265,6 @@ func defaultText(v, fallback string) string {
 	return v
 }
 
-// firstNonEmpty normalizes non empty and applies fallback defaults.
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {

@@ -25,7 +25,6 @@ type Client struct {
 
 const defaultVLESSFlow = "xtls-rprx-vision"
 
-// New initializes new with the required dependencies.
 func New(ctx context.Context, addr string) (*Client, error) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -42,7 +41,6 @@ func New(ctx context.Context, addr string) (*Client, error) {
 	}, nil
 }
 
-// waitForReady runs for ready loop until context cancellation or error.
 func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Duration) error {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -59,7 +57,6 @@ func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Durat
 	}
 }
 
-// Close returns close.
 func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
@@ -67,7 +64,6 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// QueryStats handles query stats HTTP behavior for this service.
 func (c *Client) QueryStats(ctx context.Context, pattern string, reset bool) (map[string]int64, error) {
 	resp, err := c.stats.QueryStats(ctx, &statscommand.QueryStatsRequest{
 		Pattern: pattern,
@@ -83,7 +79,6 @@ func (c *Client) QueryStats(ctx context.Context, pattern string, reset bool) (ma
 	return out, nil
 }
 
-// AddUser applies user and returns an error on failure.
 func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) error {
 	acc := accountForInbound(inboundTag, uuid)
 	op := &handlercommand.AddUserOperation{
@@ -100,7 +95,6 @@ func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) er
 	return err
 }
 
-// accountForInbound returns account for inbound.
 func accountForInbound(inboundTag, uuid string) *vless.Account {
 	acc := &vless.Account{Id: uuid}
 	// Keep runtime adds aligned with rendered config for REALITY/VLESS inbounds.
@@ -110,7 +104,6 @@ func accountForInbound(inboundTag, uuid string) *vless.Account {
 	return acc
 }
 
-// RemoveUser applies user and returns an error on failure.
 func (c *Client) RemoveUser(ctx context.Context, inboundTag, email string) error {
 	op := &handlercommand.RemoveUserOperation{Email: email}
 	_, err := c.handler.AlterInbound(ctx, &handlercommand.AlterInboundRequest{
@@ -126,7 +119,6 @@ type UserCounter struct {
 	Downlink int64
 }
 
-// ParseUserCounters parses user counters and returns normalized values.
 func ParseUserCounters(stats map[string]int64) map[string]UserCounter {
 	out := map[string]UserCounter{}
 	for name, val := range stats {
@@ -152,7 +144,6 @@ func ParseUserCounters(stats map[string]int64) map[string]UserCounter {
 	return out
 }
 
-// EnsureAPIReachable executes api reachable flow and returns the first error.
 func EnsureAPIReachable(ctx context.Context, addr string) error {
 	c, err := New(ctx, addr)
 	if err != nil {

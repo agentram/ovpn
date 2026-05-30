@@ -55,6 +55,57 @@ func TestCounterAndAggregates(t *testing.T) {
 	}
 }
 
+func TestAddDeltaAndAdvanceCounterAtomic(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	const counter = "user>>>bob>>>traffic>>>uplink"
+	now := time.Date(2026, 4, 5, 12, 0, 0, 0, time.UTC)
+	if err := store.AddDeltaAndAdvanceCounter(ctx, "bob@example.com", 500, 0, now, counter, 500); err != nil {
+		t.Fatalf("add delta and advance counter: %v", err)
+	}
+
+	c, ok, err := store.GetCounter(ctx, counter)
+	if err != nil || !ok {
+		t.Fatalf("get counter: ok=%v err=%v", ok, err)
+	}
+	if c.Value != 500 {
+		t.Fatalf("counter value = %d, want 500", c.Value)
+	}
+	totals, err := store.ListTotals(ctx)
+	if err != nil {
+		t.Fatalf("list totals: %v", err)
+	}
+	if len(totals) != 1 || totals[0].UplinkBytes != 500 {
+		t.Fatalf("unexpected totals: %+v", totals)
+	}
+
+	// A zero delta must still advance the counter without creating spurious usage rows.
+	if err := store.AddDeltaAndAdvanceCounter(ctx, "bob@example.com", 0, 0, now.Add(time.Minute), counter, 700); err != nil {
+		t.Fatalf("advance counter with zero delta: %v", err)
+	}
+	c, _, err = store.GetCounter(ctx, counter)
+	if err != nil {
+		t.Fatalf("get counter after zero delta: %v", err)
+	}
+	if c.Value != 700 {
+		t.Fatalf("counter value after zero delta = %d, want 700", c.Value)
+	}
+	totals, err = store.ListTotals(ctx)
+	if err != nil {
+		t.Fatalf("list totals after zero delta: %v", err)
+	}
+	if len(totals) != 1 || totals[0].UplinkBytes != 500 {
+		t.Fatalf("zero delta should not change usage totals: %+v", totals)
+	}
+}
+
 func TestQuotaPolicyAndStatus(t *testing.T) {
 	t.Parallel()
 

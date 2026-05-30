@@ -27,7 +27,6 @@ type agentHealth struct {
 	DBPath           string `json:"db_path,omitempty"`
 }
 
-// doctorCmd builds the Cobra command for doctor.
 func (a *App) doctorCmd() *cobra.Command {
 	var opts doctorOptions
 	cmd := &cobra.Command{
@@ -59,7 +58,6 @@ func (a *App) doctorCmd() *cobra.Command {
 	return cmd
 }
 
-// runDoctor executes doctor flow and returns the first error.
 func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, error) {
 	report := doctor.NewReport(serverName)
 	srv, err := a.store.GetServerByName(a.ctx, serverName)
@@ -178,7 +176,6 @@ func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
 	return check
 }
 
-// printDoctorReport returns print doctor report.
 func printDoctorReport(report doctor.Report, jsonOutput, verbose bool) error {
 	if jsonOutput {
 		raw, err := report.JSON()
@@ -192,7 +189,6 @@ func printDoctorReport(report doctor.Report, jsonOutput, verbose bool) error {
 	return nil
 }
 
-// checkLocalConfig returns check local config.
 func checkLocalConfig(srv model.Server) doctor.Check {
 	check := doctor.Check{
 		Name:    "Local config sanity",
@@ -247,7 +243,6 @@ func isFloatingXrayTag(tag string) bool {
 	return strings.HasPrefix(v, "dev-")
 }
 
-// splitRealityTargetHostPort returns split reality target host port.
 func splitRealityTargetHostPort(raw string) (string, string) {
 	target := strings.TrimSpace(raw)
 	if target == "" {

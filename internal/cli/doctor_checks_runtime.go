@@ -13,7 +13,6 @@ import (
 	"ovpn/internal/ssh"
 )
 
-// checkAgentHealth returns check agent health.
 func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	agentBaseURL := a.agentBaseURL()
 	check := doctor.Check{
@@ -91,7 +90,6 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	return check
 }
 
-// checkDisk returns check disk.
 func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := buildDoctorDiskCommand()
 	res, err := a.execRemote(runner, cfg, 25*time.Second, cmd)
@@ -172,7 +170,6 @@ func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	}
 }
 
-// buildDoctorDiskCommand builds doctor disk command from the current inputs and defaults.
 func buildDoctorDiskCommand() string {
 	cmd := strings.Join([]string{
 		"set -u",
@@ -193,7 +190,6 @@ func buildDoctorDiskCommand() string {
 	return cmd
 }
 
-// collectDoctorLogs executes doctor logs flow and returns the first error.
 func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	services := []string{"xray", "ovpn-agent"}
 	if srv.IsProxy() {
@@ -222,7 +218,6 @@ func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	return out
 }
 
-// addRemoteSkips applies remote skips and returns an error on failure.
 func addRemoteSkips(report *doctor.Report, includeSSH bool) {
 	names := []string{
 		"Sudo and permissions",

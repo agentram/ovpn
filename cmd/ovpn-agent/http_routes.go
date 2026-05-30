@@ -30,7 +30,6 @@ type routeDeps struct {
 	refreshOnce func(context.Context)
 }
 
-// newMetricsRefreshFunc initializes metrics refresh func with the required dependencies.
 func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *agentMetrics) func(context.Context) {
 	return func(rctx context.Context) {
 		totals, err := store.ListTotals(rctx)
@@ -76,7 +75,6 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 	}
 }
 
-// registerHTTPRoutes handles register http routes HTTP behavior for this service.
 func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 	// Serialize runtime add/remove calls to avoid concurrent AlterInbound races against one Xray process.
 	mux.Handle("/metrics", promhttp.Handler())

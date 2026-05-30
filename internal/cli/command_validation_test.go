@@ -275,7 +275,8 @@ func newTestAppWithServer(t *testing.T, dryRun bool) *App {
 	t.Helper()
 
 	ctx := context.Background()
-	st, err := local.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	dir := t.TempDir()
+	st, err := local.Open(ctx, filepath.Join(dir, "data"))
 	if err != nil {
 		t.Fatalf("open local store: %v", err)
 	}
@@ -301,9 +302,10 @@ func newTestAppWithServer(t *testing.T, dryRun bool) *App {
 		t.Fatalf("add server: %v", err)
 	}
 	return &App{
-		ctx:    ctx,
-		store:  st,
-		dryRun: dryRun,
+		ctx:     ctx,
+		store:   st,
+		dataDir: dir,
+		dryRun:  dryRun,
 	}
 }
 
@@ -311,7 +313,8 @@ func newTestAppWithoutServers(t *testing.T, dryRun bool) *App {
 	t.Helper()
 
 	ctx := context.Background()
-	st, err := local.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	dir := t.TempDir()
+	st, err := local.Open(ctx, filepath.Join(dir, "data"))
 	if err != nil {
 		t.Fatalf("open local store: %v", err)
 	}
@@ -319,9 +322,10 @@ func newTestAppWithoutServers(t *testing.T, dryRun bool) *App {
 		_ = st.Close()
 	})
 	return &App{
-		ctx:    ctx,
-		store:  st,
-		dryRun: dryRun,
+		ctx:     ctx,
+		store:   st,
+		dataDir: dir,
+		dryRun:  dryRun,
 	}
 }
 

@@ -17,26 +17,17 @@ import (
 	"ovpn/internal/util"
 )
 
-// fetchRemoteAgent returns remote agent for callers.
 func (a *App) fetchRemoteAgent(srv model.Server, method, url string, payload any) ([]byte, error) {
 	return a.fetchRemoteHTTP(srv, method, url, payload)
 }
 
-// fetchRemoteHTTP returns remote http for callers.
 func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any) ([]byte, error) {
 	if a.remoteHTTPHook != nil {
 		return a.remoteHTTPHook(srv, method, url, payload)
 	}
 	runner := a.newRunner("agent_http")
 	cfg := sshFromServer(srv)
-	var cmd string
-	if payload == nil {
-		cmd = fmt.Sprintf("curl --max-time 10 -sS -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s '%s'", method, url)
-	} else {
-		b, _ := json.Marshal(payload)
-		// Send payload through stdin to avoid shell escaping bugs and leaking large JSON in logs.
-		cmd = fmt.Sprintf("cat <<'JSON' | curl --max-time 10 -sS -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s -H 'Content-Type: application/json' -d @- '%s'\n%s\nJSON", method, url, string(b))
-	}
+	cmd := buildAgentHTTPCommand(method, url, payload)
 	a.log().Debug("calling remote agent endpoint", "server", srv.Name, "host", srv.Host, "method", method, "url", url, "has_payload", payload != nil)
 	res, err := runner.Exec(a.ctx, cfg, cmd)
 	if err != nil {
@@ -54,6 +45,21 @@ func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any)
 		return nil, fmt.Errorf("remote http call %s %s on %s returned %d: %s", method, url, srv.Host, status, msg)
 	}
 	return []byte(strings.TrimSpace(body)), nil
+}
+
+// buildAgentHTTPCommand builds the remote shell command that calls an ovpn-agent endpoint.
+//
+// The agent bearer token is read from the host-side .env that started the agent container, so the
+// operator never has to keep it in local state and both sides always agree on the value. An empty
+// token (older deploys, or auth disabled) sends a harmless empty bearer. JSON payloads are streamed
+// via stdin to avoid shell-escaping bugs and to keep large bodies out of logs.
+func buildAgentHTTPCommand(method, url string, payload any) string {
+	tokenPrelude := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); ", deploy.RemoteDir)
+	if payload == nil {
+		return tokenPrelude + fmt.Sprintf("curl --max-time 10 -sS -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s '%s'", method, url)
+	}
+	b, _ := json.Marshal(payload)
+	return tokenPrelude + fmt.Sprintf("cat <<'JSON' | curl --max-time 10 -sS -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s -H 'Content-Type: application/json' -d @- '%s'\n%s\nJSON", method, url, string(b))
 }
 
 func parseRemoteHTTPResponse(raw string) (string, int, error) {
@@ -80,7 +86,6 @@ func httpStatusText(status int) string {
 	return "HTTP error"
 }
 
-// agentHostPort returns agent host port.
 func (a *App) agentHostPort() string {
 	raw := strings.TrimSpace(envOr("OVPN_AGENT_HOST_PORT", "19000"))
 	p, err := strconv.Atoi(raw)
@@ -91,17 +96,14 @@ func (a *App) agentHostPort() string {
 	return strconv.Itoa(p)
 }
 
-// agentBaseURL returns agent base url.
 func (a *App) agentBaseURL() string {
 	return "http://127.0.0.1:" + a.agentHostPort()
 }
 
-// agentURL returns agent url.
 func (a *App) agentURL(path string) string {
 	return strings.TrimRight(a.agentBaseURL(), "/") + "/" + strings.TrimLeft(path, "/")
 }
 
-// telegramBotHostPort returns telegram bot host port.
 func (a *App) telegramBotHostPort() string {
 	raw := strings.TrimSpace(envOr("OVPN_TELEGRAM_BOT_HOST_PORT", "19001"))
 	p, err := strconv.Atoi(raw)
@@ -112,12 +114,10 @@ func (a *App) telegramBotHostPort() string {
 	return strconv.Itoa(p)
 }
 
-// telegramNotifyURL returns telegram notify url.
 func (a *App) telegramNotifyURL() string {
 	return envOr("OVPN_TELEGRAM_NOTIFY_URL", "http://127.0.0.1:"+a.telegramBotHostPort()+"/notify")
 }
 
-// sendTelegramNotifyEvent returns send telegram notify event.
 func (a *App) sendTelegramNotifyEvent(srv model.Server, ev telegrambot.NotifyEvent) {
 	if a.dryRun {
 		return
@@ -144,7 +144,6 @@ func (a *App) sendTelegramNotifyEvent(srv model.Server, ev telegrambot.NotifyEve
 	}
 }
 
-// postRemoteNotifyBestEffort executes post remote notify best effort against remote hosts over SSH.
 func (a *App) postRemoteNotifyBestEffort(srv model.Server, endpoint string, payload any) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -161,7 +160,6 @@ func (a *App) postRemoteNotifyBestEffort(srv model.Server, endpoint string, payl
 	return err
 }
 
-// uploadTelegramBotToken executes telegram bot token on the remote host in a fixed order.
 func (a *App) uploadTelegramBotToken(srv model.Server, token string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -196,7 +194,6 @@ func (a *App) uploadTelegramBotToken(srv model.Server, token string) error {
 	return nil
 }
 
-// waitForRemoteHTTPReady runs for remote http ready loop until context cancellation or error.
 func (a *App) waitForRemoteHTTPReady(srv model.Server, url string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error

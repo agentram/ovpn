@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// setPrompt applies prompt and returns an error on failure.
 func (b *bot) setPrompt(chatID int64, kind string) {
 	if strings.TrimSpace(kind) == "" {
 		return
@@ -16,7 +15,6 @@ func (b *bot) setPrompt(chatID int64, kind string) {
 	b.prompts[chatID] = promptState{Kind: kind, ExpiresAt: time.Now().UTC().Add(promptTTL)}
 }
 
-// getPrompt returns prompt for callers.
 func (b *bot) getPrompt(chatID int64) (promptState, bool) {
 	st, ok := b.prompts[chatID]
 	if !ok {
@@ -29,7 +27,6 @@ func (b *bot) getPrompt(chatID int64) (promptState, bool) {
 	return st, true
 }
 
-// clearPrompt applies prompt and returns an error on failure.
 func (b *bot) clearPrompt(chatID int64) {
 	delete(b.prompts, chatID)
 }

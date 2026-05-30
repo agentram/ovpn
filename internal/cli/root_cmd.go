@@ -34,7 +34,6 @@ type App struct {
 
 var errRuntimeQuotaBlocked = errors.New("runtime add skipped: user is blocked by quota")
 
-// NewRootCmd initializes root cmd with the required dependencies.
 func NewRootCmd() *cobra.Command {
 	app := &App{ctx: context.Background()}
 	cmd := &cobra.Command{

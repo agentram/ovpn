@@ -9,7 +9,6 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// deployCmd executes cmd flow and returns the first error.
 func (a *App) deployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy <server>",
@@ -27,7 +26,6 @@ func (a *App) deployCmd() *cobra.Command {
 	return cmd
 }
 
-// restartCmd executes cmd flow and returns the first error.
 func (a *App) restartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart <server>",

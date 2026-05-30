@@ -13,7 +13,6 @@ import (
 	"ovpn/internal/version"
 )
 
-// ensureAgentBinary executes agent binary flow and returns the first error.
 func (a *App) ensureAgentBinary() (string, error) {
 	return a.ensureRuntimeBinary(runtimeBinarySpec{
 		Name:       "ovpn-agent",
@@ -23,7 +22,6 @@ func (a *App) ensureAgentBinary() (string, error) {
 	})
 }
 
-// ensureTelegramBotBinary executes telegram bot binary flow and returns the first error.
 func (a *App) ensureTelegramBotBinary() (string, error) {
 	return a.ensureRuntimeBinary(runtimeBinarySpec{
 		Name:       "ovpn-telegram-bot",

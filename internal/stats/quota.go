@@ -13,9 +13,6 @@ import (
 const DefaultQuotaWindow = 30 * 24 * time.Hour
 const DefaultWindow30DQuotaBytes int64 = 300 * 1024 * 1024 * 1024
 
-// DefaultMonthlyQuotaBytes is kept as a compatibility alias for older callsites.
-const DefaultMonthlyQuotaBytes int64 = DefaultWindow30DQuotaBytes
-
 type RuntimeManager interface {
 	AddUser(ctx context.Context, inboundTag, email, uuid string) error
 	RemoveUser(ctx context.Context, inboundTag, email string) error
@@ -35,7 +32,6 @@ type QuotaEnforcer struct {
 	OnNotify                  func(event, message string)
 }
 
-// Enforce returns enforce.
 func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 	if q == nil || q.Store == nil {
 		return nil
@@ -162,7 +158,6 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 	return firstErr
 }
 
-// runtimeAdd executes runtime add flow and returns the first error.
 func (q *QuotaEnforcer) runtimeAdd(ctx context.Context, inboundTag, email, uuid string) error {
 	if q.Runtime == nil {
 		return fmt.Errorf("runtime manager is not configured")
@@ -177,7 +172,6 @@ func (q *QuotaEnforcer) runtimeAdd(ctx context.Context, inboundTag, email, uuid 
 	return nil
 }
 
-// runtimeRemove executes runtime remove flow and returns the first error.
 func (q *QuotaEnforcer) runtimeRemove(ctx context.Context, inboundTag, email string) error {
 	if q.Runtime == nil {
 		return fmt.Errorf("runtime manager is not configured")
@@ -192,7 +186,6 @@ func (q *QuotaEnforcer) runtimeRemove(ctx context.Context, inboundTag, email str
 	return nil
 }
 
-// logger returns logger.
 func (q *QuotaEnforcer) logger() *slog.Logger {
 	if q != nil && q.Logger != nil {
 		return q.Logger
@@ -200,21 +193,18 @@ func (q *QuotaEnforcer) logger() *slog.Logger {
 	return slog.Default()
 }
 
-// recordEvent returns record event.
 func (q *QuotaEnforcer) recordEvent(action, result string) {
 	if q != nil && q.OnEvent != nil {
 		q.OnEvent(action, result)
 	}
 }
 
-// notify returns notify.
 func (q *QuotaEnforcer) notify(event, message string) {
 	if q != nil && q.OnNotify != nil {
 		q.OnNotify(event, message)
 	}
 }
 
-// combineFirst combines input values to produce first.
 func combineFirst(current error, next error) error {
 	if current != nil {
 		return current

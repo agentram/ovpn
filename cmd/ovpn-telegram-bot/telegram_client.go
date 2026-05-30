@@ -13,7 +13,6 @@ import (
 	"strings"
 )
 
-// getUpdates returns updates for callers.
 func (c *telegramClient) getUpdates(ctx context.Context, offset int64, timeoutSeconds int) ([]telegramUpdate, error) {
 	payload := map[string]any{
 		"offset":          offset,
@@ -52,7 +51,6 @@ func (c *telegramClient) sendMessageWithMode(ctx context.Context, chatID int64, 
 	return nil
 }
 
-// answerCallbackQuery returns answer callback query.
 func (c *telegramClient) answerCallbackQuery(ctx context.Context, callbackID string, text string) error {
 	callbackID = strings.TrimSpace(callbackID)
 	if callbackID == "" {
@@ -73,7 +71,6 @@ func (c *telegramClient) answerCallbackQuery(ctx context.Context, callbackID str
 	return nil
 }
 
-// sendDocument handles send document HTTP behavior for this service.
 func (c *telegramClient) sendDocument(ctx context.Context, chatID int64, filename string, src io.Reader, caption string) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -117,7 +114,6 @@ func (c *telegramClient) sendDocument(ctx context.Context, chatID int64, filenam
 	return nil
 }
 
-// sendPhoto handles send photo HTTP behavior for this service.
 func (c *telegramClient) sendPhoto(ctx context.Context, chatID int64, filename string, src io.Reader, caption string, replyMarkup any) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -170,7 +166,6 @@ func (c *telegramClient) sendPhoto(ctx context.Context, chatID int64, filename s
 	return nil
 }
 
-// callTelegram handles call telegram HTTP behavior for this service.
 func (c *telegramClient) callTelegram(ctx context.Context, method string, payload any, out any) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -190,7 +185,6 @@ func (c *telegramClient) callTelegram(ctx context.Context, method string, payloa
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// redactError returns redact error.
 func (c *telegramClient) redactError(err error) error {
 	if err == nil {
 		return nil

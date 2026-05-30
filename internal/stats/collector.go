@@ -51,7 +51,6 @@ type Collector struct {
 	mu sync.Mutex
 }
 
-// Run runs run loop until context cancellation or error.
 func (c *Collector) Run(ctx context.Context) error {
 	if c.Interval <= 0 {
 		c.Interval = 30 * time.Second
@@ -76,7 +75,6 @@ func (c *Collector) Run(ctx context.Context) error {
 	}
 }
 
-// CollectOnce executes once flow and returns the first error.
 func (c *Collector) CollectOnce(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -161,7 +159,6 @@ func (c *Collector) CollectOnce(ctx context.Context) error {
 	return retErr
 }
 
-// consumeCounter returns consume counter.
 func (c *Collector) consumeCounter(ctx context.Context, counterKey, email string, current int64, uplink bool, now time.Time) (int64, error) {
 	prev, ok, err := c.Store.GetCounter(ctx, counterKey)
 	if err != nil {
@@ -185,35 +182,31 @@ func (c *Collector) consumeCounter(ctx context.Context, counterKey, email string
 			return 0, err
 		}
 	}
+	var upDelta, downDelta int64
+	if uplink {
+		upDelta = delta
+	} else {
+		downDelta = delta
+	}
+	// Persist the delta and advance the source counter atomically. Splitting these into two
+	// writes risks double-counting: a failure (or crash) after the delta commit but before the
+	// counter advance would replay the same delta on the next collection.
+	if err := c.Store.AddDeltaAndAdvanceCounter(ctx, email, upDelta, downDelta, now, counterKey, current); err != nil {
+		if c.Observer != nil {
+			c.Observer.OnDBWriteError("add_delta")
+		}
+		return 0, fmt.Errorf("persist delta and counter for %s: %w", email, err)
+	}
 	if delta > 0 {
-		var upDelta, downDelta int64
-		if uplink {
-			upDelta = delta
-		} else {
-			downDelta = delta
-		}
-		if err := c.Store.AddDelta(ctx, email, upDelta, downDelta, now); err != nil {
-			if c.Observer != nil {
-				c.Observer.OnDBWriteError("add_delta")
-			}
-			return 0, fmt.Errorf("add delta for %s: %w", email, err)
-		}
 		direction := "downlink"
 		if uplink {
 			direction = "uplink"
 		}
 		c.logger().Debug("delta persisted", "email", email, "direction", direction, "delta_bytes", delta)
 	}
-	if err := c.Store.UpsertCounter(ctx, counterKey, current); err != nil {
-		if c.Observer != nil {
-			c.Observer.OnDBWriteError("upsert_counter")
-		}
-		return 0, err
-	}
 	return delta, nil
 }
 
-// spikeThresholdBytes returns spike threshold bytes.
 func (c *Collector) spikeThresholdBytes() int64 {
 	if c != nil && c.SpikeDeltaBytes > 0 {
 		return c.SpikeDeltaBytes
@@ -221,7 +214,6 @@ func (c *Collector) spikeThresholdBytes() int64 {
 	return DefaultUserSpikeDeltaBytes
 }
 
-// logger returns logger.
 func (c *Collector) logger() *slog.Logger {
 	if c != nil && c.Logger != nil {
 		return c.Logger

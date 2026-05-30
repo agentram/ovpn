@@ -2,7 +2,6 @@ package main
 
 import "strings"
 
-// menuActionFromText returns menu action from text.
 func menuActionFromText(text string) string {
 	switch strings.ToLower(strings.TrimSpace(text)) {
 	case strings.ToLower(menuHome):

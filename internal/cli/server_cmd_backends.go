@@ -8,7 +8,6 @@ import (
 	"ovpn/internal/model"
 )
 
-// newServerBackendCmd initializes server backend cmd with the required dependencies.
 func (a *App) newServerBackendCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backend",

@@ -15,7 +15,6 @@ import (
 
 const quotaGBBytes int64 = 1024 * 1024 * 1024
 
-// newUserTopCmd initializes user top cmd with the required dependencies.
 func (a *App) newUserTopCmd() *cobra.Command {
 	var top struct {
 		server string
@@ -84,7 +83,6 @@ func (a *App) newUserTopCmd() *cobra.Command {
 	return cmd
 }
 
-// newUserQuotaResetCmd initializes user quota reset cmd with the required dependencies.
 func (a *App) newUserQuotaResetCmd() *cobra.Command {
 	var quotaReset struct {
 		username string
@@ -129,7 +127,6 @@ func (a *App) newUserQuotaResetCmd() *cobra.Command {
 	return cmd
 }
 
-// newUserQuotaSetCmd initializes user quota set cmd with the required dependencies.
 func (a *App) newUserQuotaSetCmd() *cobra.Command {
 	var quotaSet struct {
 		username    string
@@ -216,7 +213,6 @@ func quotaBytesFromFlags(monthlyBytes int64, monthlyGB int64, monthlyBytesSet bo
 	return monthlyBytes, nil
 }
 
-// newUserLinkCmd initializes user link cmd with the required dependencies.
 func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
 		server   string

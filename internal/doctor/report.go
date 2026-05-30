@@ -33,7 +33,6 @@ type Report struct {
 	Logs          map[string]string `json:"logs,omitempty"`
 }
 
-// NewReport initializes report with the required dependencies.
 func NewReport(server string) Report {
 	return Report{
 		Server:    server,
@@ -42,7 +41,6 @@ func NewReport(server string) Report {
 	}
 }
 
-// Add applies add and returns an error on failure.
 func (r *Report) Add(check Check) {
 	if check.Status == "" {
 		check.Status = StatusFail
@@ -50,17 +48,14 @@ func (r *Report) Add(check Check) {
 	r.Checks = append(r.Checks, check)
 }
 
-// Finalize returns finalize.
 func (r *Report) Finalize() {
 	r.OverallStatus = Summarize(r.Checks)
 }
 
-// JSON returns json.
 func (r Report) JSON() ([]byte, error) {
 	return json.MarshalIndent(r, "", "  ")
 }
 
-// Summarize returns summarize.
 func Summarize(checks []Check) Status {
 	overall := StatusSkip
 	for _, c := range checks {
@@ -78,7 +73,6 @@ func Summarize(checks []Check) Status {
 	return overall
 }
 
-// FormatHuman renders human into the format expected by callers.
 func FormatHuman(r Report, verbose bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Server: %s\n", r.Server)

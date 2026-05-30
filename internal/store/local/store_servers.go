@@ -21,7 +21,6 @@ func normalizeServerForStorage(srv *model.Server) {
 	}
 }
 
-// AddServer writes server changes to the local database.
 func (s *Store) AddServer(ctx context.Context, srv *model.Server) error {
 	normalizeServerForStorage(srv)
 	if err := srv.Validate(); err != nil {
@@ -52,7 +51,6 @@ func (s *Store) AddServer(ctx context.Context, srv *model.Server) error {
 	return nil
 }
 
-// UpdateServer writes server changes to the local database.
 func (s *Store) UpdateServer(ctx context.Context, srv *model.Server) error {
 	normalizeServerForStorage(srv)
 	if err := srv.Validate(); err != nil {
@@ -75,14 +73,12 @@ func (s *Store) UpdateServer(ctx context.Context, srv *model.Server) error {
 	return err
 }
 
-// SetServerLastDeploy writes server last deploy changes to the local database.
 func (s *Store) SetServerLastDeploy(ctx context.Context, serverID int64) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `UPDATE servers SET last_deploy_at=?, updated_at=? WHERE id=?`, now, now, serverID)
 	return err
 }
 
-// GetServerByName reads server by name from the local database.
 func (s *Store) GetServerByName(ctx context.Context, name string) (*model.Server, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
@@ -93,7 +89,6 @@ func (s *Store) GetServerByName(ctx context.Context, name string) (*model.Server
 	return scanServer(row)
 }
 
-// GetServerByID reads server by id from the local database.
 func (s *Store) GetServerByID(ctx context.Context, id int64) (*model.Server, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
@@ -104,7 +99,6 @@ func (s *Store) GetServerByID(ctx context.Context, id int64) (*model.Server, err
 	return scanServer(row)
 }
 
-// ListServers reads servers from the local database.
 func (s *Store) ListServers(ctx context.Context) ([]model.Server, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
@@ -127,7 +121,6 @@ func (s *Store) ListServers(ctx context.Context) ([]model.Server, error) {
 	return out, rows.Err()
 }
 
-// DeleteServerByName writes server by name changes to the local database.
 func (s *Store) DeleteServerByName(ctx context.Context, name string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

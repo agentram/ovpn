@@ -19,7 +19,6 @@ import (
 	"ovpn/internal/xraycfg"
 )
 
-// initOrDeployServer returns init or deploy server.
 func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	event := "deploy"
 	if bootstrap {
@@ -121,7 +120,6 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	return nil
 }
 
-// buildDeployInput builds deploy input from the current inputs and defaults.
 func (a *App) buildDeployInput(
 	srv model.Server,
 	users []model.User,
@@ -150,6 +148,10 @@ func (a *App) buildDeployInput(
 	if strings.TrimSpace(envOr("OVPN_TELEGRAM_OWNER_USER_ID", "")) == "" && ownerUserID != "" {
 		a.log().Info("OVPN_TELEGRAM_OWNER_USER_ID is empty; using first notify chat id as owner fallback", "owner_user_id", ownerUserID)
 	}
+	agentToken, err := a.agentToken()
+	if err != nil {
+		return deploy.Input{}, err
+	}
 	input := deploy.Input{
 		Server:                       srv,
 		Users:                        users,
@@ -164,6 +166,7 @@ func (a *App) buildDeployInput(
 		TelegramBotImage:             envOr("OVPN_TELEGRAM_BOT_IMAGE", defaults.DefaultTelegramBotImage),
 		HAProxyImage:                 envOr("OVPN_HAPROXY_IMAGE", defaults.DefaultHAProxyImage),
 		AgentLogLevel:                a.agentLogLevel(),
+		AgentToken:                   agentToken,
 		AgentHostPort:                a.agentHostPort(),
 		TelegramBotHostPort:          a.telegramBotHostPort(),
 		AgentCertFile:                envOr("OVPN_AGENT_CERT_FILE", "/tmp/ovpn-agent-cert.pem"),
@@ -291,7 +294,6 @@ func (a *App) persistAndSyncPolicies(srv model.Server) error {
 	return a.syncQuotaPolicy(srv)
 }
 
-// persistConfigOnly executes persist config only against remote hosts over SSH.
 func (a *App) persistConfigOnly(srv model.Server) error {
 	// Runtime API changes are ephemeral across Xray restarts unless config.json is updated too.
 	// This path persists the reconciled config without forcing an immediate compose restart.
@@ -326,7 +328,6 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 	return err
 }
 
-// syncQuotaPolicy executes quota policy flow and returns the first error.
 func (a *App) syncQuotaPolicy(srv model.Server) error {
 	if a.dryRun {
 		a.log().Info("dry-run: skipping remote quota policy sync", "server", srv.Name)
@@ -408,7 +409,6 @@ func (a *App) syncUserPolicies(srv model.Server) error {
 	return fmt.Errorf("user policy sync failed after retries: %w", lastErr)
 }
 
-// fetchQuotaStatus returns quota status for callers.
 func (a *App) fetchQuotaStatus(srv model.Server, email string) (model.QuotaStatusResponse, error) {
 	url := a.agentURL("/quota/status")
 	if strings.TrimSpace(email) != "" {
@@ -437,7 +437,6 @@ func (a *App) isUserBlockedByQuota(srv model.Server, email string) (bool, error)
 	return status.Users[0].BlockedByQuota, nil
 }
 
-// usersForRuntimeConfig returns users for runtime config.
 func (a *App) usersForRuntimeConfig(srv model.Server, users []model.User) ([]model.User, error) {
 	// First deploy and dry-run deploys have no safe remote quota_state source.
 	// Use local desired state only, preserving the preview contract for --dry-run.
@@ -484,7 +483,6 @@ func effectiveUserEnabled(u model.User) bool {
 	return model.IsEffectivelyEnabled(u.Enabled, u.ExpiryDate, time.Now().UTC())
 }
 
-// applyRuntimeUser returns apply runtime user.
 func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) error {
 	path := "/runtime/user/remove"
 	if enable {

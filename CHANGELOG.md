@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## Unreleased
+
+### Security
+- `ovpn-agent` mutating endpoints (`/quota/*`, `/users/sync`, `/runtime/user/*`, `/collect`) now require a bearer token when `OVPN_AGENT_TOKEN` is set. The CLI auto-generates and persists a token under `~/.ovpn/secrets/agent-token` and renders it into the remote `.env`, so deploys enable it automatically. Read-only endpoints (`/metrics`, `/health`, stats/status) stay open for Prometheus and health checks.
+- Rendered `xray/config.json` is now delivered as `0640 root:<xray-gid>` (was world-readable `0644`); it embeds the REALITY private key and client UUIDs, so it is now readable only by root and the xray runtime group.
+- Added a `govulncheck` job to the security workflow.
+
+### Changed
+- Deploy bundles extract with `tar --no-same-owner`, so remote files are owned by the deploying account instead of the operator's local UID baked into the archive.
+- Repo-root `docker-compose.yml`/`docker-compose.monitoring.yml` are kept byte-identical to the embedded deploy templates (guarded by a test); the duplicate, drifted `deploy/compose/` tree was removed.
+- Both HTTP servers (`ovpn-agent`, `ovpn-telegram-bot`) now set read/write/idle timeouts.
+
+### Fixed
+- Traffic deltas and their source counter are now persisted in a single transaction, preventing double-counting if a write fails between them.
+
 ## 1.4.5
 
 ### Added

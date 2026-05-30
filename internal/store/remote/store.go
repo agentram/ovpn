@@ -24,7 +24,6 @@ type Store struct {
 	db *sql.DB
 }
 
-// Open initializes open with the required dependencies.
 func Open(ctx context.Context, baseDir string) (*Store, error) {
 	if err := util.EnsureDir(baseDir); err != nil {
 		return nil, err
@@ -43,7 +42,6 @@ func Open(ctx context.Context, baseDir string) (*Store, error) {
 	return s, nil
 }
 
-// Close returns close.
 func (s *Store) Close() error { return s.db.Close() }
 
 // migrate writes migrate to the local database.
@@ -114,10 +112,19 @@ func (s *Store) migrate(ctx context.Context) error {
 	return nil
 }
 
-// UpsertCounter writes counter changes to the local database.
 func (s *Store) UpsertCounter(ctx context.Context, name string, value int64) error {
 	now := util.NowUTC().Format(time.RFC3339)
-	_, err := s.db.ExecContext(ctx, `
+	return upsertCounterTx(ctx, s.db, name, value, now)
+}
+
+// execer is satisfied by both *sql.DB and *sql.Tx so the write helpers can run inside or
+// outside a transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func upsertCounterTx(ctx context.Context, db execer, name string, value int64, now string) error {
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO counter_state (name, value, updated_at)
 		VALUES (?, ?, ?)
 		ON CONFLICT(name)
@@ -126,7 +133,6 @@ func (s *Store) UpsertCounter(ctx context.Context, name string, value int64) err
 	return err
 }
 
-// GetCounter reads counter from the local database.
 func (s *Store) GetCounter(ctx context.Context, name string) (Counter, bool, error) {
 	var c Counter
 	var ts string
@@ -141,39 +147,64 @@ func (s *Store) GetCounter(ctx context.Context, name string) (Counter, bool, err
 	return c, true, nil
 }
 
-// AddDelta writes delta changes to the local database.
 func (s *Store) AddDelta(ctx context.Context, email string, upDelta, downDelta int64, ts time.Time) error {
-	hour := ts.UTC().Truncate(time.Hour)
-	day := time.Date(ts.UTC().Year(), ts.UTC().Month(), ts.UTC().Day(), 0, 0, 0, 0, time.UTC)
-	now := util.NowUTC().Format(time.RFC3339)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	_, err = tx.ExecContext(ctx, `
+	if err := addDeltaTx(ctx, tx, email, upDelta, downDelta, ts); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// AddDeltaAndAdvanceCounter persists a usage delta and advances the source counter in a single
+// transaction. Doing both atomically prevents double-counting: if the counter were advanced in a
+// separate write that failed (or the process crashed in between), the next collection would
+// recompute the same delta against the stale counter value and add it twice.
+func (s *Store) AddDeltaAndAdvanceCounter(ctx context.Context, email string, upDelta, downDelta int64, ts time.Time, counterName string, counterValue int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if upDelta > 0 || downDelta > 0 {
+		if err := addDeltaTx(ctx, tx, email, upDelta, downDelta, ts); err != nil {
+			return err
+		}
+	}
+	if err := upsertCounterTx(ctx, tx, counterName, counterValue, util.NowUTC().Format(time.RFC3339)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func addDeltaTx(ctx context.Context, tx execer, email string, upDelta, downDelta int64, ts time.Time) error {
+	hour := ts.UTC().Truncate(time.Hour)
+	day := time.Date(ts.UTC().Year(), ts.UTC().Month(), ts.UTC().Day(), 0, 0, 0, 0, time.UTC)
+	now := util.NowUTC().Format(time.RFC3339)
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO user_traffic_hourly (email, window_start, uplink_bytes, downlink_bytes)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(email, window_start)
 		DO UPDATE SET
 			uplink_bytes=user_traffic_hourly.uplink_bytes + excluded.uplink_bytes,
 			downlink_bytes=user_traffic_hourly.downlink_bytes + excluded.downlink_bytes
-	`, email, hour.Format(time.RFC3339), upDelta, downDelta)
-	if err != nil {
+	`, email, hour.Format(time.RFC3339), upDelta, downDelta); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO user_traffic_daily (email, window_start, uplink_bytes, downlink_bytes)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(email, window_start)
 		DO UPDATE SET
 			uplink_bytes=user_traffic_daily.uplink_bytes + excluded.uplink_bytes,
 			downlink_bytes=user_traffic_daily.downlink_bytes + excluded.downlink_bytes
-	`, email, day.Format(time.RFC3339), upDelta, downDelta)
-	if err != nil {
+	`, email, day.Format(time.RFC3339), upDelta, downDelta); err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO user_traffic_total (email, uplink_bytes, downlink_bytes, updated_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(email)
@@ -182,13 +213,9 @@ func (s *Store) AddDelta(ctx context.Context, email string, upDelta, downDelta i
 			downlink_bytes=user_traffic_total.downlink_bytes + excluded.downlink_bytes,
 			updated_at=excluded.updated_at
 	`, email, upDelta, downDelta, now)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
-// SetMeta writes meta changes to the local database.
 func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
@@ -200,7 +227,6 @@ func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 	return err
 }
 
-// GetMeta reads meta from the local database.
 func (s *Store) GetMeta(ctx context.Context, key string) (string, bool, error) {
 	var v string
 	err := s.db.QueryRowContext(ctx, `SELECT v FROM collector_meta WHERE k=?`, key).Scan(&v)
@@ -213,7 +239,6 @@ func (s *Store) GetMeta(ctx context.Context, key string) (string, bool, error) {
 	return v, true, nil
 }
 
-// ListTotals reads totals from the local database.
 func (s *Store) ListTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT email, uplink_bytes, downlink_bytes FROM user_traffic_total ORDER BY email`)
 	if err != nil {
@@ -233,7 +258,6 @@ func (s *Store) ListTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	return out, rows.Err()
 }
 
-// ListDaily reads daily from the local database.
 func (s *Store) ListDaily(ctx context.Context, day time.Time) ([]model.UserTraffic, error) {
 	dayStart := time.Date(day.UTC().Year(), day.UTC().Month(), day.UTC().Day(), 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	rows, err := s.db.QueryContext(ctx, `

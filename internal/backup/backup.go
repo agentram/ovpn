@@ -33,7 +33,6 @@ type Manifest struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-// BuildManifest builds manifest from the current inputs and defaults.
 func BuildManifest(serverName, backupType, archivePath, sha256, remotePath, createdBy string, now time.Time) Manifest {
 	return Manifest{
 		Version:    1,
@@ -47,7 +46,6 @@ func BuildManifest(serverName, backupType, archivePath, sha256, remotePath, crea
 	}
 }
 
-// JSON returns json.
 func (m Manifest) JSON() ([]byte, error) {
 	return json.MarshalIndent(m, "", "  ")
 }
@@ -98,7 +96,6 @@ func LocalRestore(dataDir, archive string) error {
 	return nil
 }
 
-// RemoteBackup executes remote backup against remote hosts over SSH.
 func RemoteBackup(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, server model.Server) (remotePath string, err error) {
 	ts := time.Now().UTC().Format("20060102T150405")
 	remotePath = fmt.Sprintf("%s/%s-%s.tgz", deploy.RemoteBackupDir, server.Name, ts)
@@ -110,7 +107,6 @@ func RemoteBackup(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, serve
 	return remotePath, err
 }
 
-// buildRemoteBackupScript builds remote backup script from the current inputs and defaults.
 func buildRemoteBackupScript(remotePath string, serverName string) string {
 	return fmt.Sprintf(`set -e
 sudo mkdir -p %[1]s
@@ -131,7 +127,6 @@ fi
 `, deploy.RemoteBackupDir, deploy.RemoteDir, remotePath, serverName, defaultRemoteBackupRetention)
 }
 
-// RemoteRestore executes remote restore against remote hosts over SSH.
 func RemoteRestore(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, archiveRemotePath string) error {
 	cmd := buildRemoteRestoreScript(archiveRemotePath)
 	_, err := runner.Exec(ctx, cfg, cmd)
@@ -141,7 +136,6 @@ func RemoteRestore(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, arch
 	return nil
 }
 
-// buildRemoteRestoreScript builds remote restore script from the current inputs and defaults.
 func buildRemoteRestoreScript(archiveRemotePath string) string {
 	return fmt.Sprintf(`set -e
 TMP=$(mktemp -d)

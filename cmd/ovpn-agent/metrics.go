@@ -47,7 +47,6 @@ type agentMetrics struct {
 	certChecksTotal             *prometheus.CounterVec
 }
 
-// newAgentMetrics initializes agent metrics with the required dependencies.
 func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 	// Keep labels low-cardinality and operationally bounded.
 	// Per-user traffic stays in SQLite/HTTP endpoints, not in Prometheus labels.
@@ -216,12 +215,10 @@ func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 	return m
 }
 
-// OnCollectStart returns on collect start.
 func (m *agentMetrics) OnCollectStart() {
 	m.collectorLastRunUnix.Set(float64(time.Now().UTC().Unix()))
 }
 
-// OnCollectFinish returns on collect finish.
 func (m *agentMetrics) OnCollectFinish(duration time.Duration, users int, err error) {
 	m.collectorDurationSeconds.Observe(duration.Seconds())
 	m.collectorUsersSeen.Set(float64(users))
@@ -233,12 +230,10 @@ func (m *agentMetrics) OnCollectFinish(duration time.Duration, users int, err er
 	m.collectorLastSuccessUnix.Set(float64(time.Now().UTC().Unix()))
 }
 
-// OnCounterReset returns on counter reset.
 func (m *agentMetrics) OnCounterReset() {
 	m.collectorCounterResetsTotal.Inc()
 }
 
-// OnUsersActive returns on users active.
 func (m *agentMetrics) OnUsersActive(count int) {
 	if count < 0 {
 		count = 0
@@ -246,12 +241,10 @@ func (m *agentMetrics) OnUsersActive(count int) {
 	m.usersActive.Set(float64(count))
 }
 
-// OnUserSpike returns on user spike.
 func (m *agentMetrics) OnUserSpike(_ int64) {
 	m.userSpikeEventsTotal.Inc()
 }
 
-// OnDBWriteError returns on db write error.
 func (m *agentMetrics) OnDBWriteError(operation string) {
 	if strings.TrimSpace(operation) == "" {
 		operation = "unknown"
@@ -259,7 +252,6 @@ func (m *agentMetrics) OnDBWriteError(operation string) {
 	m.dbWriteErrorsTotal.WithLabelValues(operation).Inc()
 }
 
-// OnXrayAPIReachable returns on xray api reachable.
 func (m *agentMetrics) OnXrayAPIReachable(reachable bool) {
 	if reachable {
 		m.xrayAPIReachable.Set(1)
@@ -268,7 +260,6 @@ func (m *agentMetrics) OnXrayAPIReachable(reachable bool) {
 	m.xrayAPIReachable.Set(0)
 }
 
-// observeRuntime returns observe runtime.
 func (m *agentMetrics) observeRuntime(operation, result string) {
 	if strings.TrimSpace(operation) == "" {
 		operation = "unknown"
@@ -279,7 +270,6 @@ func (m *agentMetrics) observeRuntime(operation, result string) {
 	m.runtimeOperationsTotal.WithLabelValues(operation, result).Inc()
 }
 
-// observeQuotaEvent returns observe quota event.
 func (m *agentMetrics) observeQuotaEvent(action, result string) {
 	if strings.TrimSpace(action) == "" {
 		action = "unknown"
@@ -290,12 +280,10 @@ func (m *agentMetrics) observeQuotaEvent(action, result string) {
 	m.quotaEventsTotal.WithLabelValues(action, result).Inc()
 }
 
-// setQuotaBlockedUsers applies quota blocked users and returns an error on failure.
 func (m *agentMetrics) setQuotaBlockedUsers(blocked int) {
 	m.quotaBlockedUsers.Set(float64(blocked))
 }
 
-// setQuotaUsageBands applies quota usage bands and returns an error on failure.
 func (m *agentMetrics) setQuotaUsageBands(over80 int, over95 int) {
 	if over80 < 0 {
 		over80 = 0
@@ -307,7 +295,6 @@ func (m *agentMetrics) setQuotaUsageBands(over80 int, over95 int) {
 	m.quotaUsersOver95.Set(float64(over95))
 }
 
-// setUserTrafficTotals applies user traffic totals and returns an error on failure.
 func (m *agentMetrics) setUserTrafficTotals(rows []model.UserTraffic) {
 	m.userTrafficTotalBytes.Reset()
 	for _, row := range rows {
@@ -324,7 +311,6 @@ func (m *agentMetrics) setUserTrafficTotals(rows []model.UserTraffic) {
 	}
 }
 
-// setUserQuotaStatus applies user quota status and returns an error on failure.
 func (m *agentMetrics) setUserQuotaStatus(status model.QuotaStatusResponse) {
 	m.userWindow30DUsageBytes.Reset()
 	m.userWindow30DQuotaBytes.Reset()
@@ -396,7 +382,6 @@ func (m *agentMetrics) setUserExpiryStatus(status model.UserStatusResponse) {
 	}
 }
 
-// observeCertExpiry returns observe cert expiry.
 func (m *agentMetrics) observeCertExpiry(certFile string, logger *slog.Logger) {
 	certFile = strings.TrimSpace(certFile)
 	if certFile == "" {

@@ -11,7 +11,6 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// newServerCleanupCmd initializes server cleanup cmd with the required dependencies.
 func (a *App) newServerCleanupCmd() *cobra.Command {
 	var cleanup struct {
 		keepBackups       bool

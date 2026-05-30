@@ -35,7 +35,6 @@ type Result struct {
 	Stderr string
 }
 
-// Exec executes exec against remote hosts over SSH.
 func (r *Runner) Exec(ctx context.Context, cfg Config, remoteCmd string) (Result, error) {
 	args := sshArgs(cfg)
 	args = append(args, target(cfg), remoteCmd)
@@ -67,7 +66,6 @@ func (r *Runner) Exec(ctx context.Context, cfg Config, remoteCmd string) (Result
 	return res, nil
 }
 
-// CopyFile combines input values to produce file.
 func (r *Runner) CopyFile(ctx context.Context, cfg Config, localPath, remotePath string) error {
 	args := scpArgs(cfg)
 	args = append(args, localPath, fmt.Sprintf("%s:%s", target(cfg), remotePath))
@@ -98,7 +96,6 @@ func (r *Runner) CopyFile(ctx context.Context, cfg Config, localPath, remotePath
 	return nil
 }
 
-// ExecStream executes exec stream against remote hosts over SSH.
 func (r *Runner) ExecStream(ctx context.Context, cfg Config, remoteCmd string, stdout, stderr io.Writer) error {
 	args := sshArgs(cfg)
 	args = append(args, target(cfg), remoteCmd)
@@ -125,7 +122,6 @@ func (r *Runner) ExecStream(ctx context.Context, cfg Config, remoteCmd string, s
 	return nil
 }
 
-// baseArgs returns base args.
 func baseArgs(cfg Config, portFlag string) []string {
 	port := cfg.Port
 	if port == 0 {
@@ -152,18 +148,15 @@ func baseArgs(cfg Config, portFlag string) []string {
 	return args
 }
 
-// sshArgs returns ssh args.
 func sshArgs(cfg Config) []string {
 	return baseArgs(cfg, "-p")
 }
 
-// scpArgs returns scp args.
 func scpArgs(cfg Config) []string {
 	// scp uses uppercase -P for port; lowercase -p means "preserve file attributes".
 	return baseArgs(cfg, "-P")
 }
 
-// target returns target.
 func target(cfg Config) string {
 	if cfg.User == "" {
 		return cfg.Host
@@ -171,7 +164,6 @@ func target(cfg Config) string {
 	return fmt.Sprintf("%s@%s", cfg.User, cfg.Host)
 }
 
-// TimeoutCtx returns timeout ctx.
 func TimeoutCtx(parent context.Context, d time.Duration) (context.Context, context.CancelFunc) {
 	if d <= 0 {
 		d = 30 * time.Second
@@ -179,7 +171,6 @@ func TimeoutCtx(parent context.Context, d time.Duration) (context.Context, conte
 	return context.WithTimeout(parent, d)
 }
 
-// logger returns logger.
 func (r *Runner) logger() *slog.Logger {
 	if r != nil && r.Logger != nil {
 		return r.Logger
@@ -187,7 +178,6 @@ func (r *Runner) logger() *slog.Logger {
 	return slog.Default()
 }
 
-// trimForError normalizes for error and applies fallback defaults.
 func trimForError(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) <= 400 {
@@ -202,7 +192,6 @@ func trimForError(v string) string {
 	return v[:head] + "...(truncated)..." + v[len(v)-tail:]
 }
 
-// sanitizeRemoteCmd builds the Cobra command for sanitize remote.
 func sanitizeRemoteCmd(cmd string) string {
 	trimmed := strings.TrimSpace(cmd)
 	// Redact heredoc payload commands because they often embed full config JSON.

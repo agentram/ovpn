@@ -11,7 +11,6 @@ import (
 	"ovpn/internal/ssh"
 )
 
-// checkSSH returns check ssh.
 func (a *App) checkSSH(runner *ssh.Runner, cfg ssh.Config) (doctor.Check, bool) {
 	cmd := strings.Join([]string{
 		"set -u",
@@ -47,7 +46,6 @@ func (a *App) checkSSH(runner *ssh.Runner, cfg ssh.Config) (doctor.Check, bool) 
 	}, true
 }
 
-// checkSudo returns check sudo.
 func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
@@ -101,7 +99,6 @@ func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	return check
 }
 
-// checkDocker returns check docker.
 func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
@@ -150,7 +147,6 @@ func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	return check
 }
 
-// checkDeployFiles returns check deploy files.
 func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	paths := []string{
 		deploy.RemoteDir,
@@ -213,7 +209,6 @@ func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	return check
 }
 
-// checkProxyServiceRuntimeIdentity returns check proxy service runtime identity.
 func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -e",
@@ -252,7 +247,6 @@ func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Confi
 	return check
 }
 
-// checkComposeState returns check compose state.
 func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	validateCmd := withRemoteTimeout(10, fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml config -q", shellQuote(deploy.RemoteDir)))
 	if _, err := a.execRemote(runner, cfg, 25*time.Second, validateCmd); err != nil {
@@ -335,7 +329,6 @@ func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config, srv model.Se
 	}
 }
 
-// checkXrayConfig returns check xray config.
 func (a *App) checkXrayConfig(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := strings.Join([]string{
 		"set -e",

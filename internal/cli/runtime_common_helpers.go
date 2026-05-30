@@ -16,7 +16,6 @@ import (
 	"ovpn/internal/util"
 )
 
-// sshFromServer returns ssh from server.
 func sshFromServer(srv model.Server) ssh.Config {
 	return ssh.Config{
 		User:            srv.SSHUser,
@@ -44,7 +43,6 @@ func generateX25519Pair() (string, string, error) {
 	return base64.RawURLEncoding.EncodeToString(priv), base64.RawURLEncoding.EncodeToString(pub[:]), nil
 }
 
-// randomShortID returns random short id.
 func randomShortID() string {
 	b := make([]byte, 8)
 	if _, err := io.ReadFull(cryptorand.Reader, b); err != nil {
@@ -53,7 +51,6 @@ func randomShortID() string {
 	return fmt.Sprintf("%x", b)
 }
 
-// firstShortID normalizes short id and applies fallback defaults.
 func firstShortID(csv string) string {
 	items := util.ParseCSV(csv)
 	if len(items) == 0 {
@@ -62,7 +59,6 @@ func firstShortID(csv string) string {
 	return items[0]
 }
 
-// firstNonEmpty normalizes non empty and applies fallback defaults.
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if trimmed := strings.TrimSpace(v); trimmed != "" {
@@ -72,7 +68,6 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// normalizeXrayVersionTag normalizes xray version tag and applies fallback defaults.
 func normalizeXrayVersionTag(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) > 1 && strings.HasPrefix(v, "v") {
@@ -84,7 +79,6 @@ func normalizeXrayVersionTag(v string) string {
 	return v
 }
 
-// newRunner initializes runner with the required dependencies.
 func (a *App) newRunner(operation string) *ssh.Runner {
 	log := a.log()
 	if log != nil {
@@ -96,7 +90,6 @@ func (a *App) newRunner(operation string) *ssh.Runner {
 	}
 }
 
-// log returns log.
 func (a *App) log() *slog.Logger {
 	if a != nil && a.logger != nil {
 		return a.logger
@@ -104,7 +97,6 @@ func (a *App) log() *slog.Logger {
 	return slog.Default()
 }
 
-// xrayLogLevel returns xray log level.
 func (a *App) xrayLogLevel() string {
 	// Keep production noise low by default; elevate to info only for explicit debug sessions.
 	if a.debug || a.verbose || strings.EqualFold(a.logLevel, "debug") {
@@ -113,7 +105,6 @@ func (a *App) xrayLogLevel() string {
 	return "warning"
 }
 
-// agentLogLevel returns agent log level.
 func (a *App) agentLogLevel() string {
 	if a.debug || a.verbose || strings.EqualFold(a.logLevel, "debug") {
 		return "debug"
@@ -121,7 +112,6 @@ func (a *App) agentLogLevel() string {
 	return "info"
 }
 
-// validateComposeService executes compose service flow and returns the first error.
 func validateComposeService(svc string) (string, error) {
 	if strings.TrimSpace(svc) == "" {
 		return "", nil
@@ -134,7 +124,6 @@ func validateComposeService(svc string) (string, error) {
 	}
 }
 
-// emptyAsAll returns empty as all.
 func emptyAsAll(v string) string {
 	if strings.TrimSpace(v) == "" {
 		return "all"

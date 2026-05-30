@@ -10,7 +10,6 @@ import (
 	"ovpn/internal/model"
 )
 
-// cleanupRemoveBackupsEffective returns cleanup remove backups effective.
 func cleanupRemoveBackupsEffective(keepBackups, removeBackups bool) bool {
 	if removeBackups {
 		return true
@@ -18,7 +17,6 @@ func cleanupRemoveBackupsEffective(keepBackups, removeBackups bool) bool {
 	return !keepBackups
 }
 
-// validateCleanupConfirm executes cleanup confirm flow and returns the first error.
 func validateCleanupConfirm(confirm string, dryRun bool) error {
 	confirm = strings.TrimSpace(confirm)
 	if confirm == "CLEANUP" {
@@ -31,7 +29,6 @@ func validateCleanupConfirm(confirm string, dryRun bool) error {
 	return errors.New("refusing destructive cleanup without explicit confirmation; pass --confirm CLEANUP")
 }
 
-// latestServerBackupRecord returns latest server backup record.
 func (a *App) latestServerBackupRecord(serverID int64) (*model.BackupRecord, error) {
 	records, err := a.store.ListBackupRecords(a.ctx, serverID)
 	if err != nil {
@@ -54,7 +51,6 @@ func (a *App) latestServerBackupRecord(serverID int64) (*model.BackupRecord, err
 	return latest, nil
 }
 
-// ensureRecentBackupForCleanup executes recent backup for cleanup flow and returns the first error.
 func (a *App) ensureRecentBackupForCleanup(srv model.Server, maxAge time.Duration) (*model.BackupRecord, time.Duration, error) {
 	latest, err := a.latestServerBackupRecord(srv.ID)
 	if err != nil {
@@ -70,7 +66,6 @@ func (a *App) ensureRecentBackupForCleanup(srv model.Server, maxAge time.Duratio
 	return latest, age, nil
 }
 
-// roundDuration returns round duration.
 func roundDuration(d time.Duration) time.Duration {
 	if d < 0 {
 		d = 0
@@ -89,7 +84,6 @@ type quotaSummaryOut struct {
 	BlockedByQuota     bool    `json:"blocked_by_quota"`
 }
 
-// quotaSummary returns quota summary.
 func quotaSummary(status model.QuotaUserStatus) quotaSummaryOut {
 	remaining := status.Window30DQuotaByte - status.Window30DUsageByte
 	if remaining < 0 {
@@ -104,7 +98,6 @@ func quotaSummary(status model.QuotaUserStatus) quotaSummaryOut {
 	}
 }
 
-// quotaPercent returns quota percent.
 func quotaPercent(usage int64, quota int64) float64 {
 	if usage <= 0 || quota <= 0 {
 		return 0
@@ -127,7 +120,6 @@ type userTopRow struct {
 	BlockedByQuota bool
 }
 
-// buildUserTopRows builds user top rows from the current inputs and defaults.
 func buildUserTopRows(totals []model.UserTraffic, users []model.User, quotaByEmail map[string]model.QuotaUserStatus, limit int) []userTopRow {
 	usernames := make(map[string]string, len(users))
 	for _, u := range users {

@@ -14,7 +14,6 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// loadConfig returns load config.
 func loadConfig() (config, error) {
 	cfg := config{}
 	ownerUserIDRaw := envOr("OVPN_TELEGRAM_OWNER_USER_ID", "")
@@ -67,7 +66,6 @@ func loadConfig() (config, error) {
 	return cfg, nil
 }
 
-// readSecretFile returns secret file for callers.
 func readSecretFile(path string) (string, error) {
 	cleanPath := strings.TrimSpace(path)
 	if cleanPath == "" {
@@ -102,7 +100,6 @@ func readOptionalSecretFile(path string) (string, error) {
 	return strings.TrimSpace(string(b)), nil
 }
 
-// envOr normalizes env or and applies fallback defaults.
 func envOr(key, fallback string) string {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
@@ -111,7 +108,6 @@ func envOr(key, fallback string) string {
 	return v
 }
 
-// parseOwnerUserID parses owner user id and returns normalized values.
 func parseOwnerUserID(raw string) (int64, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -197,7 +193,6 @@ func (c *config) loadLinkConfig() error {
 	return nil
 }
 
-// parseTelegramAPIFallbackIPs parses telegram api fallback ips and returns normalized values.
 func parseTelegramAPIFallbackIPs(raw string) ([]string, error) {
 	parts := strings.Split(strings.TrimSpace(raw), ",")
 	out := make([]string, 0, len(parts))
@@ -219,7 +214,6 @@ func parseTelegramAPIFallbackIPs(raw string) ([]string, error) {
 	return out, nil
 }
 
-// defaultText normalizes text and applies fallback defaults.
 func defaultText(v, fallback string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {

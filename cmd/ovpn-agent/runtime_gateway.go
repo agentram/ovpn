@@ -26,7 +26,6 @@ type runtimeGateway struct {
 	observer *agentMetrics
 }
 
-// AddUser applies user and returns an error on failure.
 func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid string) error {
 	if strings.TrimSpace(inboundTag) == "" {
 		inboundTag = "vless-reality"
@@ -46,7 +45,6 @@ func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid st
 	return nil
 }
 
-// RemoveUser applies user and returns an error on failure.
 func (g *runtimeGateway) RemoveUser(ctx context.Context, inboundTag, email string) error {
 	if strings.TrimSpace(inboundTag) == "" {
 		inboundTag = "vless-reality"
