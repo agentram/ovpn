@@ -317,7 +317,7 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 		return err
 	}
 	tmpFile := filepath.Join(os.TempDir(), "ovpn-config-persist.json")
-	if err := os.WriteFile(tmpFile, jsonRaw, 0o644); err != nil {
+	if err := os.WriteFile(tmpFile, jsonRaw, 0o600); err != nil {
 		return err
 	}
 	defer os.Remove(tmpFile)
@@ -327,7 +327,13 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 	if err := runner.CopyFile(a.ctx, cfg, tmpFile, "/tmp/ovpn-config.json"); err != nil {
 		return err
 	}
-	_, err = runner.Exec(a.ctx, cfg, "set -e; mkdir -p /opt/ovpn/xray; mv /tmp/ovpn-config.json /opt/ovpn/xray/config.json")
+	// Re-apply the same ownership/permissions a deploy installs, otherwise persisting config from a
+	// user add/remove would leave config.json world-readable and leak the REALITY key and UUIDs.
+	remoteCmd := fmt.Sprintf(
+		"set -e; mkdir -p %[1]s/xray; mv /tmp/ovpn-config.json %[1]s/xray/config.json; sudo chown 0:%[2]d %[1]s/xray/config.json; sudo chmod 640 %[1]s/xray/config.json",
+		deploy.RemoteDir, deploy.XrayRuntimeGID,
+	)
+	_, err = runner.Exec(a.ctx, cfg, remoteCmd)
 	return err
 }
 

@@ -533,8 +533,8 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "rm -f /opt/ovpn/agent/ovpn-agent /opt/ovpn/monitoring/telegram-bot/ovpn-telegram-bot") {
 		t.Fatalf("fourth command should unlink agent+telegram bot binaries before copy, got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[3], "cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
-		t.Fatalf("fourth command should apply validated staged bundle, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[3], "sudo cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
+		t.Fatalf("fourth command should apply validated staged bundle under sudo (to read root-owned config.json), got %q", r.execCmds[3])
 	}
 	if !strings.Contains(r.execCmds[3], "chmod 600 /opt/ovpn/.env") {
 		t.Fatalf("fourth command should lock down .env after copy, got %q", r.execCmds[3])
@@ -579,7 +579,7 @@ func TestBuildDeployBackupCommandIncludesRetentionPrune(t *testing.T) {
 
 	cmd := buildDeployBackupCommand("20260412T010203")
 	for _, want := range []string{
-		"cp -a /opt/ovpn /opt/ovpn-backups/ovpn-20260412T010203",
+		"sudo cp -a /opt/ovpn /opt/ovpn-backups/ovpn-20260412T010203",
 		"find /opt/ovpn-backups -mindepth 1 -maxdepth 1 -name 'ovpn-*'",
 		"NR>7",
 		"xargs -r sudo rm -rf",
