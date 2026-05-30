@@ -16,7 +16,7 @@ import (
 	"ovpn/internal/util"
 )
 
-// sshFromServer returns ssh from server.
+// sshFromServer derives an ssh.Config from a server record.
 func sshFromServer(srv model.Server) ssh.Config {
 	return ssh.Config{
 		User:            srv.SSHUser,
@@ -44,7 +44,7 @@ func generateX25519Pair() (string, string, error) {
 	return base64.RawURLEncoding.EncodeToString(priv), base64.RawURLEncoding.EncodeToString(pub[:]), nil
 }
 
-// randomShortID returns random short id.
+// randomShortID generates a random REALITY shortId hex string.
 func randomShortID() string {
 	b := make([]byte, 8)
 	if _, err := io.ReadFull(cryptorand.Reader, b); err != nil {
@@ -53,7 +53,7 @@ func randomShortID() string {
 	return fmt.Sprintf("%x", b)
 }
 
-// firstShortID normalizes short id and applies fallback defaults.
+// firstShortID returns the first shortId from a comma-separated list.
 func firstShortID(csv string) string {
 	items := util.ParseCSV(csv)
 	if len(items) == 0 {
@@ -62,7 +62,7 @@ func firstShortID(csv string) string {
 	return items[0]
 }
 
-// firstNonEmpty normalizes non empty and applies fallback defaults.
+// firstNonEmpty returns the first non-empty, trimmed value.
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if trimmed := strings.TrimSpace(v); trimmed != "" {
@@ -72,7 +72,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// normalizeXrayVersionTag normalizes xray version tag and applies fallback defaults.
+// normalizeXrayVersionTag strips a leading 'v' so the image tag matches the xray-core release naming.
 func normalizeXrayVersionTag(v string) string {
 	v = strings.TrimSpace(v)
 	if len(v) > 1 && strings.HasPrefix(v, "v") {
@@ -84,7 +84,7 @@ func normalizeXrayVersionTag(v string) string {
 	return v
 }
 
-// newRunner initializes runner with the required dependencies.
+// newRunner builds an SSH runner tagged with operation and honoring the App's dry-run setting.
 func (a *App) newRunner(operation string) *ssh.Runner {
 	log := a.log()
 	if log != nil {
@@ -96,7 +96,7 @@ func (a *App) newRunner(operation string) *ssh.Runner {
 	}
 }
 
-// log returns log.
+// log returns the App logger, falling back to the default logger.
 func (a *App) log() *slog.Logger {
 	if a != nil && a.logger != nil {
 		return a.logger
@@ -104,7 +104,7 @@ func (a *App) log() *slog.Logger {
 	return slog.Default()
 }
 
-// xrayLogLevel returns xray log level.
+// xrayLogLevel returns the configured Xray log level, defaulting to a safe value.
 func (a *App) xrayLogLevel() string {
 	// Keep production noise low by default; elevate to info only for explicit debug sessions.
 	if a.debug || a.verbose || strings.EqualFold(a.logLevel, "debug") {
@@ -113,7 +113,7 @@ func (a *App) xrayLogLevel() string {
 	return "warning"
 }
 
-// agentLogLevel returns agent log level.
+// agentLogLevel returns the configured ovpn-agent log level, defaulting to info.
 func (a *App) agentLogLevel() string {
 	if a.debug || a.verbose || strings.EqualFold(a.logLevel, "debug") {
 		return "debug"
@@ -121,7 +121,7 @@ func (a *App) agentLogLevel() string {
 	return "info"
 }
 
-// validateComposeService executes compose service flow and returns the first error.
+// validateComposeService normalizes and validates a restartable compose service name.
 func validateComposeService(svc string) (string, error) {
 	if strings.TrimSpace(svc) == "" {
 		return "", nil
@@ -134,7 +134,7 @@ func validateComposeService(svc string) (string, error) {
 	}
 }
 
-// emptyAsAll returns empty as all.
+// emptyAsAll returns "all" when v is empty, for display of unscoped operations.
 func emptyAsAll(v string) string {
 	if strings.TrimSpace(v) == "" {
 		return "all"

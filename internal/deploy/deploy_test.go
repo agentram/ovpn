@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -13,6 +14,31 @@ import (
 	"ovpn/internal/ssh"
 	"ovpn/internal/xraycfg"
 )
+
+// TestRootComposeMirrorsEmbeddedTemplates guards against the duplicate-template drift that used to
+// exist between the repo-root compose files (validated in CI) and the templates actually shipped to
+// hosts. They must stay byte-identical so `docker compose config` validates what really deploys.
+func TestRootComposeMirrorsEmbeddedTemplates(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"../../docker-compose.yml":            "templates/docker-compose.yml.tmpl",
+		"../../docker-compose.monitoring.yml": "templates/docker-compose.monitoring.yml.tmpl",
+	}
+	for rootPath, assetName := range cases {
+		want, err := AssetFS.ReadFile(assetName)
+		if err != nil {
+			t.Fatalf("read embedded template %s: %v", assetName, err)
+		}
+		got, err := os.ReadFile(rootPath)
+		if err != nil {
+			t.Fatalf("read root compose %s: %v", rootPath, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("%s drifted from %s; keep them byte-identical so CI validates the shipped file", rootPath, assetName)
+		}
+	}
+}
 
 type fakeRunner struct {
 	execCmds []string
@@ -127,8 +153,8 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat config: %v", err)
 	}
-	if got := cfgInfo.Mode().Perm(); got != 0o644 {
-		t.Fatalf("config mode = %o, want 644", got)
+	if got := cfgInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("config mode = %o, want 600", got)
 	}
 	gotEnv, err := os.ReadFile(filepath.Join(bundle.Dir, ".env"))
 	if err != nil {
@@ -507,14 +533,17 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "rm -f /opt/ovpn/agent/ovpn-agent /opt/ovpn/monitoring/telegram-bot/ovpn-telegram-bot") {
 		t.Fatalf("fourth command should unlink agent+telegram bot binaries before copy, got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[3], "cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
-		t.Fatalf("fourth command should apply validated staged bundle, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[3], "sudo cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
+		t.Fatalf("fourth command should apply validated staged bundle under sudo (to read root-owned config.json), got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo chown root:root /opt/ovpn/.env") || !strings.Contains(r.execCmds[3], "sudo chmod 600 /opt/ovpn/.env") {
+	if !strings.Contains(r.execCmds[3], "chmod 600 /opt/ovpn/.env") {
 		t.Fatalf("fourth command should lock down .env after copy, got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo chown root:root /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 644 /opt/ovpn/xray/config.json") {
-		t.Fatalf("fourth command should keep xray config portable across container runtime users, got %q", r.execCmds[3])
+	if strings.Contains(r.execCmds[3], "chown root:root /opt/ovpn/.env") {
+		t.Fatalf("fourth command must not force .env to root ownership (breaks non-root deployers), got %q", r.execCmds[3])
+	}
+	if !strings.Contains(r.execCmds[3], "sudo chown 0:65532 /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 640 /opt/ovpn/xray/config.json") {
+		t.Fatalf("fourth command should lock down xray config to the xray runtime group, got %q", r.execCmds[3])
 	}
 	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[4], "up -d --force-recreate --remove-orphans") {
 		t.Fatalf("expected compose up command, got %q", r.execCmds[4])
@@ -550,7 +579,7 @@ func TestBuildDeployBackupCommandIncludesRetentionPrune(t *testing.T) {
 
 	cmd := buildDeployBackupCommand("20260412T010203")
 	for _, want := range []string{
-		"cp -a /opt/ovpn /opt/ovpn-backups/ovpn-20260412T010203",
+		"sudo cp -a /opt/ovpn /opt/ovpn-backups/ovpn-20260412T010203",
 		"find /opt/ovpn-backups -mindepth 1 -maxdepth 1 -name 'ovpn-*'",
 		"NR>7",
 		"xargs -r sudo rm -rf",
@@ -610,17 +639,20 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	if len(r.copyOps) != 1 {
 		t.Fatalf("expected one scp call, got %d", len(r.copyOps))
 	}
-	if len(r.execCmds) != 1 || !strings.Contains(r.execCmds[0], "tar -xzf") {
+	if len(r.execCmds) != 1 || !strings.Contains(r.execCmds[0], "tar --no-same-owner -xzf") {
 		t.Fatalf("expected extract command, got %#v", r.execCmds)
 	}
 	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
 		t.Fatalf("expected extract command to use bounded remote timeout, got %#v", r.execCmds)
 	}
-	if !strings.Contains(r.execCmds[0], "sudo chown root:root /opt/ovpn/.incoming/.env") || !strings.Contains(r.execCmds[0], "sudo chmod 600 /opt/ovpn/.incoming/.env") {
+	if !strings.Contains(r.execCmds[0], "chmod 600 /opt/ovpn/.incoming/.env") {
 		t.Fatalf("extract command should lock down staged .env before validation, got %#v", r.execCmds)
 	}
-	if !strings.Contains(r.execCmds[0], "sudo chown root:root /opt/ovpn/.incoming/xray/config.json") || !strings.Contains(r.execCmds[0], "sudo chmod 644 /opt/ovpn/.incoming/xray/config.json") {
-		t.Fatalf("extract command should keep staged xray config portable across container runtime users before validation, got %#v", r.execCmds)
+	if strings.Contains(r.execCmds[0], "chown root:root /opt/ovpn/.incoming/.env") {
+		t.Fatalf("extract command must not force staged .env to root ownership (breaks non-root deployers), got %#v", r.execCmds)
+	}
+	if !strings.Contains(r.execCmds[0], "sudo chown 0:65532 /opt/ovpn/.incoming/xray/config.json") || !strings.Contains(r.execCmds[0], "sudo chmod 640 /opt/ovpn/.incoming/xray/config.json") {
+		t.Fatalf("extract command should lock down staged xray config to the xray runtime group before validation, got %#v", r.execCmds)
 	}
 }
 

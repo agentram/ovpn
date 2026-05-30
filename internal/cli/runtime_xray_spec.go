@@ -12,7 +12,7 @@ import (
 	"ovpn/internal/xraycfg"
 )
 
-// buildXraySpec builds xray spec from the current inputs and defaults.
+// buildXraySpec assembles the xraycfg.Spec for a server from its record, users, and environment overrides.
 func (a *App) buildXraySpec(srv model.Server, users []model.User) (xraycfg.Spec, error) {
 	fallbackUpload, fallbackDownload, err := a.realityFallbackRateLimits()
 	if err != nil {
@@ -64,7 +64,7 @@ func (a *App) buildXraySpec(srv model.Server, users []model.User) (xraycfg.Spec,
 	return spec, nil
 }
 
-// realityFallbackRateLimits returns reality fallback rate limits.
+// realityFallbackRateLimits parses optional REALITY upload/download fallback rate limits from the environment.
 func (a *App) realityFallbackRateLimits() (*xraycfg.FallbackRateLimit, *xraycfg.FallbackRateLimit, error) {
 	upload, err := parseFallbackRateLimitFromEnv("OVPN_REALITY_LIMIT_FALLBACK_UPLOAD")
 	if err != nil {
@@ -77,7 +77,7 @@ func (a *App) realityFallbackRateLimits() (*xraycfg.FallbackRateLimit, *xraycfg.
 	return upload, download, nil
 }
 
-// parseFallbackRateLimitFromEnv parses fallback rate limit from env and returns normalized values.
+// parseFallbackRateLimitFromEnv parses a single REALITY fallback rate limit from env vars sharing prefix.
 func parseFallbackRateLimitFromEnv(prefix string) (*xraycfg.FallbackRateLimit, error) {
 	after, afterSet, err := parseNonNegativeInt64Env(prefix + "_AFTER_BYTES")
 	if err != nil {
@@ -101,7 +101,7 @@ func parseFallbackRateLimitFromEnv(prefix string) (*xraycfg.FallbackRateLimit, e
 	}, nil
 }
 
-// parseNonNegativeInt64Env parses non negative int 64 env and returns normalized values.
+// parseNonNegativeInt64Env reads a non-negative int64 from key, reporting whether it was set.
 func parseNonNegativeInt64Env(key string) (int64, bool, error) {
 	raw, ok := os.LookupEnv(key)
 	if !ok {
@@ -121,7 +121,7 @@ func parseNonNegativeInt64Env(key string) (int64, bool, error) {
 	return v, true, nil
 }
 
-// parseSecurityProfileFromEnv parses security profile from env and returns normalized values.
+// parseSecurityProfileFromEnv reads and validates the OVPN_SECURITY_PROFILE setting.
 func parseSecurityProfileFromEnv() (string, error) {
 	raw := strings.TrimSpace(envOr("OVPN_SECURITY_PROFILE", xraycfg.SecurityProfileMinimal))
 	switch strings.ToLower(raw) {
@@ -134,7 +134,7 @@ func parseSecurityProfileFromEnv() (string, error) {
 	}
 }
 
-// parseThreatDNSServersFromEnv parses threat dns servers from env and returns normalized values.
+// parseThreatDNSServersFromEnv parses the threat-DNS server list used by the minimal security profile.
 func parseThreatDNSServersFromEnv() ([]string, error) {
 	servers := util.ParseCSV(envOr("OVPN_THREAT_DNS_SERVERS", strings.Join([]string{"9.9.9.9", "149.112.112.112"}, ",")))
 	if len(servers) == 0 {

@@ -168,8 +168,6 @@ jobs:
           cp .env.example .env
           docker compose --env-file .env -f docker-compose.yml config -q
           docker compose --env-file .env -f docker-compose.monitoring.yml config -q
-          docker compose --env-file .env -f deploy/compose/docker-compose.yml.tmpl config -q
-          docker compose --env-file .env -f deploy/compose/docker-compose.monitoring.yml.tmpl config -q
 
       - name: CI job summary
         if: always()

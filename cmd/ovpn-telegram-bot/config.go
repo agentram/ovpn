@@ -14,7 +14,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
-// loadConfig returns load config.
+// loadConfig builds the bot configuration from environment variables and secret files.
 func loadConfig() (config, error) {
 	cfg := config{}
 	ownerUserIDRaw := envOr("OVPN_TELEGRAM_OWNER_USER_ID", "")
@@ -67,7 +67,7 @@ func loadConfig() (config, error) {
 	return cfg, nil
 }
 
-// readSecretFile returns secret file for callers.
+// readSecretFile reads and trims a secret file, returning an empty string when the path is unset.
 func readSecretFile(path string) (string, error) {
 	cleanPath := strings.TrimSpace(path)
 	if cleanPath == "" {
@@ -102,7 +102,7 @@ func readOptionalSecretFile(path string) (string, error) {
 	return strings.TrimSpace(string(b)), nil
 }
 
-// envOr normalizes env or and applies fallback defaults.
+// envOr returns the trimmed value of env var key, or fallback when it is empty.
 func envOr(key, fallback string) string {
 	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
@@ -111,7 +111,7 @@ func envOr(key, fallback string) string {
 	return v
 }
 
-// parseOwnerUserID parses owner user id and returns normalized values.
+// parseOwnerUserID parses the owner Telegram user ID, treating an empty value as unset (0).
 func parseOwnerUserID(raw string) (int64, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -197,7 +197,7 @@ func (c *config) loadLinkConfig() error {
 	return nil
 }
 
-// parseTelegramAPIFallbackIPs parses telegram api fallback ips and returns normalized values.
+// parseTelegramAPIFallbackIPs parses a comma-separated list of fallback IPs for the Telegram API host.
 func parseTelegramAPIFallbackIPs(raw string) ([]string, error) {
 	parts := strings.Split(strings.TrimSpace(raw), ",")
 	out := make([]string, 0, len(parts))
@@ -219,7 +219,7 @@ func parseTelegramAPIFallbackIPs(raw string) ([]string, error) {
 	return out, nil
 }
 
-// defaultText normalizes text and applies fallback defaults.
+// defaultText returns v when non-empty, otherwise fallback.
 func defaultText(v, fallback string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {

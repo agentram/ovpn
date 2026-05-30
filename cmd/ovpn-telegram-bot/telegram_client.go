@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// getUpdates returns updates for callers.
+// getUpdates long-polls the Telegram getUpdates API starting at offset.
 func (c *telegramClient) getUpdates(ctx context.Context, offset int64, timeoutSeconds int) ([]telegramUpdate, error) {
 	payload := map[string]any{
 		"offset":          offset,
@@ -52,7 +52,7 @@ func (c *telegramClient) sendMessageWithMode(ctx context.Context, chatID int64, 
 	return nil
 }
 
-// answerCallbackQuery returns answer callback query.
+// answerCallbackQuery acknowledges an inline-keyboard callback, optionally showing text to the user.
 func (c *telegramClient) answerCallbackQuery(ctx context.Context, callbackID string, text string) error {
 	callbackID = strings.TrimSpace(callbackID)
 	if callbackID == "" {
@@ -73,7 +73,7 @@ func (c *telegramClient) answerCallbackQuery(ctx context.Context, callbackID str
 	return nil
 }
 
-// sendDocument handles send document HTTP behavior for this service.
+// sendDocument uploads a document to a chat as a multipart request.
 func (c *telegramClient) sendDocument(ctx context.Context, chatID int64, filename string, src io.Reader, caption string) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -117,7 +117,7 @@ func (c *telegramClient) sendDocument(ctx context.Context, chatID int64, filenam
 	return nil
 }
 
-// sendPhoto handles send photo HTTP behavior for this service.
+// sendPhoto uploads a photo to a chat as a multipart request, optionally with a reply markup.
 func (c *telegramClient) sendPhoto(ctx context.Context, chatID int64, filename string, src io.Reader, caption string, replyMarkup any) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -170,7 +170,7 @@ func (c *telegramClient) sendPhoto(ctx context.Context, chatID int64, filename s
 	return nil
 }
 
-// callTelegram handles call telegram HTTP behavior for this service.
+// callTelegram invokes a Telegram Bot API method with a JSON payload and decodes the result into out.
 func (c *telegramClient) callTelegram(ctx context.Context, method string, payload any, out any) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -190,7 +190,7 @@ func (c *telegramClient) callTelegram(ctx context.Context, method string, payloa
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
-// redactError returns redact error.
+// redactError strips the bot token from an error before it is logged or surfaced.
 func (c *telegramClient) redactError(err error) error {
 	if err == nil {
 		return nil

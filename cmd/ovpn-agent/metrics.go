@@ -47,7 +47,7 @@ type agentMetrics struct {
 	certChecksTotal             *prometheus.CounterVec
 }
 
-// newAgentMetrics initializes agent metrics with the required dependencies.
+// newAgentMetrics registers the agent's Prometheus collectors on reg and returns the metrics holder.
 func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 	// Keep labels low-cardinality and operationally bounded.
 	// Per-user traffic stays in SQLite/HTTP endpoints, not in Prometheus labels.
@@ -216,12 +216,12 @@ func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 	return m
 }
 
-// OnCollectStart returns on collect start.
+// OnCollectStart marks the start of a stats collection cycle.
 func (m *agentMetrics) OnCollectStart() {
 	m.collectorLastRunUnix.Set(float64(time.Now().UTC().Unix()))
 }
 
-// OnCollectFinish returns on collect finish.
+// OnCollectFinish records the duration, user count, and success/failure of a collection cycle.
 func (m *agentMetrics) OnCollectFinish(duration time.Duration, users int, err error) {
 	m.collectorDurationSeconds.Observe(duration.Seconds())
 	m.collectorUsersSeen.Set(float64(users))
@@ -233,12 +233,12 @@ func (m *agentMetrics) OnCollectFinish(duration time.Duration, users int, err er
 	m.collectorLastSuccessUnix.Set(float64(time.Now().UTC().Unix()))
 }
 
-// OnCounterReset returns on counter reset.
+// OnCounterReset counts a detected Xray counter reset.
 func (m *agentMetrics) OnCounterReset() {
 	m.collectorCounterResetsTotal.Inc()
 }
 
-// OnUsersActive returns on users active.
+// OnUsersActive records how many users moved traffic during the last cycle.
 func (m *agentMetrics) OnUsersActive(count int) {
 	if count < 0 {
 		count = 0
@@ -246,12 +246,12 @@ func (m *agentMetrics) OnUsersActive(count int) {
 	m.usersActive.Set(float64(count))
 }
 
-// OnUserSpike returns on user spike.
+// OnUserSpike counts a per-user traffic burst that exceeded the spike threshold.
 func (m *agentMetrics) OnUserSpike(_ int64) {
 	m.userSpikeEventsTotal.Inc()
 }
 
-// OnDBWriteError returns on db write error.
+// OnDBWriteError counts a failed database operation, labeled by operation name.
 func (m *agentMetrics) OnDBWriteError(operation string) {
 	if strings.TrimSpace(operation) == "" {
 		operation = "unknown"
@@ -259,7 +259,7 @@ func (m *agentMetrics) OnDBWriteError(operation string) {
 	m.dbWriteErrorsTotal.WithLabelValues(operation).Inc()
 }
 
-// OnXrayAPIReachable returns on xray api reachable.
+// OnXrayAPIReachable records whether the Xray gRPC API is currently reachable.
 func (m *agentMetrics) OnXrayAPIReachable(reachable bool) {
 	if reachable {
 		m.xrayAPIReachable.Set(1)
@@ -268,7 +268,7 @@ func (m *agentMetrics) OnXrayAPIReachable(reachable bool) {
 	m.xrayAPIReachable.Set(0)
 }
 
-// observeRuntime returns observe runtime.
+// observeRuntime records the result of a runtime user add/remove call.
 func (m *agentMetrics) observeRuntime(operation, result string) {
 	if strings.TrimSpace(operation) == "" {
 		operation = "unknown"
@@ -279,7 +279,7 @@ func (m *agentMetrics) observeRuntime(operation, result string) {
 	m.runtimeOperationsTotal.WithLabelValues(operation, result).Inc()
 }
 
-// observeQuotaEvent returns observe quota event.
+// observeQuotaEvent records a quota enforcement action and its outcome.
 func (m *agentMetrics) observeQuotaEvent(action, result string) {
 	if strings.TrimSpace(action) == "" {
 		action = "unknown"
@@ -290,12 +290,12 @@ func (m *agentMetrics) observeQuotaEvent(action, result string) {
 	m.quotaEventsTotal.WithLabelValues(action, result).Inc()
 }
 
-// setQuotaBlockedUsers applies quota blocked users and returns an error on failure.
+// setQuotaBlockedUsers updates the gauge tracking how many users are currently quota-blocked.
 func (m *agentMetrics) setQuotaBlockedUsers(blocked int) {
 	m.quotaBlockedUsers.Set(float64(blocked))
 }
 
-// setQuotaUsageBands applies quota usage bands and returns an error on failure.
+// setQuotaUsageBands updates the gauges counting users above 80% and 95% of their quota.
 func (m *agentMetrics) setQuotaUsageBands(over80 int, over95 int) {
 	if over80 < 0 {
 		over80 = 0
@@ -307,7 +307,7 @@ func (m *agentMetrics) setQuotaUsageBands(over80 int, over95 int) {
 	m.quotaUsersOver95.Set(float64(over95))
 }
 
-// setUserTrafficTotals applies user traffic totals and returns an error on failure.
+// setUserTrafficTotals publishes per-user cumulative uplink/downlink byte gauges.
 func (m *agentMetrics) setUserTrafficTotals(rows []model.UserTraffic) {
 	m.userTrafficTotalBytes.Reset()
 	for _, row := range rows {
@@ -324,7 +324,7 @@ func (m *agentMetrics) setUserTrafficTotals(rows []model.UserTraffic) {
 	}
 }
 
-// setUserQuotaStatus applies user quota status and returns an error on failure.
+// setUserQuotaStatus publishes per-user rolling-window usage and quota gauges.
 func (m *agentMetrics) setUserQuotaStatus(status model.QuotaStatusResponse) {
 	m.userWindow30DUsageBytes.Reset()
 	m.userWindow30DQuotaBytes.Reset()
@@ -396,7 +396,7 @@ func (m *agentMetrics) setUserExpiryStatus(status model.UserStatusResponse) {
 	}
 }
 
-// observeCertExpiry returns observe cert expiry.
+// observeCertExpiry reads certFile (when configured) and publishes the days remaining until it expires.
 func (m *agentMetrics) observeCertExpiry(certFile string, logger *slog.Logger) {
 	certFile = strings.TrimSpace(certFile)
 	if certFile == "" {

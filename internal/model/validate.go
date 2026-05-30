@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// NormalizeServerRole normalizes role and applies fallback defaults.
+// NormalizeServerRole canonicalizes a server role to "vpn" or "proxy", returning "" when invalid.
 func NormalizeServerRole(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", ServerRoleVPN:
@@ -18,7 +18,7 @@ func NormalizeServerRole(raw string) string {
 	}
 }
 
-// Validate executes validate flow and returns the first error.
+// Validate reports the combined set of problems with a server record, or nil when it is well-formed.
 func (s Server) Validate() error {
 	var errs []string
 
@@ -76,7 +76,7 @@ func (s Server) Validate() error {
 	return errors.New(strings.Join(errs, "; "))
 }
 
-// Validate executes validate flow and returns the first error.
+// Validate reports the combined set of problems with a user record, or nil when it is well-formed.
 func (u User) Validate() error {
 	var errs []string
 

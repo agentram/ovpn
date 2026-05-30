@@ -1,6 +1,6 @@
 package stats
 
-// computeDelta returns compute delta.
+// computeDelta returns the traffic delta since the previous counter value, treating a decrease as a counter reset.
 func computeDelta(prevValue int64, hasPrev bool, currentValue int64) (delta int64, reset bool) {
 	switch {
 	case !hasPrev:

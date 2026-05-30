@@ -30,7 +30,7 @@ type routeDeps struct {
 	refreshOnce func(context.Context)
 }
 
-// newMetricsRefreshFunc initializes metrics refresh func with the required dependencies.
+// newMetricsRefreshFunc returns a closure that refreshes the Prometheus gauges (traffic totals, quota status, usage bands, and expiry) from the store.
 func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *agentMetrics) func(context.Context) {
 	return func(rctx context.Context) {
 		totals, err := store.ListTotals(rctx)
@@ -76,7 +76,7 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 	}
 }
 
-// registerHTTPRoutes handles register http routes HTTP behavior for this service.
+// registerHTTPRoutes wires the agent's HTTP handlers (health, stats, quota, user sync, and runtime user add/remove) onto mux.
 func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 	// Serialize runtime add/remove calls to avoid concurrent AlterInbound races against one Xray process.
 	mux.Handle("/metrics", promhttp.Handler())
@@ -116,7 +116,11 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 		}
 		writeJSON(w, http.StatusOK, payload)
 	})
-	mux.HandleFunc("/collect", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/collect", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
 		collectOnce := d.collectOnce
 		if collectOnce == nil && d.collector != nil {
 			collectOnce = d.collector.CollectOnce

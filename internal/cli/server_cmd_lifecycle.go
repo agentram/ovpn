@@ -14,7 +14,7 @@ import (
 	"ovpn/internal/util"
 )
 
-// newServerAddCmd initializes server add cmd with the required dependencies.
+// newServerAddCmd builds the `server add` command that registers a server in local state.
 func (a *App) newServerAddCmd() *cobra.Command {
 	var add struct {
 		name         string
@@ -169,7 +169,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	return addCmd
 }
 
-// newServerInitCmd initializes server init cmd with the required dependencies.
+// newServerInitCmd builds the `server init` command that bootstraps Docker and deploys the stack.
 func (a *App) newServerInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init <server>",
@@ -186,7 +186,7 @@ func (a *App) newServerInitCmd() *cobra.Command {
 	}
 }
 
-// newServerListCmd initializes server list cmd with the required dependencies.
+// newServerListCmd builds the `server list` command.
 func (a *App) newServerListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
@@ -212,7 +212,7 @@ func (a *App) newServerListCmd() *cobra.Command {
 	}
 }
 
-// newServerSetXrayVersionCmd initializes server set xray version cmd with the required dependencies.
+// newServerSetXrayVersionCmd builds the `server set-xray-version` command that pins the Xray version in local state.
 func (a *App) newServerSetXrayVersionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-xray-version <server> <version>",
@@ -240,7 +240,7 @@ func (a *App) newServerSetXrayVersionCmd() *cobra.Command {
 	}
 }
 
-// newServerStatusCmd initializes server status cmd with the required dependencies.
+// newServerStatusCmd builds the `server status` command that shows remote compose status.
 func (a *App) newServerStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <server>",

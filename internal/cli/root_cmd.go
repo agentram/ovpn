@@ -34,7 +34,7 @@ type App struct {
 
 var errRuntimeQuotaBlocked = errors.New("runtime add skipped: user is blocked by quota")
 
-// NewRootCmd initializes root cmd with the required dependencies.
+// NewRootCmd builds the root `ovpn` command, wiring global flags and lazily opening local state in PersistentPreRunE.
 func NewRootCmd() *cobra.Command {
 	app := &App{ctx: context.Background()}
 	cmd := &cobra.Command{
