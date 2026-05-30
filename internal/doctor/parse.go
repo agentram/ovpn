@@ -13,6 +13,7 @@ type ServiceState struct {
 	Health  string `json:"health,omitempty"`
 }
 
+// ParseKV parses `key=value` lines into a map.
 func ParseKV(raw string) map[string]string {
 	out := map[string]string{}
 	lines := strings.Split(raw, "\n")
@@ -32,6 +33,7 @@ func ParseKV(raw string) map[string]string {
 	return out
 }
 
+// ParseComposePS parses the JSON output of `docker compose ps` into service states.
 func ParseComposePS(raw string) ([]ServiceState, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -61,6 +63,7 @@ func ParseComposePS(raw string) ([]ServiceState, error) {
 	return mapToStates(arr), nil
 }
 
+// mapToStates projects decoded compose-ps rows into ServiceState values.
 func mapToStates(rows []map[string]any) []ServiceState {
 	out := make([]ServiceState, 0, len(rows))
 	for _, row := range rows {
@@ -82,6 +85,7 @@ func mapToStates(rows []map[string]any) []ServiceState {
 	return out
 }
 
+// strAny renders an arbitrary JSON value as a trimmed string.
 func strAny(v any) string {
 	s, _ := v.(string)
 	return strings.TrimSpace(s)

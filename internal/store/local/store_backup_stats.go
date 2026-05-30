@@ -9,6 +9,7 @@ import (
 	"ovpn/internal/util"
 )
 
+// AddDeployRevision records a completed deploy revision.
 func (s *Store) AddDeployRevision(ctx context.Context, rev *model.DeployRevision) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	if rev.AppliedAt.IsZero() {
@@ -25,6 +26,7 @@ func (s *Store) AddDeployRevision(ctx context.Context, rev *model.DeployRevision
 	return err
 }
 
+// AddBackupRecord records a created backup.
 func (s *Store) AddBackupRecord(ctx context.Context, rec *model.BackupRecord) error {
 	if rec.CreatedAt.IsZero() {
 		rec.CreatedAt = util.NowUTC()
@@ -40,6 +42,7 @@ func (s *Store) AddBackupRecord(ctx context.Context, rec *model.BackupRecord) er
 	return nil
 }
 
+// ListBackupRecords returns a server's backup records, newest first.
 func (s *Store) ListBackupRecords(ctx context.Context, serverID int64) ([]model.BackupRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, server_id, type, path, sha256, created_at, created_by, remote_path
@@ -68,6 +71,7 @@ func (s *Store) ListBackupRecords(ctx context.Context, serverID int64) ([]model.
 	return out, rows.Err()
 }
 
+// UpsertStatsCache stores or updates a cached per-user traffic row.
 func (s *Store) UpsertStatsCache(ctx context.Context, t model.UserTraffic) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
@@ -82,6 +86,7 @@ func (s *Store) UpsertStatsCache(ctx context.Context, t model.UserTraffic) error
 	return err
 }
 
+// ListStatsCache returns cached traffic rows for a server and window type.
 func (s *Store) ListStatsCache(ctx context.Context, serverID int64, windowType string) ([]model.UserTraffic, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT server_id, email, window_start, window_type, uplink_bytes, downlink_bytes

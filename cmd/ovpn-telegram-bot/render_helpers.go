@@ -7,6 +7,7 @@ import (
 	"ovpn/internal/model"
 )
 
+// quotaPressure counts how many users are over 80% and over 95% of their quota.
 func quotaPressure(status model.QuotaStatusResponse) (int, int) {
 	over80 := 0
 	over95 := 0
@@ -25,6 +26,7 @@ func quotaPressure(status model.QuotaStatusResponse) (int, int) {
 	return over80, over95
 }
 
+// trafficSummary totals the user count, active-user count, and combined bytes across rows.
 func trafficSummary(rows []model.UserTraffic) (users int, active int, total int64) {
 	users = len(rows)
 	for _, r := range rows {
@@ -37,6 +39,7 @@ func trafficSummary(rows []model.UserTraffic) (users int, active int, total int6
 	return users, active, total
 }
 
+// quotaPercent returns usage as a percentage of quota, or 0 when quota is non-positive.
 func quotaPercent(usage int64, quota int64) float64 {
 	if usage <= 0 || quota <= 0 {
 		return 0
@@ -69,6 +72,7 @@ func renderUserState(u model.UserAccessStatus) string {
 	}
 }
 
+// formatBytes renders a byte count as a human-readable size (KiB, MiB, ...).
 func formatBytes(v int64) string {
 	if v < 0 {
 		v = 0

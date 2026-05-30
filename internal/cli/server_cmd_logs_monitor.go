@@ -13,6 +13,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
+// newServerLogsCmd builds the `server logs` command that streams remote compose logs.
 func (a *App) newServerLogsCmd() *cobra.Command {
 	var service string
 	var tail int
@@ -62,6 +63,7 @@ func (a *App) newServerLogsCmd() *cobra.Command {
 	return cmd
 }
 
+// newServerMonitorCmd builds the `server monitor` command group for the optional monitoring stack.
 func (a *App) newServerMonitorCmd() *cobra.Command {
 	monitorCmd := &cobra.Command{
 		Use:   "monitor",
@@ -76,6 +78,7 @@ func (a *App) newServerMonitorCmd() *cobra.Command {
 	return monitorCmd
 }
 
+// newServerMonitorUpCmd builds the `server monitor up` command that starts the monitoring stack.
 func (a *App) newServerMonitorUpCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "up <server>",
@@ -96,6 +99,7 @@ func (a *App) newServerMonitorUpCmd() *cobra.Command {
 	}
 }
 
+// newServerMonitorDownCmd builds the `server monitor down` command that stops the monitoring stack.
 func (a *App) newServerMonitorDownCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "down <server>",
@@ -116,6 +120,7 @@ func (a *App) newServerMonitorDownCmd() *cobra.Command {
 	}
 }
 
+// newServerMonitorStatusCmd builds the `server monitor status` command.
 func (a *App) newServerMonitorStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status <server>",
@@ -137,6 +142,7 @@ func (a *App) newServerMonitorStatusCmd() *cobra.Command {
 	}
 }
 
+// newServerMonitorTelegramSetupCmd builds the command that installs the Telegram bot token on the host.
 func (a *App) newServerMonitorTelegramSetupCmd() *cobra.Command {
 	var setup struct {
 		token         string

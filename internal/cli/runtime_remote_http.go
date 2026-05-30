@@ -17,10 +17,12 @@ import (
 	"ovpn/internal/util"
 )
 
+// fetchRemoteAgent calls an ovpn-agent endpoint on a server and returns the response body.
 func (a *App) fetchRemoteAgent(srv model.Server, method, url string, payload any) ([]byte, error) {
 	return a.fetchRemoteHTTP(srv, method, url, payload)
 }
 
+// fetchRemoteHTTP runs curl on the host over SSH to reach the loopback-bound agent, returning the response body or an error for non-2xx status.
 func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any) ([]byte, error) {
 	if a.remoteHTTPHook != nil {
 		return a.remoteHTTPHook(srv, method, url, payload)
@@ -86,6 +88,7 @@ func httpStatusText(status int) string {
 	return "HTTP error"
 }
 
+// agentHostPort returns the validated host port that maps to the agent, defaulting to 19000.
 func (a *App) agentHostPort() string {
 	raw := strings.TrimSpace(envOr("OVPN_AGENT_HOST_PORT", "19000"))
 	p, err := strconv.Atoi(raw)
@@ -96,14 +99,17 @@ func (a *App) agentHostPort() string {
 	return strconv.Itoa(p)
 }
 
+// agentBaseURL returns the loopback base URL of the agent on the host.
 func (a *App) agentBaseURL() string {
 	return "http://127.0.0.1:" + a.agentHostPort()
 }
 
+// agentURL joins path onto the agent base URL.
 func (a *App) agentURL(path string) string {
 	return strings.TrimRight(a.agentBaseURL(), "/") + "/" + strings.TrimLeft(path, "/")
 }
 
+// telegramBotHostPort returns the validated host port that maps to the Telegram bot, defaulting to 19001.
 func (a *App) telegramBotHostPort() string {
 	raw := strings.TrimSpace(envOr("OVPN_TELEGRAM_BOT_HOST_PORT", "19001"))
 	p, err := strconv.Atoi(raw)
@@ -114,10 +120,12 @@ func (a *App) telegramBotHostPort() string {
 	return strconv.Itoa(p)
 }
 
+// telegramNotifyURL returns the bot notify endpoint URL on the host.
 func (a *App) telegramNotifyURL() string {
 	return envOr("OVPN_TELEGRAM_NOTIFY_URL", "http://127.0.0.1:"+a.telegramBotHostPort()+"/notify")
 }
 
+// sendTelegramNotifyEvent makes a best-effort delivery of a notify event when Telegram targets are configured.
 func (a *App) sendTelegramNotifyEvent(srv model.Server, ev telegrambot.NotifyEvent) {
 	if a.dryRun {
 		return
@@ -144,6 +152,7 @@ func (a *App) sendTelegramNotifyEvent(srv model.Server, ev telegrambot.NotifyEve
 	}
 }
 
+// postRemoteNotifyBestEffort POSTs a notify payload on the host via a temp file, ignoring delivery failures.
 func (a *App) postRemoteNotifyBestEffort(srv model.Server, endpoint string, payload any) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -160,6 +169,7 @@ func (a *App) postRemoteNotifyBestEffort(srv model.Server, endpoint string, payl
 	return err
 }
 
+// uploadTelegramBotToken copies the Telegram bot token to the host and installs it with restrictive permissions.
 func (a *App) uploadTelegramBotToken(srv model.Server, token string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -194,6 +204,7 @@ func (a *App) uploadTelegramBotToken(srv model.Server, token string) error {
 	return nil
 }
 
+// waitForRemoteHTTPReady polls url until it responds successfully or the timeout elapses.
 func (a *App) waitForRemoteHTTPReady(srv model.Server, url string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var lastErr error

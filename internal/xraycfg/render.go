@@ -69,6 +69,7 @@ const (
 
 var defaultThreatDNSServers = []string{"9.9.9.9", "149.112.112.112"}
 
+// RenderServerJSON renders a complete Xray server config (inbounds, routing, outbounds) as JSON from spec.
 func RenderServerJSON(spec Spec) ([]byte, error) {
 	spec.SecurityProfile = normalizeSecurityProfile(spec.SecurityProfile)
 	spec.Role = model.NormalizeServerRole(spec.Role)
@@ -299,6 +300,7 @@ func baseOutbounds(spec Spec) []any {
 	}
 }
 
+// normalizeX25519KeyBase64 re-encodes a 32-byte X25519 key to URL-safe raw base64, accepting legacy encodings.
 func normalizeX25519KeyBase64(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -317,6 +319,7 @@ func normalizeX25519KeyBase64(raw string) string {
 	return raw
 }
 
+// normalizeLogLevel canonicalizes an Xray log level, defaulting to warning.
 func normalizeLogLevel(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "debug":
@@ -332,6 +335,7 @@ func normalizeLogLevel(raw string) string {
 	}
 }
 
+// normalizeSecurityProfile canonicalizes the security profile to minimal or off, returning "" when invalid.
 func normalizeSecurityProfile(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", SecurityProfileMinimal:
@@ -365,6 +369,7 @@ func resolveProxyPreset(raw string) (proxyPreset, error) {
 	}
 }
 
+// ValidateSpec checks that a Spec has the REALITY and security fields required to render a valid config.
 func ValidateSpec(spec Spec) error {
 	if spec.SecurityProfile == "" {
 		spec.SecurityProfile = SecurityProfileMinimal
@@ -461,6 +466,7 @@ type LinkInput struct {
 	Label      string
 }
 
+// BuildVLESSLink renders a client VLESS+REALITY connection URL from in.
 func BuildVLESSLink(in LinkInput) string {
 	if in.Port == 0 {
 		in.Port = 443
@@ -486,6 +492,7 @@ func BuildVLESSLink(in LinkInput) string {
 	)
 }
 
+// urlEscapeLabel escapes a value for use as the fragment label of a VLESS link.
 func urlEscapeLabel(v string) string {
 	replacer := strings.NewReplacer(" ", "%20", "#", "%23")
 	return replacer.Replace(v)

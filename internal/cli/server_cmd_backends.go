@@ -8,6 +8,7 @@ import (
 	"ovpn/internal/model"
 )
 
+// newServerBackendCmd builds the `server backend` command group for managing proxy backend attachments.
 func (a *App) newServerBackendCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "backend",

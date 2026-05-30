@@ -13,6 +13,7 @@ import (
 	"ovpn/internal/ssh"
 )
 
+// checkAgentHealth verifies that ovpn-agent is reachable and that its Xray API checks pass.
 func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	agentBaseURL := a.agentBaseURL()
 	check := doctor.Check{
@@ -90,6 +91,7 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	return check
 }
 
+// checkDisk verifies that disk usage on the host stays within safe thresholds.
 func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := buildDoctorDiskCommand()
 	res, err := a.execRemote(runner, cfg, 25*time.Second, cmd)
@@ -170,6 +172,7 @@ func (a *App) checkDisk(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	}
 }
 
+// buildDoctorDiskCommand renders the shell command that reports root filesystem usage.
 func buildDoctorDiskCommand() string {
 	cmd := strings.Join([]string{
 		"set -u",
@@ -190,6 +193,7 @@ func buildDoctorDiskCommand() string {
 	return cmd
 }
 
+// collectDoctorLogs fetches recent logs for each runtime service, keyed by service name.
 func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	services := []string{"xray", "ovpn-agent"}
 	if srv.IsProxy() {
@@ -218,6 +222,7 @@ func (a *App) collectDoctorLogs(srv model.Server, tail int) map[string]string {
 	return out
 }
 
+// addRemoteSkips records skipped entries for the remote checks when SSH connectivity is unavailable.
 func addRemoteSkips(report *doctor.Report, includeSSH bool) {
 	names := []string{
 		"Sudo and permissions",

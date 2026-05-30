@@ -15,6 +15,7 @@ import (
 
 const quotaGBBytes int64 = 1024 * 1024 * 1024
 
+// newUserTopCmd builds the `user top` command that lists the heaviest traffic consumers.
 func (a *App) newUserTopCmd() *cobra.Command {
 	var top struct {
 		server string
@@ -83,6 +84,7 @@ func (a *App) newUserTopCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserQuotaResetCmd builds the `user quota-reset` command that clears a user's quota block.
 func (a *App) newUserQuotaResetCmd() *cobra.Command {
 	var quotaReset struct {
 		username string
@@ -127,6 +129,7 @@ func (a *App) newUserQuotaResetCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserQuotaSetCmd builds the `user quota-set` command that changes a user's rolling quota.
 func (a *App) newUserQuotaSetCmd() *cobra.Command {
 	var quotaSet struct {
 		username    string
@@ -213,6 +216,7 @@ func quotaBytesFromFlags(monthlyBytes int64, monthlyGB int64, monthlyBytesSet bo
 	return monthlyBytes, nil
 }
 
+// newUserLinkCmd builds the `user link` command that prints a user's VLESS link and QR code.
 func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
 		server   string

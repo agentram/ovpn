@@ -16,6 +16,7 @@ type Store struct {
 	db *sql.DB
 }
 
+// Open opens (creating and migrating as needed) the local SQLite state database under dataDir.
 func Open(ctx context.Context, dataDir string) (*Store, error) {
 	if err := util.EnsureDir(dataDir); err != nil {
 		return nil, err
@@ -34,4 +35,5 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	return s, nil
 }
 
+// Close closes the underlying database.
 func (s *Store) Close() error { return s.db.Close() }

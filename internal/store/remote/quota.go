@@ -18,6 +18,7 @@ type QuotaState struct {
 	BlockedAt *time.Time
 }
 
+// GetQuotaState returns a user's current quota-block state, if recorded.
 func (s *Store) GetQuotaState(ctx context.Context, email string) (QuotaState, bool, error) {
 	var out QuotaState
 	var blocked int
@@ -44,6 +45,7 @@ func (s *Store) GetQuotaState(ctx context.Context, email string) (QuotaState, bo
 	return out, true, nil
 }
 
+// ReplaceQuotaPolicies replaces the full quota policy set and prunes block state for users no longer present.
 func (s *Store) ReplaceQuotaPolicies(ctx context.Context, users []model.QuotaUserPolicy) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -88,6 +90,7 @@ func (s *Store) ReplaceQuotaPolicies(ctx context.Context, users []model.QuotaUse
 	return tx.Commit()
 }
 
+// ListQuotaPolicies returns all stored quota policies.
 func (s *Store) ListQuotaPolicies(ctx context.Context) ([]model.QuotaUserPolicy, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT email, uuid, inbound_tag, quota_enabled, monthly_quota_byte
@@ -116,6 +119,7 @@ func (s *Store) ListQuotaPolicies(ctx context.Context) ([]model.QuotaUserPolicy,
 	return out, rows.Err()
 }
 
+// GetQuotaPolicy returns a user's quota policy, if present.
 func (s *Store) GetQuotaPolicy(ctx context.Context, email string) (model.QuotaUserPolicy, bool, error) {
 	var u model.QuotaUserPolicy
 	var enabled int
@@ -139,6 +143,7 @@ func (s *Store) GetQuotaPolicy(ctx context.Context, email string) (model.QuotaUs
 	return u, true, nil
 }
 
+// SetQuotaBlocked records or clears a user's quota-blocked state.
 func (s *Store) SetQuotaBlocked(ctx context.Context, email string, blocked bool, blockedAt *time.Time) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	if !blocked {
@@ -157,6 +162,7 @@ func (s *Store) SetQuotaBlocked(ctx context.Context, email string, blocked bool,
 	return err
 }
 
+// ListQuotaStates returns all quota-block states keyed by email.
 func (s *Store) ListQuotaStates(ctx context.Context) (map[string]QuotaState, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT email, blocked, blocked_month, blocked_at
@@ -187,6 +193,7 @@ func (s *Store) ListQuotaStates(ctx context.Context) (map[string]QuotaState, err
 	return out, rows.Err()
 }
 
+// ListUsageBetween returns total bytes per user within the [start, end) window.
 func (s *Store) ListUsageBetween(ctx context.Context, start time.Time, end time.Time) (map[string]int64, error) {
 	startUTC := start.UTC()
 	endUTC := end.UTC()
@@ -212,6 +219,7 @@ func (s *Store) ListUsageBetween(ctx context.Context, start time.Time, end time.
 	return out, rows.Err()
 }
 
+// QuotaStatus computes each user's rolling-window usage against their quota, optionally filtered by email.
 func (s *Store) QuotaStatus(ctx context.Context, now time.Time, window time.Duration, defaultQuotaByte int64, email string) (model.QuotaStatusResponse, error) {
 	policies, err := s.ListQuotaPolicies(ctx)
 	if err != nil {
@@ -267,6 +275,7 @@ func (s *Store) QuotaStatus(ctx context.Context, now time.Time, window time.Dura
 	return resp, nil
 }
 
+// boolToInt maps a bool to its 0/1 SQLite representation.
 func boolToInt(v bool) int {
 	if v {
 		return 1
@@ -274,6 +283,7 @@ func boolToInt(v bool) int {
 	return 0
 }
 
+// nullableTime renders an optional time as an RFC3339 string or SQL NULL.
 func nullableTime(t *time.Time) any {
 	if t == nil {
 		return nil
@@ -289,6 +299,7 @@ func nullableInt64(v *int64) any {
 	return *v
 }
 
+// ClearQuotaState removes a user's quota-block state row.
 func (s *Store) ClearQuotaState(ctx context.Context, email string) error {
 	if strings.TrimSpace(email) == "" {
 		_, err := s.db.ExecContext(ctx, `DELETE FROM quota_state`)

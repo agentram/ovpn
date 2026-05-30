@@ -33,6 +33,7 @@ type Report struct {
 	Logs          map[string]string `json:"logs,omitempty"`
 }
 
+// NewReport creates an empty diagnostics report for a server.
 func NewReport(server string) Report {
 	return Report{
 		Server:    server,
@@ -41,6 +42,7 @@ func NewReport(server string) Report {
 	}
 }
 
+// Add appends a check result to the report.
 func (r *Report) Add(check Check) {
 	if check.Status == "" {
 		check.Status = StatusFail
@@ -48,14 +50,17 @@ func (r *Report) Add(check Check) {
 	r.Checks = append(r.Checks, check)
 }
 
+// Finalize computes the report's overall status from its checks.
 func (r *Report) Finalize() {
 	r.OverallStatus = Summarize(r.Checks)
 }
 
+// JSON marshals the report as indented JSON.
 func (r Report) JSON() ([]byte, error) {
 	return json.MarshalIndent(r, "", "  ")
 }
 
+// Summarize reduces a set of checks to a single overall status (the worst seen).
 func Summarize(checks []Check) Status {
 	overall := StatusSkip
 	for _, c := range checks {
@@ -73,6 +78,7 @@ func Summarize(checks []Check) Status {
 	return overall
 }
 
+// FormatHuman renders the report as human-readable text, including details when verbose.
 func FormatHuman(r Report, verbose bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Server: %s\n", r.Server)

@@ -27,6 +27,7 @@ type agentHealth struct {
 	DBPath           string `json:"db_path,omitempty"`
 }
 
+// doctorCmd builds the `doctor` command that runs end-to-end diagnostics against a server.
 func (a *App) doctorCmd() *cobra.Command {
 	var opts doctorOptions
 	cmd := &cobra.Command{
@@ -58,6 +59,7 @@ func (a *App) doctorCmd() *cobra.Command {
 	return cmd
 }
 
+// runDoctor executes the local and remote diagnostic checks for a server and returns the assembled report.
 func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, error) {
 	report := doctor.NewReport(serverName)
 	srv, err := a.store.GetServerByName(a.ctx, serverName)
@@ -176,6 +178,7 @@ func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
 	return check
 }
 
+// printDoctorReport writes the diagnostics report as JSON or human-readable text.
 func printDoctorReport(report doctor.Report, jsonOutput, verbose bool) error {
 	if jsonOutput {
 		raw, err := report.JSON()
@@ -189,6 +192,7 @@ func printDoctorReport(report doctor.Report, jsonOutput, verbose bool) error {
 	return nil
 }
 
+// checkLocalConfig validates the locally stored server record before any remote calls.
 func checkLocalConfig(srv model.Server) doctor.Check {
 	check := doctor.Check{
 		Name:    "Local config sanity",
@@ -243,6 +247,7 @@ func isFloatingXrayTag(tag string) bool {
 	return strings.HasPrefix(v, "dev-")
 }
 
+// splitRealityTargetHostPort splits a REALITY target into host and port, defaulting the port to 443.
 func splitRealityTargetHostPort(raw string) (string, string) {
 	target := strings.TrimSpace(raw)
 	if target == "" {

@@ -2,6 +2,7 @@ package cli
 
 import "github.com/spf13/cobra"
 
+// userCmd builds the `user` command group for managing users.
 func (a *App) userCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "user", Short: "Manage users"}
 	cmd.AddCommand(

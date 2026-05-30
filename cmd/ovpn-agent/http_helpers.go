@@ -17,6 +17,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
+// envInt64 reads key as a base-10 int64, returning fallback when it is unset or unparseable.
 func envInt64(key string, fallback int64) int64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -29,6 +30,7 @@ func envInt64(key string, fallback int64) int64 {
 	return v
 }
 
+// handleQuotaPolicies serves GET /quota/policies, returning the stored quota policies as JSON.
 func handleQuotaPolicies(store quotaPolicyLister, logger *slog.Logger, metrics *agentMetrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -58,6 +60,7 @@ func isRuntimeUserAbsentError(err error) bool {
 		strings.Contains(text, "failed to remove") && strings.Contains(text, "user")
 }
 
+// postNotifyEvent delivers a NotifyEvent to the local Telegram bot notify endpoint with a short timeout.
 func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error {
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -83,6 +86,7 @@ func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error
 	return nil
 }
 
+// writeJSON encodes payload as a JSON response body with the given status code.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -94,6 +98,7 @@ type statusRecorder struct {
 	status int
 }
 
+// WriteHeader records the response status code before delegating to the wrapped ResponseWriter.
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)

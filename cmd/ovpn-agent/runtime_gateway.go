@@ -26,6 +26,7 @@ type runtimeGateway struct {
 	observer *agentMetrics
 }
 
+// AddUser adds a VLESS client to the live Xray inbound via the gRPC API, serializing calls against the shared process.
 func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid string) error {
 	if strings.TrimSpace(inboundTag) == "" {
 		inboundTag = "vless-reality"
@@ -45,6 +46,7 @@ func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid st
 	return nil
 }
 
+// RemoveUser removes a VLESS client from the live Xray inbound via the gRPC API.
 func (g *runtimeGateway) RemoveUser(ctx context.Context, inboundTag, email string) error {
 	if strings.TrimSpace(inboundTag) == "" {
 		inboundTag = "vless-reality"

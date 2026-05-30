@@ -25,6 +25,7 @@ type Client struct {
 
 const defaultVLESSFlow = "xtls-rprx-vision"
 
+// New dials the Xray gRPC API at addr and waits for the connection to become ready.
 func New(ctx context.Context, addr string) (*Client, error) {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -41,6 +42,7 @@ func New(ctx context.Context, addr string) (*Client, error) {
 	}, nil
 }
 
+// waitForReady blocks until the gRPC connection is ready or the timeout elapses.
 func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Duration) error {
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -57,6 +59,7 @@ func waitForReady(ctx context.Context, conn *grpc.ClientConn, timeout time.Durat
 	}
 }
 
+// Close closes the gRPC connection.
 func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
@@ -64,6 +67,7 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
+// QueryStats returns Xray stat counters matching pattern, optionally resetting them.
 func (c *Client) QueryStats(ctx context.Context, pattern string, reset bool) (map[string]int64, error) {
 	resp, err := c.stats.QueryStats(ctx, &statscommand.QueryStatsRequest{
 		Pattern: pattern,
@@ -79,6 +83,7 @@ func (c *Client) QueryStats(ctx context.Context, pattern string, reset bool) (ma
 	return out, nil
 }
 
+// AddUser adds a VLESS client to a live inbound via the Handler service.
 func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) error {
 	acc := accountForInbound(inboundTag, uuid)
 	op := &handlercommand.AddUserOperation{
@@ -95,6 +100,7 @@ func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) er
 	return err
 }
 
+// accountForInbound builds the VLESS account (with the appropriate flow) for an inbound.
 func accountForInbound(inboundTag, uuid string) *vless.Account {
 	acc := &vless.Account{Id: uuid}
 	// Keep runtime adds aligned with rendered config for REALITY/VLESS inbounds.
@@ -104,6 +110,7 @@ func accountForInbound(inboundTag, uuid string) *vless.Account {
 	return acc
 }
 
+// RemoveUser removes a client from a live inbound via the Handler service.
 func (c *Client) RemoveUser(ctx context.Context, inboundTag, email string) error {
 	op := &handlercommand.RemoveUserOperation{Email: email}
 	_, err := c.handler.AlterInbound(ctx, &handlercommand.AlterInboundRequest{
@@ -119,6 +126,7 @@ type UserCounter struct {
 	Downlink int64
 }
 
+// ParseUserCounters folds raw `user>>>...` stat keys into per-user uplink/downlink counters.
 func ParseUserCounters(stats map[string]int64) map[string]UserCounter {
 	out := map[string]UserCounter{}
 	for name, val := range stats {
@@ -144,6 +152,7 @@ func ParseUserCounters(stats map[string]int64) map[string]UserCounter {
 	return out
 }
 
+// EnsureAPIReachable dials the Xray API and closes it, returning an error when it is unreachable.
 func EnsureAPIReachable(ctx context.Context, addr string) error {
 	c, err := New(ctx, addr)
 	if err != nil {

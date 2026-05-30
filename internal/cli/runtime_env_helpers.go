@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// envOr returns the value of key (including any _FILE override), or fallback when unset.
 func envOr(key, fallback string) string {
 	if v, ok := envWithFileOverride(key); ok {
 		return v
@@ -14,6 +15,7 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+// envWithFileOverride resolves key from a <key>_FILE path first, then the plain env var.
 func envWithFileOverride(key string) (string, bool) {
 	fileKey := key + "_FILE"
 	if filePath := strings.TrimSpace(os.Getenv(fileKey)); filePath != "" {
@@ -32,6 +34,7 @@ func envWithFileOverride(key string) (string, bool) {
 	return "", false
 }
 
+// setEnvOverrides applies env var overrides and returns a function that restores the previous values.
 func setEnvOverrides(overrides map[string]string) (restore func()) {
 	type previous struct {
 		value string

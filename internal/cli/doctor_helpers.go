@@ -8,6 +8,7 @@ import (
 	"ovpn/internal/ssh"
 )
 
+// execRemote runs a remote command with a timeout, routing through the test hook when one is set.
 func (a *App) execRemote(runner *ssh.Runner, cfg ssh.Config, timeout time.Duration, cmd string) (ssh.Result, error) {
 	if a.remoteExecHook != nil {
 		return a.remoteExecHook(cfg, timeout, cmd)
@@ -17,6 +18,7 @@ func (a *App) execRemote(runner *ssh.Runner, cfg ssh.Config, timeout time.Durati
 	return runner.Exec(ctx, cfg, cmd)
 }
 
+// kvOr returns kv[key] when present and non-empty, otherwise fallback.
 func kvOr(kv map[string]string, key, fallback string) string {
 	if v := strings.TrimSpace(kv[key]); v != "" {
 		return v
@@ -24,11 +26,13 @@ func kvOr(kv map[string]string, key, fallback string) string {
 	return fallback
 }
 
+// sanitizeKey reduces a path to a stable key suitable for map lookups and labels.
 func sanitizeKey(path string) string {
 	replacer := strings.NewReplacer("/", "_", "-", "_", ".", "_")
 	return replacer.Replace(strings.Trim(path, "_/"))
 }
 
+// extractOwnerMode pulls the owner:group and mode fields out of a stat line.
 func extractOwnerMode(raw string) string {
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
@@ -39,10 +43,12 @@ func extractOwnerMode(raw string) string {
 	return ""
 }
 
+// trimState normalizes a compose service state string for comparison.
 func trimState(v string) string {
 	return strings.TrimSpace(strings.Trim(v, "\""))
 }
 
+// trimmedLines splits raw into lines and drops surrounding whitespace and empty lines.
 func trimmedLines(raw string) []string {
 	lines := strings.Split(raw, "\n")
 	out := make([]string, 0, len(lines))
@@ -56,6 +62,7 @@ func trimmedLines(raw string) []string {
 	return out
 }
 
+// shellQuote single-quotes v for safe inclusion in a remote shell command.
 func shellQuote(v string) string {
 	v = strings.ReplaceAll(v, `'`, `'"'"'`)
 	return "'" + v + "'"

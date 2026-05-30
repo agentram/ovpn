@@ -12,6 +12,7 @@ import (
 
 const telegramAPIHost = "api.telegram.org"
 
+// newTelegramHTTPClient builds an HTTP client whose dialer falls back to fixed Telegram API IPs when DNS resolution fails.
 func newTelegramHTTPClient(logger *slog.Logger, fallbackIPs []string) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	dialer := &net.Dialer{Timeout: 8 * time.Second, KeepAlive: 30 * time.Second}
@@ -25,6 +26,7 @@ func newTelegramHTTPClient(logger *slog.Logger, fallbackIPs []string) *http.Clie
 	}
 }
 
+// dialTelegramWithFallback dials addr normally and, on failure, retries against the configured fallback IPs.
 func dialTelegramWithFallback(ctx context.Context, logger *slog.Logger, dialer *net.Dialer, network, addr string, fallbackIPs []string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil || !strings.EqualFold(strings.TrimSpace(host), telegramAPIHost) || len(fallbackIPs) == 0 {
@@ -50,6 +52,7 @@ func dialTelegramWithFallback(ctx context.Context, logger *slog.Logger, dialer *
 	return nil, fmt.Errorf("telegram connect to %s failed: %w", addr, firstErr)
 }
 
+// compactIPs trims, de-duplicates, and drops empty entries from a list of IPs.
 func compactIPs(in []string) []string {
 	if len(in) == 0 {
 		return nil

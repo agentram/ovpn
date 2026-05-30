@@ -13,6 +13,7 @@ import (
 const DefaultQuotaWindow = 30 * 24 * time.Hour
 const DefaultWindow30DQuotaBytes int64 = 300 * 1024 * 1024 * 1024
 
+// RuntimeManager adds and removes users from the live Xray inbound.
 type RuntimeManager interface {
 	AddUser(ctx context.Context, inboundTag, email, uuid string) error
 	RemoveUser(ctx context.Context, inboundTag, email string) error
@@ -32,6 +33,7 @@ type QuotaEnforcer struct {
 	OnNotify                  func(event, message string)
 }
 
+// Enforce blocks users whose rolling-window usage meets their quota and unblocks those that have dropped back below it.
 func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 	if q == nil || q.Store == nil {
 		return nil
@@ -158,6 +160,7 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 	return firstErr
 }
 
+// runtimeAdd re-adds a user to the live inbound, validating that the runtime identity is complete.
 func (q *QuotaEnforcer) runtimeAdd(ctx context.Context, inboundTag, email, uuid string) error {
 	if q.Runtime == nil {
 		return fmt.Errorf("runtime manager is not configured")
@@ -172,6 +175,7 @@ func (q *QuotaEnforcer) runtimeAdd(ctx context.Context, inboundTag, email, uuid 
 	return nil
 }
 
+// runtimeRemove removes a user from the live inbound, validating that the runtime identity is complete.
 func (q *QuotaEnforcer) runtimeRemove(ctx context.Context, inboundTag, email string) error {
 	if q.Runtime == nil {
 		return fmt.Errorf("runtime manager is not configured")
@@ -186,6 +190,7 @@ func (q *QuotaEnforcer) runtimeRemove(ctx context.Context, inboundTag, email str
 	return nil
 }
 
+// logger returns the enforcer's logger, falling back to the default logger.
 func (q *QuotaEnforcer) logger() *slog.Logger {
 	if q != nil && q.Logger != nil {
 		return q.Logger
@@ -193,18 +198,21 @@ func (q *QuotaEnforcer) logger() *slog.Logger {
 	return slog.Default()
 }
 
+// recordEvent reports a quota action and result to the optional observer.
 func (q *QuotaEnforcer) recordEvent(action, result string) {
 	if q != nil && q.OnEvent != nil {
 		q.OnEvent(action, result)
 	}
 }
 
+// notify forwards a quota event to the optional notification callback.
 func (q *QuotaEnforcer) notify(event, message string) {
 	if q != nil && q.OnNotify != nil {
 		q.OnNotify(event, message)
 	}
 }
 
+// combineFirst keeps the first non-nil error, used to surface the earliest failure in a batch.
 func combineFirst(current error, next error) error {
 	if current != nil {
 		return current

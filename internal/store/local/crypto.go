@@ -29,6 +29,7 @@ var (
 	noKeyWarnOnce      sync.Once
 )
 
+// encryptSensitiveField AES-GCM encrypts a field when a key is configured, returning the plaintext unchanged otherwise.
 func encryptSensitiveField(plain string) (string, error) {
 	// This helper is intentionally field-level so we can incrementally protect
 	// sensitive columns without changing the full DB format.
@@ -60,6 +61,7 @@ func encryptSensitiveField(plain string) (string, error) {
 	return encryptedFieldPrefix + base64.RawStdEncoding.EncodeToString(payload), nil
 }
 
+// decryptSensitiveField decrypts a value carrying the encryption prefix; non-prefixed (legacy plaintext) values pass through.
 func decryptSensitiveField(value string) (string, error) {
 	// Non-prefixed values are legacy/plaintext records and remain readable.
 	if !strings.HasPrefix(value, encryptedFieldPrefix) {
@@ -97,6 +99,7 @@ func decryptSensitiveField(value string) (string, error) {
 	return string(plain), nil
 }
 
+// loadSecretKey resolves and caches the field-encryption key, reporting whether one is configured.
 func loadSecretKey() ([]byte, bool, error) {
 	secretKeyOnce.Do(func() {
 		keyRaw, ok, err := readRawSecretKey()
@@ -123,6 +126,7 @@ func loadSecretKey() ([]byte, bool, error) {
 	return cachedSecretKey, true, nil
 }
 
+// readRawSecretKey reads the key from OVPN_SECRET_KEY or ~/.ovpn/secret.key, reporting whether one was found.
 func readRawSecretKey() (string, bool, error) {
 	if v := strings.TrimSpace(os.Getenv(secretKeyEnv)); v != "" {
 		return v, true, nil
@@ -142,6 +146,7 @@ func readRawSecretKey() (string, bool, error) {
 	return v, true, nil
 }
 
+// parseSecretKey decodes a 32-byte key from raw bytes, hex, or base64.
 func parseSecretKey(raw string) ([]byte, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -162,12 +167,14 @@ func parseSecretKey(raw string) ([]byte, error) {
 	return nil, errors.New("invalid secret key format: expected 32-byte raw string, 64-char hex, or base64-encoded 32-byte value")
 }
 
+// warnMissingSecretKeyOnce logs a one-time warning that sensitive fields are being stored in plaintext.
 func warnMissingSecretKeyOnce() {
 	noKeyWarnOnce.Do(func() {
 		log.Printf("warning: sensitive local DB fields are stored in plaintext; set %s or ~/.ovpn/secret.key to enable AES-GCM field protection", secretKeyEnv)
 	})
 }
 
+// resetSecretKeyCacheForTests clears the cached key so tests can exercise different key states.
 func resetSecretKeyCacheForTests() {
 	secretKeyOnce = sync.Once{}
 	cachedSecretKey = nil

@@ -17,6 +17,7 @@ type reconcileAction struct {
 	details  string
 }
 
+// newUserReconcileCmd builds the `user reconcile` command that re-applies local user state to the live runtime.
 func (a *App) newUserReconcileCmd() *cobra.Command {
 	var reconcile struct {
 		fromServer string

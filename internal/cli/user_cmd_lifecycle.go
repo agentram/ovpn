@@ -13,6 +13,7 @@ import (
 	"ovpn/internal/model"
 )
 
+// newUserAddCmd builds the `user add` command that provisions a user across enabled servers.
 func (a *App) newUserAddCmd() *cobra.Command {
 	var add struct {
 		username string
@@ -107,6 +108,7 @@ func (a *App) newUserAddCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserExpirySetCmd builds the `user expiry-set` command.
 func (a *App) newUserExpirySetCmd() *cobra.Command {
 	var set struct {
 		username string
@@ -161,6 +163,7 @@ func (a *App) newUserExpirySetCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserExpiryClearCmd builds the `user expiry-clear` command.
 func (a *App) newUserExpiryClearCmd() *cobra.Command {
 	var clear struct {
 		username string
@@ -205,6 +208,7 @@ func (a *App) newUserExpiryClearCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserRemoveCmd builds the `user remove` command.
 func (a *App) newUserRemoveCmd() *cobra.Command {
 	var rm struct {
 		username string
@@ -249,10 +253,12 @@ func (a *App) newUserRemoveCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserEnableCmd builds the `user enable` command.
 func (a *App) newUserEnableCmd() *cobra.Command {
 	return a.newUserSetEnabledCmd(true)
 }
 
+// newUserDisableCmd builds the `user disable` command.
 func (a *App) newUserDisableCmd() *cobra.Command {
 	return a.newUserSetEnabledCmd(false)
 }
@@ -308,6 +314,7 @@ func (a *App) newUserSetEnabledCmd(enable bool) *cobra.Command {
 	return cmd
 }
 
+// newUserListCmd builds the `user list` command.
 func (a *App) newUserListCmd() *cobra.Command {
 	var list struct{ server string }
 	cmd := &cobra.Command{
@@ -349,6 +356,7 @@ func (a *App) newUserListCmd() *cobra.Command {
 	return cmd
 }
 
+// newUserShowCmd builds the `user show` command.
 func (a *App) newUserShowCmd() *cobra.Command {
 	var show struct{ server, username string }
 	cmd := &cobra.Command{

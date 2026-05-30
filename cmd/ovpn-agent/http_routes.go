@@ -30,6 +30,7 @@ type routeDeps struct {
 	refreshOnce func(context.Context)
 }
 
+// newMetricsRefreshFunc returns a closure that refreshes the Prometheus gauges (traffic totals, quota status, usage bands, and expiry) from the store.
 func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *agentMetrics) func(context.Context) {
 	return func(rctx context.Context) {
 		totals, err := store.ListTotals(rctx)
@@ -75,6 +76,7 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 	}
 }
 
+// registerHTTPRoutes wires the agent's HTTP handlers (health, stats, quota, user sync, and runtime user add/remove) onto mux.
 func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 	// Serialize runtime add/remove calls to avoid concurrent AlterInbound races against one Xray process.
 	mux.Handle("/metrics", promhttp.Handler())

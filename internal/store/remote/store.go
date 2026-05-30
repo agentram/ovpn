@@ -24,6 +24,7 @@ type Store struct {
 	db *sql.DB
 }
 
+// Open opens (creating and migrating as needed) the agent's SQLite database under baseDir.
 func Open(ctx context.Context, baseDir string) (*Store, error) {
 	if err := util.EnsureDir(baseDir); err != nil {
 		return nil, err
@@ -42,6 +43,7 @@ func Open(ctx context.Context, baseDir string) (*Store, error) {
 	return s, nil
 }
 
+// Close closes the underlying database.
 func (s *Store) Close() error { return s.db.Close() }
 
 // migrate writes migrate to the local database.
@@ -112,6 +114,7 @@ func (s *Store) migrate(ctx context.Context) error {
 	return nil
 }
 
+// UpsertCounter stores the latest cumulative value for a named Xray counter.
 func (s *Store) UpsertCounter(ctx context.Context, name string, value int64) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	return upsertCounterTx(ctx, s.db, name, value, now)
@@ -133,6 +136,7 @@ func upsertCounterTx(ctx context.Context, db execer, name string, value int64, n
 	return err
 }
 
+// GetCounter returns the last stored value for a named counter, if present.
 func (s *Store) GetCounter(ctx context.Context, name string) (Counter, bool, error) {
 	var c Counter
 	var ts string
@@ -147,6 +151,7 @@ func (s *Store) GetCounter(ctx context.Context, name string) (Counter, bool, err
 	return c, true, nil
 }
 
+// AddDelta adds a traffic delta to a user's hourly, daily, and total aggregates in one transaction.
 func (s *Store) AddDelta(ctx context.Context, email string, upDelta, downDelta int64, ts time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -216,6 +221,7 @@ func addDeltaTx(ctx context.Context, tx execer, email string, upDelta, downDelta
 	return err
 }
 
+// SetMeta stores a collector metadata key/value pair.
 func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
@@ -227,6 +233,7 @@ func (s *Store) SetMeta(ctx context.Context, key, value string) error {
 	return err
 }
 
+// GetMeta returns a collector metadata value, if present.
 func (s *Store) GetMeta(ctx context.Context, key string) (string, bool, error) {
 	var v string
 	err := s.db.QueryRowContext(ctx, `SELECT v FROM collector_meta WHERE k=?`, key).Scan(&v)
@@ -239,6 +246,7 @@ func (s *Store) GetMeta(ctx context.Context, key string) (string, bool, error) {
 	return v, true, nil
 }
 
+// ListTotals returns cumulative per-user traffic totals.
 func (s *Store) ListTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT email, uplink_bytes, downlink_bytes FROM user_traffic_total ORDER BY email`)
 	if err != nil {
@@ -258,6 +266,7 @@ func (s *Store) ListTotals(ctx context.Context) ([]model.UserTraffic, error) {
 	return out, rows.Err()
 }
 
+// ListDaily returns per-user traffic for the given day.
 func (s *Store) ListDaily(ctx context.Context, day time.Time) ([]model.UserTraffic, error) {
 	dayStart := time.Date(day.UTC().Year(), day.UTC().Month(), day.UTC().Day(), 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	rows, err := s.db.QueryContext(ctx, `

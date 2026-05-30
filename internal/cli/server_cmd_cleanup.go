@@ -11,6 +11,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
+// newServerCleanupCmd builds the `server cleanup` command that safely decommissions the ovpn runtime on a host.
 func (a *App) newServerCleanupCmd() *cobra.Command {
 	var cleanup struct {
 		keepBackups       bool

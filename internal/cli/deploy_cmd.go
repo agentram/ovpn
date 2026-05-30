@@ -9,6 +9,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
+// deployCmd builds the `deploy` command that renders and pushes the runtime stack to a server.
 func (a *App) deployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy <server>",
@@ -26,6 +27,7 @@ func (a *App) deployCmd() *cobra.Command {
 	return cmd
 }
 
+// restartCmd builds the `restart` command that restarts xray and ovpn-agent via docker compose.
 func (a *App) restartCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "restart <server>",

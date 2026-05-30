@@ -51,6 +51,7 @@ type Collector struct {
 	mu sync.Mutex
 }
 
+// Run collects stats on a ticker until ctx is canceled, performing one collection immediately on start.
 func (c *Collector) Run(ctx context.Context) error {
 	if c.Interval <= 0 {
 		c.Interval = 30 * time.Second
@@ -75,6 +76,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	}
 }
 
+// CollectOnce reads Xray counters, persists deltas, and runs quota and expiry enforcement under a single-flight lock.
 func (c *Collector) CollectOnce(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -159,6 +161,7 @@ func (c *Collector) CollectOnce(ctx context.Context) error {
 	return retErr
 }
 
+// consumeCounter computes the delta against the stored counter, persisting both atomically, and returns the delta.
 func (c *Collector) consumeCounter(ctx context.Context, counterKey, email string, current int64, uplink bool, now time.Time) (int64, error) {
 	prev, ok, err := c.Store.GetCounter(ctx, counterKey)
 	if err != nil {
@@ -207,6 +210,7 @@ func (c *Collector) consumeCounter(ctx context.Context, counterKey, email string
 	return delta, nil
 }
 
+// spikeThresholdBytes returns the per-cycle per-user delta that marks a traffic spike.
 func (c *Collector) spikeThresholdBytes() int64 {
 	if c != nil && c.SpikeDeltaBytes > 0 {
 		return c.SpikeDeltaBytes
@@ -214,6 +218,7 @@ func (c *Collector) spikeThresholdBytes() int64 {
 	return DefaultUserSpikeDeltaBytes
 }
 
+// logger returns the collector's logger, falling back to the default logger.
 func (c *Collector) logger() *slog.Logger {
 	if c != nil && c.Logger != nil {
 		return c.Logger

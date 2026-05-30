@@ -11,6 +11,7 @@ import (
 	"ovpn/internal/util"
 )
 
+// AddProxyBackend attaches a backend server to a proxy server.
 func (s *Store) AddProxyBackend(ctx context.Context, pb *model.ProxyBackend) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	res, err := s.db.ExecContext(ctx, `
@@ -29,6 +30,7 @@ func (s *Store) AddProxyBackend(ctx context.Context, pb *model.ProxyBackend) err
 	return nil
 }
 
+// UpsertProxyBackend inserts or updates a proxy-to-backend attachment.
 func (s *Store) UpsertProxyBackend(ctx context.Context, pb *model.ProxyBackend) error {
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err := s.db.ExecContext(ctx, `
@@ -43,11 +45,13 @@ func (s *Store) UpsertProxyBackend(ctx context.Context, pb *model.ProxyBackend) 
 	return err
 }
 
+// DeleteProxyBackend removes a proxy-to-backend attachment.
 func (s *Store) DeleteProxyBackend(ctx context.Context, proxyServerID, backendServerID int64) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM proxy_backends WHERE proxy_server_id=? AND backend_server_id=?`, proxyServerID, backendServerID)
 	return err
 }
 
+// ListProxyBackends returns the backend attachments for a proxy server.
 func (s *Store) ListProxyBackends(ctx context.Context, proxyServerID int64) ([]model.ProxyBackend, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT
@@ -91,6 +95,7 @@ func (s *Store) ListProxyBackends(ctx context.Context, proxyServerID int64) ([]m
 	return out, nil
 }
 
+// ListAttachedBackendServers returns the backend server records attached to a proxy server.
 func (s *Store) ListAttachedBackendServers(ctx context.Context, proxyServerID int64) ([]model.Server, error) {
 	mappings, err := s.ListProxyBackends(ctx, proxyServerID)
 	if err != nil {

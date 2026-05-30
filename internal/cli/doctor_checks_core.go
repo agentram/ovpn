@@ -11,6 +11,7 @@ import (
 	"ovpn/internal/ssh"
 )
 
+// checkSSH verifies SSH authentication and remote command execution; the bool reports whether to continue with remote checks.
 func (a *App) checkSSH(runner *ssh.Runner, cfg ssh.Config) (doctor.Check, bool) {
 	cmd := strings.Join([]string{
 		"set -u",
@@ -46,6 +47,7 @@ func (a *App) checkSSH(runner *ssh.Runner, cfg ssh.Config) (doctor.Check, bool) 
 	}, true
 }
 
+// checkSudo verifies that the SSH user has the sudo and Docker permissions deploys require.
 func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
@@ -99,6 +101,7 @@ func (a *App) checkSudo(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	return check
 }
 
+// checkDocker verifies that the Docker engine and the compose plugin are available on the host.
 func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -u",
@@ -147,6 +150,7 @@ func (a *App) checkDocker(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	return check
 }
 
+// checkDeployFiles verifies that the expected runtime files exist under the remote deploy directory.
 func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	paths := []string{
 		deploy.RemoteDir,
@@ -209,6 +213,7 @@ func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	return check
 }
 
+// checkProxyServiceRuntimeIdentity verifies that a proxy host's relay identity matches its attached backends.
 func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -e",
@@ -247,6 +252,7 @@ func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Confi
 	return check
 }
 
+// checkComposeState verifies that the required compose services are running.
 func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	validateCmd := withRemoteTimeout(10, fmt.Sprintf("set -e; cd %s; sudo -n docker compose --env-file .env -f docker-compose.yml config -q", shellQuote(deploy.RemoteDir)))
 	if _, err := a.execRemote(runner, cfg, 25*time.Second, validateCmd); err != nil {
@@ -329,6 +335,7 @@ func (a *App) checkComposeState(runner *ssh.Runner, cfg ssh.Config, srv model.Se
 	}
 }
 
+// checkXrayConfig runs `xray -test` against the deployed config inside the pinned image.
 func (a *App) checkXrayConfig(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := strings.Join([]string{
 		"set -e",

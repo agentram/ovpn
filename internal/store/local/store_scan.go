@@ -9,6 +9,7 @@ import (
 	"ovpn/internal/model"
 )
 
+// scanServer scans a single server row into a model.Server.
 func scanServer(row scanner) (*model.Server, error) {
 	srv := &model.Server{}
 	var created, updated string
@@ -44,8 +45,10 @@ func scanServer(row scanner) (*model.Server, error) {
 	return srv, nil
 }
 
+// scanServerRows scans the current server row from a result set.
 func scanServerRows(rows *sql.Rows) (*model.Server, error) { return scanServer(rows) }
 
+// scanUser scans a single user row into a model.User.
 func scanUser(row scanner) (*model.User, error) {
 	u := &model.User{}
 	var created, updated string
@@ -79,12 +82,14 @@ func scanUser(row scanner) (*model.User, error) {
 	return u, nil
 }
 
+// scanUserRows scans the current user row from a result set.
 func scanUserRows(rows *sql.Rows) (*model.User, error) { return scanUser(rows) }
 
 type scanner interface {
 	Scan(dest ...any) error
 }
 
+// boolToInt maps a bool to its 0/1 SQLite representation.
 func boolToInt(v bool) int {
 	if v {
 		return 1
@@ -92,6 +97,7 @@ func boolToInt(v bool) int {
 	return 0
 }
 
+// nullableTime renders an optional time as an RFC3339 string or SQL NULL.
 func nullableTime(t *time.Time) any {
 	if t == nil {
 		return nil

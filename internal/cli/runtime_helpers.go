@@ -19,6 +19,7 @@ import (
 	"ovpn/internal/xraycfg"
 )
 
+// initOrDeployServer runs the full deploy workflow (optionally bootstrapping the host) and notifies Telegram of the outcome.
 func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	event := "deploy"
 	if bootstrap {
@@ -120,6 +121,7 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	return nil
 }
 
+// buildDeployInput assembles the deploy.Input for a server from local state and environment configuration.
 func (a *App) buildDeployInput(
 	srv model.Server,
 	users []model.User,
@@ -294,6 +296,7 @@ func (a *App) persistAndSyncPolicies(srv model.Server) error {
 	return a.syncQuotaPolicy(srv)
 }
 
+// persistConfigOnly renders and stores the runtime config locally without pushing it to the host.
 func (a *App) persistConfigOnly(srv model.Server) error {
 	// Runtime API changes are ephemeral across Xray restarts unless config.json is updated too.
 	// This path persists the reconciled config without forcing an immediate compose restart.
@@ -328,6 +331,7 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 	return err
 }
 
+// syncQuotaPolicy pushes the current quota policies to the agent and triggers enforcement.
 func (a *App) syncQuotaPolicy(srv model.Server) error {
 	if a.dryRun {
 		a.log().Info("dry-run: skipping remote quota policy sync", "server", srv.Name)
@@ -409,6 +413,7 @@ func (a *App) syncUserPolicies(srv model.Server) error {
 	return fmt.Errorf("user policy sync failed after retries: %w", lastErr)
 }
 
+// fetchQuotaStatus reads the rolling-window quota status from the agent, optionally filtered by email.
 func (a *App) fetchQuotaStatus(srv model.Server, email string) (model.QuotaStatusResponse, error) {
 	url := a.agentURL("/quota/status")
 	if strings.TrimSpace(email) != "" {
@@ -437,6 +442,7 @@ func (a *App) isUserBlockedByQuota(srv model.Server, email string) (bool, error)
 	return status.Users[0].BlockedByQuota, nil
 }
 
+// usersForRuntimeConfig filters and prepares the user set that should appear in the rendered runtime config.
 func (a *App) usersForRuntimeConfig(srv model.Server, users []model.User) ([]model.User, error) {
 	// First deploy and dry-run deploys have no safe remote quota_state source.
 	// Use local desired state only, preserving the preview contract for --dry-run.
@@ -483,6 +489,7 @@ func effectiveUserEnabled(u model.User) bool {
 	return model.IsEffectivelyEnabled(u.Enabled, u.ExpiryDate, time.Now().UTC())
 }
 
+// applyRuntimeUser adds or removes a single user from the live Xray inbound via the agent.
 func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) error {
 	path := "/runtime/user/remove"
 	if enable {

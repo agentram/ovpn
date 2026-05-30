@@ -10,6 +10,7 @@ import (
 	"ovpn/internal/telegrambot"
 )
 
+// pollLoop long-polls Telegram getUpdates and dispatches each message or callback until ctx is canceled.
 func (b *bot) pollLoop(ctx context.Context) {
 	offset := int64(0)
 	for {
@@ -41,6 +42,7 @@ func (b *bot) pollLoop(ctx context.Context) {
 	}
 }
 
+// handleMessage authorizes the sender, then routes a text message to a pending prompt, command, or menu action.
 func (b *bot) handleMessage(ctx context.Context, msg *telegramMessage) {
 	if msg == nil {
 		return
@@ -97,6 +99,7 @@ func (b *bot) handleMessage(ctx context.Context, msg *telegramMessage) {
 	}
 }
 
+// handleCallback authorizes the sender and dispatches an inline-keyboard callback query.
 func (b *bot) handleCallback(ctx context.Context, cb *telegramCallbackQuery) {
 	if cb == nil || cb.Message == nil {
 		return
@@ -148,6 +151,7 @@ func formatFriendlyError(err error) string {
 	return fmt.Sprintf("Request failed: %s", strings.TrimSpace(err.Error()))
 }
 
+// dispatchCommand routes a slash command (e.g. /status, /help) to its handler.
 func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd string, args []string) error {
 	switch cmd {
 	case "/start", "/menu":
@@ -192,6 +196,7 @@ func (b *bot) dispatchCommand(ctx context.Context, chatID int64, _ int64, cmd st
 	}
 }
 
+// dispatchMenuAction routes a reply-keyboard button action to its handler.
 func (b *bot) dispatchMenuAction(ctx context.Context, chatID int64, _ int64, action string) error {
 	switch action {
 	case "home":
@@ -227,6 +232,7 @@ func (b *bot) dispatchMenuAction(ctx context.Context, chatID int64, _ int64, act
 	}
 }
 
+// dispatchCallback routes an inline-keyboard callback payload to its handler.
 func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, data string) error {
 	data = strings.TrimSpace(data)
 	switch data {
@@ -322,6 +328,7 @@ func (b *bot) dispatchCallback(ctx context.Context, chatID int64, userID int64, 
 	return b.sendPlainMessage(ctx, chatID, "Unknown action. Use /menu.", mainReplyKeyboard())
 }
 
+// handlePromptInput consumes free-text follow-up input for a pending prompt (such as a user link lookup).
 func (b *bot) handlePromptInput(ctx context.Context, chatID int64, userID int64, st promptState, text string) error {
 	defer b.clearPrompt(chatID)
 	switch st.Kind {

@@ -65,6 +65,7 @@ type Input struct {
 	RenderedOverride             []byte
 }
 
+// applyDefaults fills unset Input fields with their default images, ports, and paths.
 func (in *Input) applyDefaults() {
 	if in.XrayImage == "" {
 		in.XrayImage = defaults.DefaultXrayImage(in.Server.XrayVersion)
@@ -98,6 +99,7 @@ func (in *Input) applyDefaults() {
 	in.TelegramLinkShortID = defaultString(in.TelegramLinkShortID, firstShortID(in.Server.RealityShortIDs))
 }
 
+// defaultString returns v when non-blank, otherwise fallback.
 func defaultString(v string, fallback string) string {
 	if strings.TrimSpace(v) == "" {
 		return fallback
@@ -110,6 +112,7 @@ type Bundle struct {
 	ConfigRaw []byte
 }
 
+// RenderBundle renders the full deployable bundle (config, compose files, env, monitoring assets) into a temp directory.
 func RenderBundle(in Input) (*Bundle, error) {
 	in.applyDefaults()
 
@@ -343,6 +346,7 @@ backend foreign_backends
 	return b.String()
 }
 
+// CleanupBundle removes the temporary bundle directory.
 func CleanupBundle(b *Bundle) {
 	if b == nil || b.Dir == "" {
 		return
@@ -393,6 +397,7 @@ func createTarGz(tarPath, srcDir string) error {
 	})
 }
 
+// copyFile copies src to dst with the given file mode.
 func copyFile(src, dst string, mode os.FileMode) error {
 	in, err := os.Open(src)
 	if err != nil {
