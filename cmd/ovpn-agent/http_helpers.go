@@ -104,31 +104,36 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
-// requireAgentToken guards mutating endpoints with a bearer token when one is configured.
+// readOnlyAgentPaths are the endpoints safe to serve without the bearer token: Prometheus
+// scraping, health checks, and read-only stats/status queries. This allowlist drives a
+// default-deny policy, so any other path — including a side-effecting endpoint like /collect that
+// accepts non-POST methods — requires the token, and a newly added endpoint is protected by default.
+var readOnlyAgentPaths = map[string]bool{
+	"/metrics":        true,
+	"/health":         true,
+	"/stats/total":    true,
+	"/stats/daily":    true,
+	"/quota/status":   true,
+	"/users/status":   true,
+	"/quota/policies": true,
+}
+
+// requireAgentToken guards every non-read-only endpoint with a bearer token when one is configured.
 //
 // The agent binds to 127.0.0.1 on the host but is reachable by every container that shares its
 // Docker network (Prometheus, Grafana, cAdvisor, the Telegram bot). Without a token, any of those
-// images could call the mutating endpoints (/runtime/user/add, /quota/reset, ...) and take over
-// VPN user state. Read-only methods stay open so Prometheus scraping and health checks keep
-// working; when no token is set the agent behaves exactly as before (backward compatible).
+// images could call the mutating endpoints (/runtime/user/add, /quota/reset, /collect, ...) and
+// take over VPN user state. Matching on path rather than HTTP method ensures a side-effecting GET
+// such as /collect cannot slip through. When no token is set the agent behaves as before.
 func requireAgentToken(token string, next http.Handler) http.Handler {
 	token = strings.TrimSpace(token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if token != "" && !isReadOnlyMethod(r.Method) && !bearerTokenMatches(r.Header.Get("Authorization"), token) {
+		if token != "" && !readOnlyAgentPaths[r.URL.Path] && !bearerTokenMatches(r.Header.Get("Authorization"), token) {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func isReadOnlyMethod(method string) bool {
-	switch method {
-	case http.MethodGet, http.MethodHead, http.MethodOptions:
-		return true
-	default:
-		return false
-	}
 }
 
 func bearerTokenMatches(header, token string) bool {

@@ -148,7 +148,7 @@ func TestAgentRoutesManualCollectAndRuntimeErrorBranches(t *testing.T) {
 		t.Fatalf("replace user policies: %v", err)
 	}
 
-	assertAgentStatus(t, mux, http.MethodGet, "/collect", nil, http.StatusInternalServerError, "collector is not configured")
+	assertAgentStatus(t, mux, http.MethodPost, "/collect", nil, http.StatusInternalServerError, "collector is not configured")
 	assertAgentStatus(t, mux, http.MethodGet, "/quota/sync", nil, http.StatusMethodNotAllowed, "method not allowed")
 	assertAgentStatus(t, mux, http.MethodPost, "/quota/sync", `{`, http.StatusBadRequest, "invalid request")
 	assertAgentStatus(t, mux, http.MethodGet, "/users/sync", nil, http.StatusMethodNotAllowed, "method not allowed")
@@ -184,7 +184,7 @@ func TestAgentManualCollectRouteUsesInjectedCollector(t *testing.T) {
 		collectOnce: func(context.Context) error { calls++; return nil },
 		refreshOnce: func(context.Context) {},
 	})
-	assertAgentStatus(t, mux, http.MethodGet, "/collect", nil, http.StatusOK, `"ok":true`)
+	assertAgentStatus(t, mux, http.MethodPost, "/collect", nil, http.StatusOK, `"ok":true`)
 	if calls != 1 {
 		t.Fatalf("expected collectOnce call, got %d", calls)
 	}

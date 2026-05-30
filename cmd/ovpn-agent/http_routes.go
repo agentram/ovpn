@@ -116,7 +116,11 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 		}
 		writeJSON(w, http.StatusOK, payload)
 	})
-	mux.HandleFunc("/collect", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/collect", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
 		collectOnce := d.collectOnce
 		if collectOnce == nil && d.collector != nil {
 			collectOnce = d.collector.CollectOnce

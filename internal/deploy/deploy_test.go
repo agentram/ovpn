@@ -536,8 +536,11 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
 		t.Fatalf("fourth command should apply validated staged bundle, got %q", r.execCmds[3])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo chown root:root /opt/ovpn/.env") || !strings.Contains(r.execCmds[3], "sudo chmod 600 /opt/ovpn/.env") {
+	if !strings.Contains(r.execCmds[3], "chmod 600 /opt/ovpn/.env") {
 		t.Fatalf("fourth command should lock down .env after copy, got %q", r.execCmds[3])
+	}
+	if strings.Contains(r.execCmds[3], "chown root:root /opt/ovpn/.env") {
+		t.Fatalf("fourth command must not force .env to root ownership (breaks non-root deployers), got %q", r.execCmds[3])
 	}
 	if !strings.Contains(r.execCmds[3], "sudo chown 0:65532 /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 640 /opt/ovpn/xray/config.json") {
 		t.Fatalf("fourth command should lock down xray config to the xray runtime group, got %q", r.execCmds[3])
@@ -642,8 +645,11 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
 		t.Fatalf("expected extract command to use bounded remote timeout, got %#v", r.execCmds)
 	}
-	if !strings.Contains(r.execCmds[0], "sudo chown root:root /opt/ovpn/.incoming/.env") || !strings.Contains(r.execCmds[0], "sudo chmod 600 /opt/ovpn/.incoming/.env") {
+	if !strings.Contains(r.execCmds[0], "chmod 600 /opt/ovpn/.incoming/.env") {
 		t.Fatalf("extract command should lock down staged .env before validation, got %#v", r.execCmds)
+	}
+	if strings.Contains(r.execCmds[0], "chown root:root /opt/ovpn/.incoming/.env") {
+		t.Fatalf("extract command must not force staged .env to root ownership (breaks non-root deployers), got %#v", r.execCmds)
 	}
 	if !strings.Contains(r.execCmds[0], "sudo chown 0:65532 /opt/ovpn/.incoming/xray/config.json") || !strings.Contains(r.execCmds[0], "sudo chmod 640 /opt/ovpn/.incoming/xray/config.json") {
 		t.Fatalf("extract command should lock down staged xray config to the xray runtime group before validation, got %#v", r.execCmds)
