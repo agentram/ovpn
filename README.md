@@ -8,6 +8,8 @@
 
 The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
+It is intended for operators who prefer a local CLI and SSH workflow over a web panel. It is not a hosted VPN service; it gives you reproducible files and commands for your own servers.
+
 ## Fast navigation
 
 - [Project site](https://agentram.github.io/ovpn/)
