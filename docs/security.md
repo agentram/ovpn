@@ -83,7 +83,7 @@ Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentiona
 - SSH agent forwarding is disabled by default (`ovpn_ssh_allow_agent_forwarding: false`).
 - Obsolete public firewall allows can be removed with `ovpn_firewall_remove_tcp_ports`.
 - Explicitly declared apt source files and packages can be removed with `ovpn_remove_apt_source_files` and `ovpn_purge_packages`; keep these lists empty unless a host needs cleanup.
-- Existing runtime secrets and backup archives are locked down when present; missing files are ignored so fresh hosts still bootstrap cleanly. The Xray config keeps portable read permissions so container image UID changes do not break startup.
+- Existing runtime secrets and backup archives are locked down when present; missing files are ignored so fresh hosts still bootstrap cleanly. The Xray config is installed as `root:<xray-gid> 0640`, so the Xray container can read it without making the REALITY private key and client UUIDs world-readable.
 - Docker daemon defaults enable live-restore and json-file log rotation.
 - Docker daemon defaults are merged into existing `/etc/docker/daemon.json` content so unrelated daemon settings are preserved.
 - The optional OVPN MOTD summarizes host role, domain, deploy root, VPN port, monitoring tunnel policy, and the no-auto-reboot policy.
@@ -188,7 +188,7 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 - Local DB (`~/.ovpn/ovpn.db`) contains sensitive metadata.
 - Remote runtime (`/opt/ovpn`) contains runtime secrets/config.
 - Backups may contain secrets and must be treated as sensitive.
-- Deploy and host maintenance keep `/opt/ovpn/.env` at `root:root 0600`, Xray config at `root:root 0644`, and backup archives at `root:root 0600`.
+- Deploy keeps `/opt/ovpn/.env` at `0600` for the deploying account, keeps Xray config at `root:<xray-gid> 0640`, and treats remote backups/snapshots as sensitive because they may contain runtime secrets.
 - Keep inventory secrets in `ansible-vault`.
 - Logs redact `vless://` links and common secret-like inline values (`password`, `token`, `private_key`), but avoid logging secrets intentionally.
 
