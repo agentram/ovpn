@@ -1,8 +1,12 @@
 package main
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -44,5 +48,33 @@ func TestRequireAgentToken(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.wantStatus)
 			}
 		})
+	}
+}
+
+func TestResolveAgentToken(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	dir := t.TempDir()
+	// Explicit env token is returned and persisted.
+	if got := resolveAgentToken("tok-1", dir, logger); got != "tok-1" {
+		t.Fatalf("env token = %q, want tok-1", got)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, agentTokenFile)); err != nil || string(b) != "tok-1" {
+		t.Fatalf("token not persisted: %q err=%v", string(b), err)
+	}
+	// Empty env token reuses the persisted one (auth stays enabled).
+	if got := resolveAgentToken("", dir, logger); got != "tok-1" {
+		t.Fatalf("empty env should reuse persisted token, got %q", got)
+	}
+	// A new explicit token rotates the persisted value.
+	if got := resolveAgentToken("tok-2", dir, logger); got != "tok-2" {
+		t.Fatalf("rotated token = %q, want tok-2", got)
+	}
+	if got := resolveAgentToken("", dir, logger); got != "tok-2" {
+		t.Fatalf("empty env should reuse rotated token, got %q", got)
+	}
+	// No env token and no persisted file means auth stays disabled.
+	if got := resolveAgentToken("", t.TempDir(), logger); got != "" {
+		t.Fatalf("fresh dir with no token should be empty, got %q", got)
 	}
 }

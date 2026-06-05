@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.5.1
+
+### Fixed
+- `ovpn-agent` now persists its bearer token in its data directory and reuses it if it is restarted with an empty `OVPN_AGENT_TOKEN`, so a token-aware agent will not silently fall back to unauthenticated when its rendered env loses the token. Scope: this protects deploys that ship a `1.5.1+` agent; a deploy run by a pre-auth `ovpn` replaces the agent binary itself with an unauthenticated one and still disables auth, so keep every operator and host on `ovpn >= 1.5.x` — that is the only protection against the old-CLI downgrade.
+- The CLI reports a 401 from `ovpn-agent` as an explicit auth-token/version mismatch (with a `ovpn deploy` hint) rather than a generic runtime error, so the cause is clear instead of being masked by the deploy fallback.
+
+### Security
+- Bumped the pinned Go toolchain to `1.26.4` to pick up standard-library fixes for `GO-2026-5039` (`net/textproto`) and `GO-2026-5037` (`crypto/x509`).
+- Bumped pinned GitHub Actions (Dependabot): `actions/checkout` 6.0.2 → 6.0.3 and `github/codeql-action` 4.36.0 → 4.36.1.
+
 ## 1.5.0
 
 ### Security

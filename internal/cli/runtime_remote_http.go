@@ -44,6 +44,11 @@ func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any)
 		if msg == "" {
 			msg = httpStatusText(status)
 		}
+		if status == http.StatusUnauthorized {
+			// A 401 is always an agent auth-token mismatch, not a transient runtime error. Spell out
+			// the likely cause so the operator fixes the token/version skew instead of assuming a flake.
+			return nil, fmt.Errorf("remote http call %s %s on %s returned 401: %s; the ovpn-agent rejected the auth token — ensure this CLI and the deployed agent are the same ovpn version and run `ovpn deploy %s` to re-sync OVPN_AGENT_TOKEN", method, url, srv.Host, msg, srv.Name)
+		}
 		return nil, fmt.Errorf("remote http call %s %s on %s returned %d: %s", method, url, srv.Host, status, msg)
 	}
 	return []byte(strings.TrimSpace(body)), nil
