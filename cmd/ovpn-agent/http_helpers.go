@@ -5,17 +5,61 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"ovpn/internal/telegrambot"
 )
+
+// agentTokenFile is where the agent persists its bearer token inside the data directory so auth
+// survives a redeploy whose rendered env happens to carry no token.
+const agentTokenFile = "agent.token"
+
+// resolveAgentToken determines the effective bearer token and makes auth "sticky" for this agent.
+//
+// An explicit OVPN_AGENT_TOKEN always wins and is persisted. When this agent starts with an empty
+// token (its rendered env lost the value), the previously persisted token is reused so a
+// token-aware agent does not silently fall back to unauthenticated. To intentionally disable auth,
+// clear the token and remove the persisted file under the data directory.
+//
+// Scope: this only helps when a token-aware agent binary is running. A deploy performed by a
+// pre-auth ovpn replaces the agent binary itself with an unauthenticated build, which never reads
+// this file; guarding against that requires keeping every operator on a token-aware ovpn release.
+func resolveAgentToken(envToken, dbPath string, logger *slog.Logger) string {
+	// tokenPath is a fixed filename under the operator-provided data dir (a daemon flag), not
+	// network input, so the path-traversal warnings on these file ops are not applicable.
+	tokenPath := filepath.Join(dbPath, agentTokenFile)
+	if envToken != "" {
+		if err := os.MkdirAll(dbPath, 0o700); err != nil {
+			logger.Warn("create data dir for agent token failed", "path", dbPath, "error", err)
+		} else if err := os.WriteFile(tokenPath, []byte(envToken), 0o600); err != nil { // #nosec G304 G703 -- operator-controlled data dir, fixed filename.
+			logger.Warn("persist agent token failed", "path", tokenPath, "error", err)
+		}
+		return envToken
+	}
+	b, err := os.ReadFile(tokenPath) // #nosec G304 G703 -- operator-controlled data dir, fixed filename.
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			logger.Warn("read persisted agent token failed", "path", tokenPath, "error", err)
+		}
+		return ""
+	}
+	persisted := strings.TrimSpace(string(b))
+	if persisted != "" {
+		logger.Warn("OVPN_AGENT_TOKEN is empty; reusing persisted token so agent auth stays enabled",
+			"path", tokenPath,
+			"hint", "the rendered env carried no token; set OVPN_AGENT_TOKEN, or remove this file to disable auth")
+	}
+	return persisted
+}
 
 // envInt64 reads key as a base-10 int64, returning fallback when it is unset or unparseable.
 func envInt64(key string, fallback int64) int64 {

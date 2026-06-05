@@ -38,7 +38,6 @@ func main() {
 	flag.StringVar(&poll, "poll-interval", "30s", "stats polling interval")
 	flag.StringVar(&logLevelRaw, "log-level", strings.TrimSpace(os.Getenv("OVPN_AGENT_LOG_LEVEL")), "Log level: debug|info|warn|error (default: env OVPN_AGENT_LOG_LEVEL or info)")
 	flag.StringVar(&certFile, "cert-file", strings.TrimSpace(os.Getenv("OVPN_AGENT_CERT_FILE")), "Optional path to fullchain certificate file for expiry monitoring")
-	authToken := strings.TrimSpace(os.Getenv("OVPN_AGENT_TOKEN"))
 	flag.Int64Var(&spikeDeltaBytes, "spike-delta-bytes", envInt64("OVPN_AGENT_SPIKE_DELTA_BYTES", stats.DefaultUserSpikeDeltaBytes), "Per-user delta threshold for spike events")
 	flag.BoolVar(&debug, "debug", false, "Enable debug logging (shorthand for --log-level=debug)")
 	flag.Parse()
@@ -53,6 +52,11 @@ func main() {
 	}
 	logger := logx.NewTextLogger(level).With("component", "ovpn-agent")
 	slog.SetDefault(logger)
+
+	// Resolve the bearer token after dbPath is known so it can be persisted: an explicit
+	// OVPN_AGENT_TOKEN wins and is saved, otherwise a previously saved token is reused. This keeps
+	// auth from being silently disabled by a deploy that renders an empty token (e.g. an older CLI).
+	authToken := resolveAgentToken(strings.TrimSpace(os.Getenv("OVPN_AGENT_TOKEN")), dbPath, logger)
 
 	interval, err := time.ParseDuration(poll)
 	if err != nil {
