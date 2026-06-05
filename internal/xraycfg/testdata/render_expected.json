@@ -3,6 +3,7 @@
     "loglevel": "warning"
   },
   "dns": {
+    "queryStrategy": "UseIPv4",
     "servers": [
       "9.9.9.9",
       "149.112.112.112"
@@ -114,6 +115,9 @@
   "outbounds": [
     {
       "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIPv4"
+      },
       "tag": "direct"
     },
     {
@@ -122,6 +126,9 @@
     },
     {
       "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIPv4"
+      },
       "tag": "api"
     }
   ]
