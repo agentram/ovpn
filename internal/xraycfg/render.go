@@ -185,7 +185,8 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	}
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		cfg.DNS = map[string]any{
-			"servers": spec.ThreatDNSServers,
+			"queryStrategy": "UseIPv4",
+			"servers":       spec.ThreatDNSServers,
 		}
 		cfg.Routing.(map[string]any)["rules"] = append(rules,
 			map[string]any{
@@ -258,15 +259,15 @@ func buildClientUsers(users []model.User, serviceUsers []ServiceUser) []map[stri
 func baseOutbounds(spec Spec) []any {
 	if spec.Role != model.ServerRoleProxy || spec.ProxyRelay == nil {
 		return []any{
-			map[string]any{"protocol": "freedom", "tag": "direct"},
+			freedomOutbound("direct"),
 			map[string]any{"protocol": "blackhole", "tag": "block"},
-			map[string]any{"protocol": "freedom", "tag": "api"},
+			freedomOutbound("api"),
 		}
 	}
 	return []any{
 		map[string]any{"protocol": "blackhole", "tag": "block"},
-		map[string]any{"protocol": "freedom", "tag": "direct"},
-		map[string]any{"protocol": "freedom", "tag": "api"},
+		freedomOutbound("direct"),
+		freedomOutbound("api"),
 		map[string]any{
 			"tag":      "foreign-pool",
 			"protocol": "vless",
@@ -296,6 +297,16 @@ func baseOutbounds(spec Spec) []any {
 					"spiderX":     "/",
 				},
 			},
+		},
+	}
+}
+
+func freedomOutbound(tag string) map[string]any {
+	return map[string]any{
+		"protocol": "freedom",
+		"tag":      tag,
+		"settings": map[string]any{
+			"domainStrategy": "UseIPv4",
 		},
 	}
 }

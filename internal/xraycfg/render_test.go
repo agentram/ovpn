@@ -44,6 +44,9 @@ func TestRenderServerJSONIncludesRequiredSections(t *testing.T) {
 	if len(servers) == 0 {
 		t.Fatalf("dns servers missing in minimal profile")
 	}
+	if got := dns["queryStrategy"]; got != "UseIPv4" {
+		t.Fatalf("dns queryStrategy = %v, want UseIPv4", got)
+	}
 	routing, ok := obj["routing"].(map[string]any)
 	if !ok {
 		t.Fatalf("routing missing")
@@ -51,6 +54,29 @@ func TestRenderServerJSONIncludesRequiredSections(t *testing.T) {
 	rules, _ := routing["rules"].([]any)
 	if len(rules) < 3 {
 		t.Fatalf("expected api + security rules, got %d", len(rules))
+	}
+	outbounds, ok := obj["outbounds"].([]any)
+	if !ok {
+		t.Fatalf("outbounds missing")
+	}
+	freedomTags := map[string]bool{}
+	for _, outbound := range outbounds {
+		ob, ok := outbound.(map[string]any)
+		if !ok || ob["protocol"] != "freedom" {
+			continue
+		}
+		tag, _ := ob["tag"].(string)
+		if tag != "direct" && tag != "api" {
+			continue
+		}
+		settings, _ := ob["settings"].(map[string]any)
+		if got := settings["domainStrategy"]; got != "UseIPv4" {
+			t.Fatalf("%s domainStrategy = %v, want UseIPv4", tag, got)
+		}
+		freedomTags[tag] = true
+	}
+	if !freedomTags["direct"] || !freedomTags["api"] {
+		t.Fatalf("expected direct and api freedom outbounds, got %v", freedomTags)
 	}
 }
 
