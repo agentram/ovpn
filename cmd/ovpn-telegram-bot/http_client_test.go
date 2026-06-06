@@ -17,7 +17,7 @@ func TestBotHTTPHealthAlertmanagerAndNotify(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, false)
+	b := newBotTestHarness(t, rec, false)
 	b.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	b.notifyChats = []int64{101, 102}
 
@@ -49,7 +49,7 @@ func TestBotHTTPRejectsBadRequestsAndTelegramFailures(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, false)
+	b := newBotTestHarness(t, rec, false)
 	b.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	b.notifyChats = nil
 
@@ -121,7 +121,7 @@ func TestBotHTTPRejectsBadRequestsAndTelegramFailures(t *testing.T) {
 func TestBotSendToNotifyChatsReturnsFirstSendError(t *testing.T) {
 	t.Parallel()
 
-	b := newCoverageBot(t, &telegramRecorder{}, false)
+	b := newBotTestHarness(t, &telegramRecorder{}, false)
 	b.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	b.notifyChats = []int64{101}
 	b.tg = &telegramClient{

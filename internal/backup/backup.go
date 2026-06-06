@@ -117,6 +117,7 @@ sudo mkdir -p %[1]s
 VOLUME=$(sudo docker volume ls --format '{{.Name}}' | grep 'ovpn-agent-data' | head -n1 || true)
 TMP=$(mktemp -d)
 sudo cp -a %[2]s "$TMP/stack"
+sudo rm -rf "$TMP/stack/logs"
 if [ -n "$VOLUME" ]; then
   MP=$(sudo docker volume inspect "$VOLUME" --format '{{.Mountpoint}}')
   mkdir -p "$TMP/stats"

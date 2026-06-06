@@ -17,7 +17,7 @@ type reconcileAction struct {
 	details  string
 }
 
-// newUserReconcileCmd builds the `user reconcile` command that re-applies local user state to the live runtime.
+// newUserReconcileCmd builds the hidden `user reconcile` command for advanced local-state repair.
 func (a *App) newUserReconcileCmd() *cobra.Command {
 	var reconcile struct {
 		fromServer string
@@ -26,9 +26,15 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 		apply      bool
 	}
 	cmd := &cobra.Command{
-		Use:   "reconcile",
-		Short: "Reconcile users from one server to others (dry-run by default)",
-		Args:  cobra.NoArgs,
+		Use:    "reconcile",
+		Short:  "Repair local user-state drift (advanced, dry-run by default)",
+		Hidden: true,
+		Long: "Repair local user-state drift by copying one server's local user rows to another server.\n\n" +
+			"Normal operators should not need this command: user mutations already apply to all enabled VPN servers,\n" +
+			"and deploy materializes canonical users onto a newly added server automatically.\n\n" +
+			"Use this only when local ~/.ovpn state has drifted after manual database edits, an old migration,\n" +
+			"or a failed repair. The command changes local state only; run deploy for affected servers afterwards.",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if strings.TrimSpace(reconcile.fromServer) == "" {
 				return fmt.Errorf("--from-server is required")

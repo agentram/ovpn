@@ -9,7 +9,7 @@ import (
 	"ovpn/internal/model"
 )
 
-func TestServerUserBackupAndProxyCRUDCoverage(t *testing.T) {
+func TestServerUserBackupAndProxyCRUD(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -19,7 +19,7 @@ func TestServerUserBackupAndProxyCRUDCoverage(t *testing.T) {
 	}
 	defer store.Close()
 
-	server := mustAddStoreTestServer(t, ctx, store, storeCoverageServer("main", model.ServerRoleVPN))
+	server := mustAddStoreTestServer(t, ctx, store, storeCRUDServer("main", model.ServerRoleVPN))
 	server.Host = "203.0.113.10"
 	server.Enabled = false
 	if err := store.UpdateServer(ctx, server); err != nil {
@@ -104,8 +104,8 @@ func TestServerUserBackupAndProxyCRUDCoverage(t *testing.T) {
 		t.Fatalf("unexpected backups: %+v", backups)
 	}
 
-	proxy := mustAddStoreTestServer(t, ctx, store, storeCoverageServer("proxy", model.ServerRoleProxy))
-	backend := mustAddStoreTestServer(t, ctx, store, storeCoverageServer("backend", model.ServerRoleVPN))
+	proxy := mustAddStoreTestServer(t, ctx, store, storeCRUDServer("proxy", model.ServerRoleProxy))
+	backend := mustAddStoreTestServer(t, ctx, store, storeCRUDServer("backend", model.ServerRoleVPN))
 	mapping := &model.ProxyBackend{ProxyServerID: proxy.ID, BackendServerID: backend.ID, Enabled: true, Priority: 50}
 	if err := store.AddProxyBackend(ctx, mapping); err != nil {
 		t.Fatalf("add proxy backend: %v", err)
@@ -125,7 +125,7 @@ func TestServerUserBackupAndProxyCRUDCoverage(t *testing.T) {
 	}
 }
 
-func storeCoverageServer(name string, role string) *model.Server {
+func storeCRUDServer(name string, role string) *model.Server {
 	return &model.Server{
 		Name:              name,
 		Role:              role,

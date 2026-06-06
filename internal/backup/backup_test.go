@@ -106,7 +106,7 @@ func TestBuildRemoteScripts(t *testing.T) {
 	backup := buildRemoteBackupScript("/opt/ovpn-backups/main-20260405T120000.tgz", "main")
 	restore := buildRemoteRestoreScript("/opt/ovpn-backups/main-20260405T120000.tgz")
 
-	for _, want := range []string{"ovpn-agent-data", "sudo cp -a", "sudo tar -czf", "find /opt/ovpn-backups -maxdepth 1 -type f -name 'main-*.tgz'", "NR>7"} {
+	for _, want := range []string{"ovpn-agent-data", "sudo cp -a", "sudo rm -rf \"$TMP/stack/logs\"", "sudo tar -czf", "find /opt/ovpn-backups -maxdepth 1 -type f -name 'main-*.tgz'", "NR>7"} {
 		if !strings.Contains(backup, want) {
 			t.Fatalf("backup script missing %q: %q", want, backup)
 		}

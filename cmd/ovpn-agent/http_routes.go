@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -28,6 +29,120 @@ type routeDeps struct {
 	dbPath      string
 	collectOnce func(context.Context) error
 	refreshOnce func(context.Context)
+}
+
+func parseSinceParam(raw string, fallback time.Duration) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Now().UTC().Add(-fallback), nil
+	}
+	if d, err := time.ParseDuration(raw); err == nil {
+		if d <= 0 {
+			return time.Time{}, fmt.Errorf("since duration must be positive")
+		}
+		return time.Now().UTC().Add(-d), nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.UTC(), nil
+	}
+	return time.Time{}, fmt.Errorf("since must be a duration such as 24h or an RFC3339 timestamp")
+}
+
+func buildUserDiagnosticsResponse(ctx context.Context, store *remote.Store, email string, since time.Time, until time.Time) (model.UserDiagnosticsResponse, error) {
+	email = strings.TrimSpace(email)
+	userStatus, err := store.UserStatus(ctx, until, stats.DefaultQuotaWindow, stats.DefaultWindow30DQuotaBytes, email)
+	if err != nil {
+		return model.UserDiagnosticsResponse{}, err
+	}
+	var user *model.UserAccessStatus
+	username := ""
+	if len(userStatus.Users) > 0 {
+		u := userStatus.Users[0]
+		user = &u
+		username = u.Username
+	}
+	conn, err := store.ConnectionDiagnostics(ctx, email, since, until, 5)
+	if err != nil {
+		return model.UserDiagnosticsResponse{}, err
+	}
+	windows, err := buildTrafficWindows(ctx, store, email, until)
+	if err != nil {
+		return model.UserDiagnosticsResponse{}, err
+	}
+	resp := model.UserDiagnosticsResponse{
+		Time:           until.UTC().Format(time.RFC3339),
+		Email:          email,
+		Username:       username,
+		User:           user,
+		TrafficWindows: windows,
+		Connections:    conn,
+		Hints:          diagnosticsHints(user, conn),
+	}
+	return resp, nil
+}
+
+func buildTrafficWindows(ctx context.Context, store *remote.Store, email string, until time.Time) ([]model.TrafficWindow, error) {
+	specs := []struct {
+		name     string
+		duration time.Duration
+	}{
+		{name: "1h", duration: time.Hour},
+		{name: "6h", duration: 6 * time.Hour},
+		{name: "24h", duration: 24 * time.Hour},
+	}
+	out := make([]model.TrafficWindow, 0, len(specs)+1)
+	for _, spec := range specs {
+		start := until.Add(-spec.duration)
+		traffic, err := store.UserTrafficBetween(ctx, email, start, until)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, model.TrafficWindow{
+			Window:        spec.name,
+			Start:         start.UTC().Format(time.RFC3339),
+			End:           until.UTC().Format(time.RFC3339),
+			UplinkBytes:   traffic.UplinkBytes,
+			DownlinkBytes: traffic.DownlinkBytes,
+			TotalBytes:    traffic.UplinkBytes + traffic.DownlinkBytes,
+		})
+	}
+	quota, err := store.QuotaStatus(ctx, until, stats.DefaultQuotaWindow, stats.DefaultWindow30DQuotaBytes, email)
+	if err != nil {
+		return nil, err
+	}
+	total30d := int64(0)
+	if len(quota.Users) > 0 {
+		total30d = quota.Users[0].Window30DUsageByte
+	}
+	out = append(out, model.TrafficWindow{
+		Window:     "30d",
+		Start:      quota.Window30DStart,
+		End:        quota.Window30DEnd,
+		TotalBytes: total30d,
+	})
+	return out, nil
+}
+
+func diagnosticsHints(user *model.UserAccessStatus, conn model.UserConnectionDiagnostics) []string {
+	hints := []string{"shared UUID; source networks are not exact device count"}
+	if user != nil {
+		if user.BlockedByQuota {
+			hints = append(hints, "user is currently blocked by rolling quota")
+		}
+		if !user.EffectiveEnabled {
+			hints = append(hints, "user is not effectively enabled")
+		}
+	}
+	if conn.AcceptedCount == 0 && conn.RejectedCount == 0 {
+		hints = append(hints, "no parsed access-log connections in selected window")
+	}
+	if conn.DestinationIPv6Count > 0 {
+		hints = append(hints, "IPv6 destinations were observed; check IPv4-only egress symptoms if apps connect but do not load")
+	}
+	if conn.SourceNetworksOverflow > 0 {
+		hints = append(hints, "source network cap was reached; approximate source count is lower than real distinct networks")
+	}
+	return hints
 }
 
 // newMetricsRefreshFunc returns a closure that refreshes the Prometheus gauges (traffic totals, quota status, usage bands, and expiry) from the store.
@@ -73,6 +188,14 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 			return
 		}
 		metrics.setUserExpiryStatus(userStatus)
+
+		connRows, err := store.ListConnectionMetricSnapshots(rctx, now.Add(-24*time.Hour), now)
+		if err != nil {
+			logger.Warn("read connection diagnostics metrics failed", "error", err)
+			metrics.OnDBWriteError("connection_metrics")
+			return
+		}
+		metrics.setConnectionDiagnostics(connRows, "24h")
 	}
 }
 
@@ -232,6 +355,130 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
+	})
+	mux.HandleFunc("/diagnostics/user", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		email := strings.TrimSpace(r.URL.Query().Get("email"))
+		if email == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required"})
+			return
+		}
+		since, err := parseSinceParam(r.URL.Query().Get("since"), 24*time.Hour)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		resp, err := buildUserDiagnosticsResponse(r.Context(), d.store, email, since, time.Now().UTC())
+		if err != nil {
+			d.logger.Warn("user diagnostics failed", "email", email, "error", err)
+			d.metrics.OnDBWriteError("connection_diagnostics")
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	})
+	mux.HandleFunc("/diagnostics/debug/start", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		var req debugStartReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
+			return
+		}
+		req.Email = strings.TrimSpace(req.Email)
+		if req.Email == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required"})
+			return
+		}
+		duration := 15 * time.Minute
+		if strings.TrimSpace(req.Duration) != "" {
+			parsed, err := time.ParseDuration(strings.TrimSpace(req.Duration))
+			if err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"error": "duration must be a Go duration such as 15m"})
+				return
+			}
+			duration = parsed
+		}
+		session, err := d.store.StartDebugSession(r.Context(), req.Email, duration, time.Now().UTC())
+		if err != nil {
+			d.logger.Warn("start user debug failed", "email", req.Email, "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "session": session})
+	})
+	mux.HandleFunc("/diagnostics/debug/sessions", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		now := time.Now().UTC()
+		sessions, err := d.store.ListDebugSessions(r.Context(), now)
+		if err != nil {
+			d.logger.Warn("list user debug sessions failed", "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, model.ConnectionDebugSessionsResponse{
+			Time:     now.Format(time.RFC3339),
+			Sessions: sessions,
+		})
+	})
+	mux.HandleFunc("/diagnostics/debug/events", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		email := strings.TrimSpace(r.URL.Query().Get("email"))
+		if email == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required"})
+			return
+		}
+		since, err := parseSinceParam(r.URL.Query().Get("since"), 15*time.Minute)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		until := time.Now().UTC()
+		events, err := d.store.ListDebugEvents(r.Context(), email, since, until, 1000)
+		if err != nil {
+			d.logger.Warn("list user debug events failed", "email", email, "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, model.ConnectionDebugEventsResponse{
+			Email:  email,
+			Since:  since.UTC().Format(time.RFC3339),
+			Until:  until.Format(time.RFC3339),
+			Events: events,
+		})
+	})
+	mux.HandleFunc("/diagnostics/debug/stop", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+			return
+		}
+		var req debugStopReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request"})
+			return
+		}
+		req.Email = strings.TrimSpace(req.Email)
+		if req.Email == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required"})
+			return
+		}
+		if err := d.store.StopDebugSession(r.Context(), req.Email); err != nil {
+			d.logger.Warn("stop user debug failed", "email", req.Email, "error", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "email": req.Email})
 	})
 	mux.HandleFunc("/quota/policies", handleQuotaPolicies(d.store, d.logger, d.metrics))
 	mux.HandleFunc("/quota/reset", func(w http.ResponseWriter, r *http.Request) {

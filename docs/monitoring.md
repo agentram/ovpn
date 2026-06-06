@@ -68,6 +68,51 @@ Expiry semantics:
 - expired users are removed from effective runtime access even if their manual `enabled` flag is still `true`
 - after an unexpected cold restart, enforcement is restored by the next agent startup/collector pass
 
+## Connection diagnostics
+
+`ovpn-agent` keeps lightweight connection diagnostics from the Xray access log.
+The default mode is `basic`; disable it with `OVPN_CONNECTION_DIAGNOSTICS=off` before deploy.
+This default collects per-user connection metadata for support, so operators who do not want that posture should set it to `off` explicitly.
+
+The raw access log is a bounded scratch file in the runtime log directory:
+
+- max size: `30 MiB` by default (`OVPN_XRAY_ACCESS_LOG_MAX_BYTES`)
+- no backup/export
+- periodically truncated by `ovpn-agent`
+
+The agent stores only aggregates by default: last seen, accepted/rejected counts, destination family counts, top destination ports, and hashed source-network buckets (`IPv4 /24`, `IPv6 /56`).
+It does not store payloads, URLs, full source IPs, real UUIDs, or raw access-log lines in SQLite.
+Source-network counts are troubleshooting hints, not exact device counts, especially when one user profile is shared across several people or devices.
+
+Operator commands:
+
+```bash
+./ovpn user diagnose --server <server> --username <user> --since 24h
+./ovpn user diagnose --server <server> --username <user> --since 24h --json
+
+./ovpn user debug start --server <server> --username <user> --duration 15m
+./ovpn user debug list --server <server>
+./ovpn user debug show --server <server> --username <user> --since 15m
+./ovpn user debug stop --server <server> --username <user>
+```
+
+Targeted debug captures only events for the selected user while the short-lived session is active.
+Duration defaults to `15m` and is capped at `24h`.
+Stopping a debug session removes that user's captured debug events immediately; aggregate counters remain.
+Use it for narrow support windows, for example when a user says the client is connected but one app does not load.
+
+See [`cli.md`](cli.md) for the full `user diagnose` and `user debug` workflow, including how to list active debug sessions and interpret source-network counts.
+
+Prometheus receives only low-cardinality connection metrics:
+
+- `ovpn_agent_user_connection_last_seen_timestamp_seconds`
+- `ovpn_agent_user_recent_connections`
+- `ovpn_agent_user_recent_source_networks`
+- `ovpn_agent_user_recent_ipv6_destinations`
+- `ovpn_agent_connection_events_total`
+- `ovpn_agent_connection_parse_errors_total`
+- `ovpn_agent_connection_tailer_errors_total`
+
 ## Alert profile (balanced default)
 
 Default alerts cover:

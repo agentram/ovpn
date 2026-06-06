@@ -24,6 +24,15 @@ type quotaResetReq struct {
 	Email string `json:"email"`
 }
 
+type debugStartReq struct {
+	Email    string `json:"email"`
+	Duration string `json:"duration"`
+}
+
+type debugStopReq struct {
+	Email string `json:"email"`
+}
+
 const telegramNotifyEndpoint = "http://ovpn-telegram-bot:8080/notify"
 
 type quotaPolicyLister interface {

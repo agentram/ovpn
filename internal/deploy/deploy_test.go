@@ -182,6 +182,11 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if !strings.Contains(string(gotEnv), "OVPN_CERT_FULLCHAIN_PATH=/dev/null") {
 		t.Fatalf("missing cert host path in env: %q", string(gotEnv))
 	}
+	if !strings.Contains(string(gotEnv), "OVPN_CONNECTION_DIAGNOSTICS=basic") ||
+		!strings.Contains(string(gotEnv), "OVPN_XRAY_ACCESS_LOG=/var/log/ovpn/xray-access.log") ||
+		!strings.Contains(string(gotEnv), "OVPN_XRAY_ACCESS_LOG_MAX_BYTES=31457280") {
+		t.Fatalf("missing connection diagnostics env in %q", string(gotEnv))
+	}
 	gotCompose, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
 	if err != nil {
 		t.Fatalf("read compose: %v", err)
@@ -194,6 +199,13 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	}
 	if !strings.Contains(string(gotCompose), `- "127.0.0.1:${OVPN_AGENT_HOST_PORT:-19000}:9090"`) {
 		t.Fatalf("expected ovpn-agent host port mapping variable for host-local control plane access, got:\n%s", string(gotCompose))
+	}
+	if !strings.Contains(string(gotCompose), `- ./logs:/var/log/ovpn`) ||
+		!strings.Contains(string(gotCompose), `--connection-diagnostics`) {
+		t.Fatalf("expected diagnostics log mount and agent flags, got:\n%s", string(gotCompose))
+	}
+	if _, err := os.Stat(filepath.Join(bundle.Dir, "logs")); err != nil {
+		t.Fatalf("expected logs dir in bundle: %v", err)
 	}
 	if !strings.Contains(string(gotEnv), "PROMETHEUS_IMAGE=prom/prometheus:v3.11.2") {
 		t.Fatalf("missing prometheus image in env: %q", string(gotEnv))
@@ -246,6 +258,44 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		if !strings.Contains(string(monitoringCompose), want) {
 			t.Fatalf("expected monitoring compose to contain %q, got:\n%s", want, string(monitoringCompose))
 		}
+	}
+}
+
+func TestRenderBundleConnectionDiagnosticsModeControlsAccessLog(t *testing.T) {
+	t.Parallel()
+
+	base := Input{
+		Server: model.Server{
+			XrayVersion:       "26.3.27",
+			Domain:            "example.com",
+			RealityPrivateKey: "priv",
+			RealityServerName: "www.microsoft.com",
+			RealityTarget:     "www.microsoft.com:443",
+			RealityShortIDs:   "abcd",
+		},
+		Users: []model.User{{
+			Username: "alice",
+			Email:    "alice@global",
+			UUID:     "11111111-1111-1111-1111-111111111111",
+			Enabled:  true,
+		}},
+	}
+	onBundle, err := RenderBundle(base)
+	if err != nil {
+		t.Fatalf("render diagnostics on bundle: %v", err)
+	}
+	defer CleanupBundle(onBundle)
+	if !strings.Contains(string(onBundle.ConfigRaw), `"access": "/var/log/ovpn/xray-access.log"`) {
+		t.Fatalf("expected access log in default config:\n%s", string(onBundle.ConfigRaw))
+	}
+	base.ConnectionDiagnostics = "off"
+	offBundle, err := RenderBundle(base)
+	if err != nil {
+		t.Fatalf("render diagnostics off bundle: %v", err)
+	}
+	defer CleanupBundle(offBundle)
+	if strings.Contains(string(offBundle.ConfigRaw), `"access"`) {
+		t.Fatalf("access log should be omitted when diagnostics are off:\n%s", string(offBundle.ConfigRaw))
 	}
 }
 
@@ -545,6 +595,9 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[3], "sudo chown 0:65532 /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 640 /opt/ovpn/xray/config.json") {
 		t.Fatalf("fourth command should lock down xray config to the xray runtime group, got %q", r.execCmds[3])
 	}
+	if !strings.Contains(r.execCmds[3], "sudo chown 65532:65532 /opt/ovpn/logs") || !strings.Contains(r.execCmds[3], "sudo chmod 770 /opt/ovpn/logs") {
+		t.Fatalf("fourth command should make access log directory writable by xray runtime, got %q", r.execCmds[3])
+	}
 	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[4], "up -d --force-recreate --remove-orphans") {
 		t.Fatalf("expected compose up command, got %q", r.execCmds[4])
 	}
@@ -568,6 +621,10 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	}
 	if !strings.Contains(r.execCmds[2], "$XRAY_IMAGE run -test -config /etc/xray/config.json") {
 		t.Fatalf("third command should validate xray config with image entrypoint-aware syntax, got %q", r.execCmds[2])
+	}
+	if !strings.Contains(r.execCmds[2], "-v /opt/ovpn/.incoming/logs:/var/log/ovpn") ||
+		!strings.Contains(r.execCmds[2], "sudo chown 65532:65532 /opt/ovpn/.incoming/logs") {
+		t.Fatalf("third command should mount a writable access log directory for xray validation, got %q", r.execCmds[2])
 	}
 	if strings.Contains(r.execCmds[2], "$XRAY_IMAGE xray run -test") {
 		t.Fatalf("xray test command should not include duplicate leading 'xray': %q", r.execCmds[2])
@@ -653,6 +710,9 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	}
 	if !strings.Contains(r.execCmds[0], "sudo chown 0:65532 /opt/ovpn/.incoming/xray/config.json") || !strings.Contains(r.execCmds[0], "sudo chmod 640 /opt/ovpn/.incoming/xray/config.json") {
 		t.Fatalf("extract command should lock down staged xray config to the xray runtime group before validation, got %#v", r.execCmds)
+	}
+	if !strings.Contains(r.execCmds[0], "sudo chown 65532:65532 /opt/ovpn/.incoming/logs") || !strings.Contains(r.execCmds[0], "sudo chmod 770 /opt/ovpn/.incoming/logs") {
+		t.Fatalf("extract command should prepare staged logs dir for xray access logging, got %#v", r.execCmds)
 	}
 }
 

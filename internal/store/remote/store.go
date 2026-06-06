@@ -105,6 +105,57 @@ func (s *Store) migrate(ctx context.Context) error {
 				inbound_tag TEXT NOT NULL,
 				updated_at TEXT NOT NULL
 			);`,
+		`CREATE TABLE IF NOT EXISTS connection_hourly (
+				email TEXT NOT NULL,
+				window_start TEXT NOT NULL,
+				accepted_count INTEGER NOT NULL DEFAULT 0,
+				rejected_count INTEGER NOT NULL DEFAULT 0,
+				dest_ipv4_count INTEGER NOT NULL DEFAULT 0,
+				dest_ipv6_count INTEGER NOT NULL DEFAULT 0,
+				dest_domain_count INTEGER NOT NULL DEFAULT 0,
+				dest_unknown_count INTEGER NOT NULL DEFAULT 0,
+				source_overflow_count INTEGER NOT NULL DEFAULT 0,
+				last_seen_at TEXT,
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY (email, window_start)
+			);`,
+		`CREATE TABLE IF NOT EXISTS connection_source_hourly (
+				email TEXT NOT NULL,
+				window_start TEXT NOT NULL,
+				source_bucket TEXT NOT NULL,
+				count INTEGER NOT NULL DEFAULT 0,
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY (email, window_start, source_bucket)
+			);`,
+		`CREATE TABLE IF NOT EXISTS connection_port_hourly (
+				email TEXT NOT NULL,
+				window_start TEXT NOT NULL,
+				port INTEGER NOT NULL,
+				count INTEGER NOT NULL DEFAULT 0,
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY (email, window_start, port)
+			);`,
+		`CREATE TABLE IF NOT EXISTS connection_debug_sessions (
+				email TEXT PRIMARY KEY,
+				started_at TEXT NOT NULL,
+				expires_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			);`,
+		`CREATE TABLE IF NOT EXISTS connection_debug_events (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				email TEXT NOT NULL,
+				ts TEXT NOT NULL,
+				result TEXT NOT NULL,
+				source_network TEXT NOT NULL DEFAULT '',
+				destination TEXT NOT NULL DEFAULT '',
+				destination_port INTEGER NOT NULL DEFAULT 0,
+				destination_family TEXT NOT NULL DEFAULT 'unknown',
+				created_at TEXT NOT NULL
+			);`,
+		`CREATE INDEX IF NOT EXISTS idx_connection_hourly_window ON connection_hourly(window_start);`,
+		`CREATE INDEX IF NOT EXISTS idx_connection_source_hourly_window ON connection_source_hourly(window_start);`,
+		`CREATE INDEX IF NOT EXISTS idx_connection_port_hourly_window ON connection_port_hourly(window_start);`,
+		`CREATE INDEX IF NOT EXISTS idx_connection_debug_events_email_ts ON connection_debug_events(email, ts);`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {

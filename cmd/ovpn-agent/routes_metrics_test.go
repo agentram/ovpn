@@ -74,6 +74,65 @@ func TestAgentRoutesExerciseQuotaStatsHealthAndRuntime(t *testing.T) {
 	}
 }
 
+func TestAgentDiagnosticsRoutes(t *testing.T) {
+	t.Parallel()
+
+	store, mux := newTestAgentMux(t)
+	ctx := context.Background()
+	quota := int64(1000)
+	now := time.Now().UTC()
+	if err := store.ReplaceQuotaPolicies(ctx, []model.QuotaUserPolicy{{
+		Email:            "alice@global",
+		UUID:             "11111111-1111-1111-1111-111111111111",
+		InboundTag:       "vless-reality",
+		QuotaEnabled:     true,
+		MonthlyQuotaByte: &quota,
+	}}); err != nil {
+		t.Fatalf("replace quota policies: %v", err)
+	}
+	if err := store.ReplaceUserPolicies(ctx, []model.UserPolicy{{
+		Username:   "alice",
+		Email:      "alice@global",
+		UUID:       "11111111-1111-1111-1111-111111111111",
+		Enabled:    true,
+		InboundTag: "vless-reality",
+	}}); err != nil {
+		t.Fatalf("replace user policies: %v", err)
+	}
+	if err := store.AddDelta(ctx, "alice@global", 10, 20, now); err != nil {
+		t.Fatalf("add delta: %v", err)
+	}
+	if err := store.RecordConnectionEvents(ctx, []model.ConnectionEvent{{
+		Timestamp:         now,
+		Email:             "alice@global",
+		Result:            "accepted",
+		SourceNetwork:     "198.51.100.0/24",
+		Destination:       "api.telegram.org",
+		DestinationPort:   443,
+		DestinationFamily: "domain",
+	}}, 256, 1000, now); err != nil {
+		t.Fatalf("record connection event: %v", err)
+	}
+
+	assertAgentStatus(t, mux, http.MethodGet, "/diagnostics/user?email=alice%40global&since=24h", nil, http.StatusOK, "approx_source_networks")
+	assertAgentStatus(t, mux, http.MethodPost, "/diagnostics/debug/start", `{"email":"alice@global","duration":"15m"}`, http.StatusOK, "expires_at")
+	assertAgentStatus(t, mux, http.MethodGet, "/diagnostics/debug/sessions", nil, http.StatusOK, "alice@global")
+	if err := store.RecordConnectionEvents(ctx, []model.ConnectionEvent{{
+		Timestamp:         time.Now().UTC().Add(-time.Second),
+		Email:             "alice@global",
+		Result:            "accepted",
+		SourceNetwork:     "198.51.100.0/24",
+		Destination:       "api.telegram.org",
+		DestinationPort:   443,
+		DestinationFamily: "domain",
+	}}, 256, 1000, now); err != nil {
+		t.Fatalf("record debug event: %v", err)
+	}
+	assertAgentStatus(t, mux, http.MethodGet, "/diagnostics/debug/events?email=alice%40global&since=15m", nil, http.StatusOK, "api.telegram.org")
+	assertAgentStatus(t, mux, http.MethodPost, "/diagnostics/debug/stop", `{"email":"alice@global"}`, http.StatusOK, `"ok":true`)
+	assertAgentStatus(t, mux, http.MethodGet, "/diagnostics/user", nil, http.StatusBadRequest, "email is required")
+}
+
 func TestAgentRoutesQuotaSyncAndResetReadd(t *testing.T) {
 	t.Parallel()
 
