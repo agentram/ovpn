@@ -140,6 +140,10 @@ This means routing is based on a mix of:
 
 If a destination does not match those rules, it is treated as foreign.
 
+Routing uses Xray `domainStrategy=AsIs`.
+That keeps domain names available to domain/geosite rules and diagnostics, but it also means GeoIP direct rules are evaluated for IP-literal destinations rather than by resolving unmatched domains during route matching.
+For proxy presets, make sure important country-local services are covered by `geosite` data or explicit domain suffix rules; otherwise unmatched domain destinations fall through to the foreign pool.
+
 ## Existing users and compatibility
 
 Existing users continue working because:

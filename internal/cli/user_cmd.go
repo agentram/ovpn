@@ -16,6 +16,8 @@ func (a *App) userCmd() *cobra.Command {
 		a.newUserListCmd(),
 		a.newUserShowCmd(),
 		a.newUserTopCmd(),
+		a.newUserDiagnoseCmd(),
+		a.newUserDebugCmd(),
 		a.newUserQuotaSetCmd(),
 		a.newUserQuotaResetCmd(),
 		a.newUserLinkCmd(),

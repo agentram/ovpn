@@ -70,7 +70,7 @@ func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 	// Authenticate the probe the same way real agent calls do (token sourced from the host .env),
 	// so a token-protected runtime route answers with 405 (GET on a POST-only endpoint) rather
 	// than 401. A bare unauthenticated probe would otherwise look unhealthy.
-	runtimeProbeCmd := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); curl -sS -o /dev/null -w '%%{http_code}' -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" '%s/runtime/user/add'", deploy.RemoteDir, agentBaseURL)
+	runtimeProbeCmd := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sudo -n sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); curl -sS -o /dev/null -w '%%{http_code}' -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" '%s/runtime/user/add'", deploy.RemoteDir, agentBaseURL)
 	runtimeRes, runtimeErr := a.execRemote(runner, cfg, 10*time.Second, runtimeProbeCmd)
 	if runtimeErr != nil {
 		if check.Status == doctor.StatusPass {
@@ -191,7 +191,7 @@ func buildDoctorDiskCommand() string {
 		"  SRC=$(sudo -n docker inspect ovpn-agent --format '{{range .Mounts}}{{if eq .Destination \"/var/lib/ovpn-agent\"}}{{.Source}}{{end}}{{end}}' 2>/dev/null || true)",
 		"  if [ -n \"$SRC\" ]; then",
 		"    echo AGENT_DB_PATH=$SRC/stats.db",
-		"    if [ -f \"$SRC/stats.db\" ]; then echo AGENT_DB_EXISTS=1; else echo AGENT_DB_EXISTS=0; fi",
+		"    if sudo -n test -f \"$SRC/stats.db\"; then echo AGENT_DB_EXISTS=1; else echo AGENT_DB_EXISTS=0; fi",
 		"  fi",
 		"fi",
 	}, "\n")

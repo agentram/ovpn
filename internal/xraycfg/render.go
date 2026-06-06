@@ -26,6 +26,7 @@ type Spec struct {
 	APIListen             string
 	APIPort               int
 	LogLevel              string
+	AccessLogPath         string
 	Users                 []model.User
 	ServiceUsers          []ServiceUser
 	ProxyRelay            *ProxyRelay
@@ -125,11 +126,16 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			"inboundTag":  []string{"api"},
 			"outboundTag": "api",
 		},
+		ipv6BlockRule(),
+	}
+	logConfig := map[string]any{
+		"loglevel": normalizeLogLevel(spec.LogLevel),
+	}
+	if strings.TrimSpace(spec.AccessLogPath) != "" {
+		logConfig["access"] = strings.TrimSpace(spec.AccessLogPath)
 	}
 	cfg := XrayConfig{
-		Log: map[string]any{
-			"loglevel": normalizeLogLevel(spec.LogLevel),
-		},
+		Log:   logConfig,
 		Stats: map[string]any{},
 		Policy: map[string]any{
 			"levels": map[string]any{
@@ -148,7 +154,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			"services": []string{"StatsService", "HandlerService"},
 		},
 		Routing: map[string]any{
-			"domainStrategy": "IPIfNonMatch",
+			"domainStrategy": "AsIs",
 			"rules":          rules,
 		},
 		Inbounds: []any{
@@ -308,6 +314,14 @@ func freedomOutbound(tag string) map[string]any {
 		"settings": map[string]any{
 			"domainStrategy": "UseIPv4",
 		},
+	}
+}
+
+func ipv6BlockRule() map[string]any {
+	return map[string]any{
+		"type":        "field",
+		"ip":          []string{"::/0"},
+		"outboundTag": "block",
 	}
 }
 

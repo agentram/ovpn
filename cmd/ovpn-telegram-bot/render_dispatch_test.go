@@ -56,7 +56,7 @@ func TestRenderersAndDiagnosticsWithHealthyEndpoints(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, false)
+	b := newBotTestHarness(t, rec, false)
 	ctx := context.Background()
 	snapshot := b.collectAuditSnapshot(ctx)
 
@@ -137,7 +137,7 @@ func TestDispatchCommandMenuCallbackAndMessageFlows(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, false)
+	b := newBotTestHarness(t, rec, false)
 	ctx := context.Background()
 	pdfPath := filepath.Join(t.TempDir(), "clients.pdf")
 	if err := os.WriteFile(pdfPath, []byte("pdf"), 0o600); err != nil {
@@ -227,7 +227,7 @@ func TestDiagnosticsFailureAndEmptyRendererBranches(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, true)
+	b := newBotTestHarness(t, rec, true)
 	ctx := context.Background()
 
 	status := b.renderStatusSummary(ctx)
@@ -266,7 +266,7 @@ func TestDiagnosticsFailureAndEmptyRendererBranches(t *testing.T) {
 	}
 }
 
-func newCoverageBot(t *testing.T, rec *telegramRecorder, broken bool) *bot {
+func newBotTestHarness(t *testing.T, rec *telegramRecorder, broken bool) *bot {
 	t.Helper()
 	now := time.Now().UTC()
 	health := agentHealth{

@@ -21,6 +21,7 @@ It is intended for operators who prefer a local CLI and SSH workflow over a web 
 - [Production flow](#production-flow)
 - [HA proxy rollout](#4a-optional-ha-proxy-rollout)
 - [User operations](#6-add-users-and-deliver-links)
+- [CLI guide](docs/cli.md)
 - [Monitoring](#7-optional-monitoring)
 - [Documentation map](#documentation-map)
 
@@ -105,13 +106,14 @@ flowchart LR
 - User lifecycle commands and VLESS link generation
 - Global-by-default user provisioning across enabled servers
 - Rolling `30d` traffic quota enforcement
+- Lightweight per-user connection diagnostics and short targeted debug windows (`basic` mode is on by default; see `docs/cli.md`)
 - Optional Prometheus, Alertmanager, Grafana, and Telegram bot monitoring
 - Optional HA proxy entrypoint with backend failover
 - Backup, restore, and decommission commands
 
 ## Versioning
 
-- Current pinned version: `1.5.1`
+- Current pinned version: `1.6.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -340,6 +342,18 @@ Use `--monthly-gb` for human-sized quota changes. `ovpn` stores quota internally
 
 When `--email` is omitted, new users get stable identity `username@global`. User expiry is cluster-wide and uses UTC end-of-day semantics.
 
+For per-user support, start with:
+
+```bash
+./ovpn user diagnose --server <server> --username <user> --since 24h
+./ovpn user debug start --server <server> --username <user> --duration 15m
+./ovpn user debug list --server <server>
+./ovpn user debug show --server <server> --username <user> --since 15m
+./ovpn user debug stop --server <server> --username <user>
+```
+
+See [`docs/cli.md`](docs/cli.md) for the full CLI command map and targeted debug workflow.
+
 ### 7. Optional monitoring
 
 Start monitoring:
@@ -423,6 +437,7 @@ make docs-pdf
 - [`README.md`](README.md): main operator entrypoint
 - [`README.ansible.md`](README.ansible.md): host bootstrap and hardening
 - [`DEVELOPMENT.md`](DEVELOPMENT.md): contributor and architecture guide
+- [`docs/cli.md`](docs/cli.md): CLI command map and practical operator workflows
 - [`docs/clients.md`](docs/clients.md): English client guide
 - [`docs/clients-ru.md`](docs/clients-ru.md): Russian client guide
 - [`docs/security.md`](docs/security.md): security and hardening model

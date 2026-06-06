@@ -215,14 +215,22 @@ func TestUserCommandTreeContainsExpectedSubcommands(t *testing.T) {
 	t.Parallel()
 
 	cmd := (&App{}).userCmd()
-	var names []string
+	var visibleNames []string
+	var hiddenNames []string
 	for _, c := range cmd.Commands() {
-		names = append(names, c.Name())
-	}
-	for _, want := range []string{"add", "rm", "enable", "disable", "expiry-set", "expiry-clear", "reconcile", "list", "show", "top", "quota-set", "quota-reset", "link"} {
-		if !slices.Contains(names, want) {
-			t.Fatalf("expected user subcommand %q, got %v", want, names)
+		if c.Hidden {
+			hiddenNames = append(hiddenNames, c.Name())
+			continue
 		}
+		visibleNames = append(visibleNames, c.Name())
+	}
+	for _, want := range []string{"add", "rm", "enable", "disable", "expiry-set", "expiry-clear", "list", "show", "top", "quota-set", "quota-reset", "link", "diagnose", "debug"} {
+		if !slices.Contains(visibleNames, want) {
+			t.Fatalf("expected visible user subcommand %q, got visible=%v hidden=%v", want, visibleNames, hiddenNames)
+		}
+	}
+	if slices.Contains(visibleNames, "reconcile") || !slices.Contains(hiddenNames, "reconcile") {
+		t.Fatalf("expected reconcile to be hidden repair command, got visible=%v hidden=%v", visibleNames, hiddenNames)
 	}
 }
 

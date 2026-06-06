@@ -85,7 +85,7 @@ func TestDoctorBranchesForRemoteFailuresAndWarnings(t *testing.T) {
 		t.Fatalf("expected local validation failure, got %+v", got)
 	}
 
-	if got := buildDoctorDiskCommand(); !strings.Contains(got, "AGENT_DB_PATH") || !strings.Contains(got, deploy.RemoteBackupDir) {
+	if got := buildDoctorDiskCommand(); !strings.Contains(got, "AGENT_DB_PATH") || !strings.Contains(got, deploy.RemoteBackupDir) || !strings.Contains(got, "sudo -n test -f") {
 		t.Fatalf("unexpected disk command: %s", got)
 	}
 	if got := sanitizeKey("/opt/ovpn/xray/config.json"); got != "opt_ovpn_xray_config_json" {
@@ -151,6 +151,33 @@ func TestDoctorCheckCoreFailureBranches(t *testing.T) {
 	}
 	if got := app.checkProxyServiceRuntimeIdentity(runner, cfg, proxySrv); got.Status != doctor.StatusFail || !strings.Contains(got.Message, "missing") {
 		t.Fatalf("expected proxy identity failure, got %+v", got)
+	}
+}
+
+func TestDoctorXrayConfigMountsAccessLogDir(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	runner := &ssh.Runner{DryRun: true}
+	cfg := ssh.Config{Host: "example.com", User: "root"}
+
+	var gotCmd string
+	app.remoteExecHook = func(_ ssh.Config, _ time.Duration, cmd string) (ssh.Result, error) {
+		gotCmd = cmd
+		return ssh.Result{Stdout: "Configuration OK\n"}, nil
+	}
+	check := app.checkXrayConfig(runner, cfg)
+	if check.Status != doctor.StatusPass {
+		t.Fatalf("expected pass, got %+v", check)
+	}
+	for _, want := range []string{
+		"XRAY_IMAGE=$(sudo -n sed -n 's/^XRAY_IMAGE=//p' ./.env",
+		"sudo mkdir -p /opt/ovpn/logs",
+		"sudo chown 65532:65532 /opt/ovpn/logs",
+		"sudo chmod 770 /opt/ovpn/logs",
+		"-v /opt/ovpn/logs:/var/log/ovpn",
+	} {
+		if !strings.Contains(gotCmd, want) {
+			t.Fatalf("xray config check command missing %q: %s", want, gotCmd)
+		}
 	}
 }
 

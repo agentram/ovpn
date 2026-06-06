@@ -125,6 +125,82 @@ func TestUserListAndShowIncludeQuotaAndRuntimeErrors(t *testing.T) {
 	}
 }
 
+func TestUserDiagnoseAndDebugCommands(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	if err := app.store.AddUser(app.ctx, &model.User{
+		ServerID: srv.ID,
+		Username: "alice",
+		Email:    "alice@global",
+		UUID:     "11111111-1111-1111-1111-111111111111",
+		Enabled:  true,
+	}); err != nil {
+		t.Fatalf("add user: %v", err)
+	}
+	app.remoteHTTPHook = func(_ model.Server, method, url string, payload any) ([]byte, error) {
+		switch {
+		case method == "GET" && strings.Contains(url, "/diagnostics/user"):
+			if !strings.Contains(url, "alice%40global") || !strings.Contains(url, "since=24h") {
+				t.Fatalf("unexpected diagnose url %s", url)
+			}
+			return []byte(`{
+				"email":"alice@global",
+				"username":"alice",
+				"user":{"username":"alice","email":"alice@global","enabled":true,"effective_enabled":true,"window_30d_usage_byte":1073741824,"window_30d_quota_byte":2147483648},
+				"traffic_windows":[{"window":"24h","uplink_bytes":10,"downlink_bytes":20,"total_bytes":30}],
+				"connections":{"email":"alice@global","accepted_count":2,"rejected_count":1,"approx_source_networks":2,"destination_ipv6_count":1,"top_ports":[{"port":443,"count":2}]},
+				"hints":["shared UUID; source networks are not exact device count"]
+			}`), nil
+		case method == "POST" && strings.Contains(url, "/diagnostics/debug/start"):
+			body := payload.(map[string]string)
+			if body["email"] != "alice@global" || body["duration"] != "15m" {
+				t.Fatalf("unexpected start payload: %+v", payload)
+			}
+			return []byte(`{"ok":true,"session":{"email":"alice@global","started_at":"2026-06-05T12:00:00Z","expires_at":"2026-06-05T12:15:00Z"}}`), nil
+		case method == "GET" && strings.Contains(url, "/diagnostics/debug/sessions"):
+			return []byte(`{"time":"2026-06-05T12:01:00Z","sessions":[{"email":"alice@global","started_at":"2026-06-05T12:00:00Z","expires_at":"2026-06-05T12:15:00Z"}]}`), nil
+		case method == "GET" && strings.Contains(url, "/diagnostics/debug/events"):
+			return []byte(`{"email":"alice@global","events":[{"timestamp":"2026-06-05T12:01:00Z","result":"accepted","source_network":"198.51.100.0/24","destination":"api.telegram.org","destination_port":443,"destination_family":"domain"}]}`), nil
+		case method == "POST" && strings.Contains(url, "/diagnostics/debug/stop"):
+			return []byte(`{"ok":true}`), nil
+		default:
+			t.Fatalf("unexpected hook call method=%s url=%s payload=%v", method, url, payload)
+			return nil, nil
+		}
+	}
+
+	stdout, _, err := captureStdoutStderr(t, func() error {
+		cmd := app.userCmd()
+		cmd.SetArgs([]string{"diagnose", "--server", "main", "--username", "alice"})
+		return cmd.Execute()
+	})
+	if err != nil {
+		t.Fatalf("user diagnose: %v", err)
+	}
+	for _, want := range []string{"user: alice", "quota: 50.0%", "accepted=2 rejected=1", "top_ports=443=2", "shared UUID"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected %q in diagnose output:\n%s", want, stdout)
+		}
+	}
+	for _, args := range [][]string{
+		{"debug", "start", "--server", "main", "--username", "alice"},
+		{"debug", "list", "--server", "main"},
+		{"debug", "show", "--server", "main", "--username", "alice"},
+		{"debug", "stop", "--server", "main", "--username", "alice"},
+	} {
+		if _, _, err := captureStdoutStderr(t, func() error {
+			cmd := app.userCmd()
+			cmd.SetArgs(args)
+			return cmd.Execute()
+		}); err != nil {
+			t.Fatalf("user %v: %v", args, err)
+		}
+	}
+}
+
 func TestServerBackupRestoreCommandsUseDryRunRunner(t *testing.T) {
 	app := newTestAppWithServer(t, true)
 	app.dataDir = t.TempDir()

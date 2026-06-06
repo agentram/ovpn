@@ -84,7 +84,7 @@ func TestAdminActionsConfirmRestartHealAndFailures(t *testing.T) {
 	t.Parallel()
 
 	rec := &telegramRecorder{}
-	b := newCoverageBot(t, rec, false)
+	b := newBotTestHarness(t, rec, false)
 	op := &recordingServiceOperator{}
 	b.adminToken = "enabled"
 	b.operator = op

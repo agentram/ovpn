@@ -49,7 +49,7 @@ func TestBuildAgentHTTPCommandSendsBearerToken(t *testing.T) {
 	t.Parallel()
 
 	get := buildAgentHTTPCommand("GET", "http://127.0.0.1:19000/health", nil)
-	if !strings.Contains(get, "OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' /opt/ovpn/.env") {
+	if !strings.Contains(get, "OVPN_AGENT_TOKEN=$(sudo -n sed -n 's/^OVPN_AGENT_TOKEN=//p' /opt/ovpn/.env") {
 		t.Fatalf("GET command should source the token from the host .env: %q", get)
 	}
 	if !strings.Contains(get, `-H "Authorization: Bearer ${OVPN_AGENT_TOKEN}"`) {

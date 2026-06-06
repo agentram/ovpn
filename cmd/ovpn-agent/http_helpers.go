@@ -74,6 +74,14 @@ func envInt64(key string, fallback int64) int64 {
 	return v
 }
 
+func envOr(key string, fallback string) string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	return raw
+}
+
 // handleQuotaPolicies serves GET /quota/policies, returning the stored quota policies as JSON.
 func handleQuotaPolicies(store quotaPolicyLister, logger *slog.Logger, metrics *agentMetrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

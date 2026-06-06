@@ -40,6 +40,9 @@ type Input struct {
 	AgentCertFile                string
 	AgentCertHostPath            string
 	XrayLogLevel                 string
+	ConnectionDiagnostics        string
+	XrayAccessLogPath            string
+	XrayAccessLogMaxBytes        string
 	PrometheusImage              string
 	AlertmanagerImage            string
 	GrafanaImage                 string
@@ -80,6 +83,9 @@ func (in *Input) applyDefaults() {
 	in.TelegramBotHostPort = defaultString(in.TelegramBotHostPort, "19001")
 	in.AgentCertFile = defaultString(in.AgentCertFile, "/tmp/ovpn-agent-cert.pem")
 	in.AgentCertHostPath = defaultString(in.AgentCertHostPath, "/dev/null")
+	in.ConnectionDiagnostics = defaultString(in.ConnectionDiagnostics, "basic")
+	in.XrayAccessLogPath = defaultString(in.XrayAccessLogPath, "/var/log/ovpn/xray-access.log")
+	in.XrayAccessLogMaxBytes = defaultString(in.XrayAccessLogMaxBytes, "31457280")
 	in.PrometheusImage = defaultString(in.PrometheusImage, defaults.DefaultPrometheusImage)
 	in.AlertmanagerImage = defaultString(in.AlertmanagerImage, defaults.DefaultAlertmanagerImage)
 	in.GrafanaImage = defaultString(in.GrafanaImage, defaults.DefaultGrafanaImage)
@@ -134,6 +140,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		APIListen:             "0.0.0.0",
 		APIPort:               10085,
 		LogLevel:              in.XrayLogLevel,
+		AccessLogPath:         accessLogPathForDiagnostics(in.ConnectionDiagnostics, in.XrayAccessLogPath),
 		Users:                 in.Users,
 	}
 	configRaw := in.RenderedOverride
@@ -151,6 +158,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 	for _, sub := range []string{
 		"xray",
 		"agent",
+		"logs",
 		"haproxy",
 		"geodata",
 		"monitoring/prometheus/rules",
@@ -191,7 +199,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	envContent := fmt.Sprintf(
-		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_TOKEN=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
+		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_TOKEN=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nOVPN_CONNECTION_DIAGNOSTICS=%s\nOVPN_XRAY_ACCESS_LOG=%s\nOVPN_XRAY_ACCESS_LOG_MAX_BYTES=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
 		in.XrayImage,
 		in.AgentImage,
 		in.TelegramBotImage,
@@ -202,6 +210,9 @@ func RenderBundle(in Input) (*Bundle, error) {
 		in.TelegramBotHostPort,
 		in.AgentCertFile,
 		in.AgentCertHostPath,
+		in.ConnectionDiagnostics,
+		in.XrayAccessLogPath,
+		in.XrayAccessLogMaxBytes,
 		in.PrometheusImage,
 		in.AlertmanagerImage,
 		in.GrafanaImage,
@@ -309,6 +320,13 @@ func RenderBundle(in Input) (*Bundle, error) {
 		}
 	}
 	return &Bundle{Dir: tmpDir, ConfigRaw: configRaw}, nil
+}
+
+func accessLogPathForDiagnostics(mode string, path string) string {
+	if strings.EqualFold(strings.TrimSpace(mode), "off") {
+		return ""
+	}
+	return strings.TrimSpace(path)
 }
 
 func renderHAProxyConfig(backends []model.Server) string {

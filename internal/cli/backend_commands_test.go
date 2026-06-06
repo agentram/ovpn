@@ -10,9 +10,9 @@ import (
 func TestServerBackendListAndDetachFlows(t *testing.T) {
 	app := newTestAppWithoutServers(t, false)
 	ctx := app.ctx
-	proxy := coverageServer("proxy", model.ServerRoleProxy)
+	proxy := backendCommandServer("proxy", model.ServerRoleProxy)
 	proxy.ProxyPreset = model.ProxyPresetRU
-	backend := coverageServer("backend", model.ServerRoleVPN)
+	backend := backendCommandServer("backend", model.ServerRoleVPN)
 	if err := app.store.AddServer(ctx, &proxy); err != nil {
 		t.Fatalf("add proxy: %v", err)
 	}
@@ -72,9 +72,9 @@ func TestServerBackendListAndDetachFlows(t *testing.T) {
 func TestServerBackendRejectsWrongRoles(t *testing.T) {
 	app := newTestAppWithoutServers(t, false)
 	ctx := app.ctx
-	proxy := coverageServer("proxy", model.ServerRoleProxy)
+	proxy := backendCommandServer("proxy", model.ServerRoleProxy)
 	proxy.ProxyPreset = model.ProxyPresetRU
-	vpn := coverageServer("vpn", model.ServerRoleVPN)
+	vpn := backendCommandServer("vpn", model.ServerRoleVPN)
 	if err := app.store.AddServer(ctx, &proxy); err != nil {
 		t.Fatalf("add proxy: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestServerBackendRejectsWrongRoles(t *testing.T) {
 	}
 }
 
-func coverageServer(name string, role string) model.Server {
+func backendCommandServer(name string, role string) model.Server {
 	return model.Server{
 		Name:              name,
 		Role:              role,

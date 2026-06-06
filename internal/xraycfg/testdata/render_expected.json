@@ -30,13 +30,20 @@
     "tag": "api"
   },
   "routing": {
-    "domainStrategy": "IPIfNonMatch",
+    "domainStrategy": "AsIs",
     "rules": [
       {
         "inboundTag": [
           "api"
         ],
         "outboundTag": "api",
+        "type": "field"
+      },
+      {
+        "ip": [
+          "::/0"
+        ],
+        "outboundTag": "block",
         "type": "field"
       },
       {

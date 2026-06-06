@@ -26,6 +26,7 @@ func TestRequireAgentToken(t *testing.T) {
 		{name: "disabled allows mutating without token", token: "", method: http.MethodPost, path: "/runtime/user/add", wantStatus: http.StatusOK},
 		{name: "read-only path stays open", token: "secret", method: http.MethodGet, path: "/stats/total", wantStatus: http.StatusOK},
 		{name: "metrics stays open for prometheus", token: "secret", method: http.MethodGet, path: "/metrics", wantStatus: http.StatusOK},
+		{name: "diagnostics requires token", token: "secret", method: http.MethodGet, path: "/diagnostics/user", wantStatus: http.StatusUnauthorized},
 		{name: "mutating without token rejected", token: "secret", method: http.MethodPost, path: "/runtime/user/add", wantStatus: http.StatusUnauthorized},
 		{name: "mutating with wrong token rejected", token: "secret", method: http.MethodPost, path: "/runtime/user/add", authHeader: "Bearer nope", wantStatus: http.StatusUnauthorized},
 		{name: "mutating with correct token allowed", token: "secret", method: http.MethodPost, path: "/runtime/user/add", authHeader: "Bearer secret", wantStatus: http.StatusOK},

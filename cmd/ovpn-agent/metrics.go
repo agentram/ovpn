@@ -38,6 +38,13 @@ type agentMetrics struct {
 	userExpired                 *prometheus.GaugeVec
 	userEffectiveEnabled        *prometheus.GaugeVec
 	userDaysUntilExpiry         *prometheus.GaugeVec
+	connectionLastSeenUnix      *prometheus.GaugeVec
+	connectionRecentTotal       *prometheus.GaugeVec
+	connectionSourceNetworks    *prometheus.GaugeVec
+	connectionIPv6Destinations  *prometheus.GaugeVec
+	connectionEventsTotal       prometheus.Counter
+	connectionParseErrorsTotal  prometheus.Counter
+	connectionTailerErrorsTotal *prometheus.CounterVec
 	usersExpiring2D             prometheus.Gauge
 	usersExpired                prometheus.Gauge
 	xrayAPIReachable            prometheus.Gauge
@@ -149,6 +156,34 @@ func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 			Name: "ovpn_agent_user_days_until_expiry",
 			Help: "Per-user days until exclusive expiry cutoff; negative means already expired, -10000 means no expiry.",
 		}, []string{"email", "expiry_date"}),
+		connectionLastSeenUnix: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ovpn_agent_user_connection_last_seen_timestamp_seconds",
+			Help: "Unix timestamp of the latest parsed access-log connection for the user.",
+		}, []string{"email"}),
+		connectionRecentTotal: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ovpn_agent_user_recent_connections",
+			Help: "Recent parsed access-log connections grouped by user, result, and window.",
+		}, []string{"email", "result", "window"}),
+		connectionSourceNetworks: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ovpn_agent_user_recent_source_networks",
+			Help: "Approximate recent source network count grouped by user and window.",
+		}, []string{"email", "window"}),
+		connectionIPv6Destinations: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "ovpn_agent_user_recent_ipv6_destinations",
+			Help: "Recent parsed access-log connections whose destination was IPv6, grouped by user and window.",
+		}, []string{"email", "window"}),
+		connectionEventsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ovpn_agent_connection_events_total",
+			Help: "Total parsed connection diagnostic events stored by the agent.",
+		}),
+		connectionParseErrorsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "ovpn_agent_connection_parse_errors_total",
+			Help: "Total access-log lines skipped because they could not be parsed into diagnostic events.",
+		}),
+		connectionTailerErrorsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "ovpn_agent_connection_tailer_errors_total",
+			Help: "Total connection diagnostics tailer errors grouped by operation.",
+		}, []string{"operation"}),
 		usersExpiring2D: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "ovpn_agent_users_expiring_2d",
 			Help: "Number of effectively enabled users expiring within the next two days.",
@@ -203,6 +238,13 @@ func newAgentMetrics(reg prometheus.Registerer) *agentMetrics {
 		m.userExpired,
 		m.userEffectiveEnabled,
 		m.userDaysUntilExpiry,
+		m.connectionLastSeenUnix,
+		m.connectionRecentTotal,
+		m.connectionSourceNetworks,
+		m.connectionIPv6Destinations,
+		m.connectionEventsTotal,
+		m.connectionParseErrorsTotal,
+		m.connectionTailerErrorsTotal,
 		m.usersExpiring2D,
 		m.usersExpired,
 		m.xrayAPIReachable,
@@ -249,6 +291,26 @@ func (m *agentMetrics) OnUsersActive(count int) {
 // OnUserSpike counts a per-user traffic burst that exceeded the spike threshold.
 func (m *agentMetrics) OnUserSpike(_ int64) {
 	m.userSpikeEventsTotal.Inc()
+}
+
+// OnConnectionEvents counts parsed diagnostic connection events persisted by the tailer.
+func (m *agentMetrics) OnConnectionEvents(count int) {
+	if count > 0 {
+		m.connectionEventsTotal.Add(float64(count))
+	}
+}
+
+// OnConnectionParseError counts one access-log line that could not be parsed.
+func (m *agentMetrics) OnConnectionParseError() {
+	m.connectionParseErrorsTotal.Inc()
+}
+
+// OnConnectionTailerError counts a diagnostics tailer error grouped by operation.
+func (m *agentMetrics) OnConnectionTailerError(operation string) {
+	if strings.TrimSpace(operation) == "" {
+		operation = "unknown"
+	}
+	m.connectionTailerErrorsTotal.WithLabelValues(operation).Inc()
 }
 
 // OnDBWriteError counts a failed database operation, labeled by operation name.
@@ -393,6 +455,31 @@ func (m *agentMetrics) setUserExpiryStatus(status model.UserStatusResponse) {
 		m.userExpired.WithLabelValues(email, expiryDate).Set(expired)
 		m.userEffectiveEnabled.WithLabelValues(email, expiryDate).Set(effectiveEnabled)
 		m.userDaysUntilExpiry.WithLabelValues(email, expiryDate).Set(daysUntil)
+	}
+}
+
+// setConnectionDiagnostics publishes low-cardinality connection diagnostics gauges.
+func (m *agentMetrics) setConnectionDiagnostics(rows []model.UserConnectionDiagnostics, window string) {
+	window = strings.TrimSpace(window)
+	if window == "" {
+		window = "24h"
+	}
+	m.connectionLastSeenUnix.Reset()
+	m.connectionRecentTotal.Reset()
+	m.connectionSourceNetworks.Reset()
+	m.connectionIPv6Destinations.Reset()
+	for _, row := range rows {
+		email := strings.TrimSpace(row.Email)
+		if email == "" {
+			continue
+		}
+		if row.LastSeenAt != nil {
+			m.connectionLastSeenUnix.WithLabelValues(email).Set(float64(row.LastSeenAt.UTC().Unix()))
+		}
+		m.connectionRecentTotal.WithLabelValues(email, "accepted", window).Set(float64(row.AcceptedCount))
+		m.connectionRecentTotal.WithLabelValues(email, "rejected", window).Set(float64(row.RejectedCount))
+		m.connectionSourceNetworks.WithLabelValues(email, window).Set(float64(row.ApproxSourceNetworks))
+		m.connectionIPv6Destinations.WithLabelValues(email, window).Set(float64(row.DestinationIPv6Count))
 	}
 }
 
