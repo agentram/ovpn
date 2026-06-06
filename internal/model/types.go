@@ -116,6 +116,87 @@ type UserTraffic struct {
 	DownlinkBytes int64     `json:"downlink_bytes"`
 }
 
+type TrafficWindow struct {
+	Window        string `json:"window"`
+	Start         string `json:"start"`
+	End           string `json:"end"`
+	UplinkBytes   int64  `json:"uplink_bytes"`
+	DownlinkBytes int64  `json:"downlink_bytes"`
+	TotalBytes    int64  `json:"total_bytes"`
+}
+
+type ConnectionEvent struct {
+	Timestamp          time.Time `json:"timestamp"`
+	Result             string    `json:"result"`
+	Email              string    `json:"email"`
+	SourceNetwork      string    `json:"source_network,omitempty"`
+	Destination        string    `json:"destination,omitempty"`
+	DestinationPort    int       `json:"destination_port,omitempty"`
+	DestinationFamily  string    `json:"destination_family"`
+	RawDestinationHint string    `json:"-"`
+}
+
+type ConnectionPortCount struct {
+	Port  int   `json:"port"`
+	Count int64 `json:"count"`
+}
+
+type UserConnectionDiagnostics struct {
+	Email                   string                `json:"email"`
+	Since                   string                `json:"since"`
+	Until                   string                `json:"until"`
+	LastSeenAt              *time.Time            `json:"last_seen_at,omitempty"`
+	AcceptedCount           int64                 `json:"accepted_count"`
+	RejectedCount           int64                 `json:"rejected_count"`
+	DestinationIPv4Count    int64                 `json:"destination_ipv4_count"`
+	DestinationIPv6Count    int64                 `json:"destination_ipv6_count"`
+	DestinationDomainCount  int64                 `json:"destination_domain_count"`
+	DestinationUnknownCount int64                 `json:"destination_unknown_count"`
+	ApproxSourceNetworks    int                   `json:"approx_source_networks"`
+	SourceNetworksOverflow  int64                 `json:"source_networks_overflow"`
+	TopPorts                []ConnectionPortCount `json:"top_ports,omitempty"`
+	DebugActive             bool                  `json:"debug_active"`
+	DebugExpiresAt          *time.Time            `json:"debug_expires_at,omitempty"`
+}
+
+type UserDiagnosticsResponse struct {
+	Time           string                    `json:"time"`
+	Email          string                    `json:"email"`
+	Username       string                    `json:"username,omitempty"`
+	User           *UserAccessStatus         `json:"user,omitempty"`
+	TrafficWindows []TrafficWindow           `json:"traffic_windows"`
+	Connections    UserConnectionDiagnostics `json:"connections"`
+	Hints          []string                  `json:"hints,omitempty"`
+}
+
+type ConnectionDebugSession struct {
+	Email     string    `json:"email"`
+	StartedAt time.Time `json:"started_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type ConnectionDebugEvent struct {
+	Timestamp         time.Time `json:"timestamp"`
+	Result            string    `json:"result"`
+	Email             string    `json:"email"`
+	SourceNetwork     string    `json:"source_network,omitempty"`
+	Destination       string    `json:"destination,omitempty"`
+	DestinationPort   int       `json:"destination_port,omitempty"`
+	DestinationFamily string    `json:"destination_family"`
+}
+
+type ConnectionDebugEventsResponse struct {
+	Email  string                 `json:"email"`
+	Since  string                 `json:"since"`
+	Until  string                 `json:"until"`
+	Events []ConnectionDebugEvent `json:"events"`
+}
+
+type ConnectionDebugSessionsResponse struct {
+	Time     string                   `json:"time"`
+	Sessions []ConnectionDebugSession `json:"sessions"`
+}
+
 type LinkOptions struct {
 	Fragment string
 	Label    string

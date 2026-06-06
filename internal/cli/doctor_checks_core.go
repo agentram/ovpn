@@ -340,10 +340,14 @@ func (a *App) checkXrayConfig(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 	cmd := strings.Join([]string{
 		"set -e",
 		"cd " + shellQuote(deploy.RemoteDir),
-		". ./.env",
+		"XRAY_IMAGE=$(sudo -n sed -n 's/^XRAY_IMAGE=//p' ./.env 2>/dev/null | head -n1)",
+		"test -n \"$XRAY_IMAGE\"",
+		fmt.Sprintf("sudo mkdir -p %s/logs", deploy.RemoteDir),
+		fmt.Sprintf("sudo chown %d:%d %s/logs", deploy.XrayRuntimeGID, deploy.XrayRuntimeGID, deploy.RemoteDir),
+		fmt.Sprintf("sudo chmod 770 %s/logs", deploy.RemoteDir),
 		fmt.Sprintf("extra_mounts=''; if [ -f %s/geodata/geosite.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
 		fmt.Sprintf("if [ -f %s/geodata/geoip.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
-		fmt.Sprintf("eval sudo -n docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", deploy.RemoteDir),
+		fmt.Sprintf("eval sudo -n docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro -v %s/logs:/var/log/ovpn $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", deploy.RemoteDir, deploy.RemoteDir),
 	}, "; ")
 	res, err := a.execRemote(runner, cfg, 40*time.Second, cmd)
 	if err != nil {

@@ -200,13 +200,7 @@ func (a *App) newServerListCmd() *cobra.Command {
 				fmt.Println("no servers")
 				return nil
 			}
-			for _, s := range servers {
-				status := "disabled"
-				if s.Enabled {
-					status = "enabled"
-				}
-				fmt.Printf("%d\t%s\t%s\t%s\t%s\t%s\t%s\n", s.ID, s.Name, s.NormalizedRole(), s.Host, s.Domain, s.XrayVersion, status)
-			}
+			fmt.Println(renderServerListTable(servers))
 			return nil
 		},
 	}

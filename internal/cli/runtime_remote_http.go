@@ -61,7 +61,7 @@ func (a *App) fetchRemoteHTTP(srv model.Server, method, url string, payload any)
 // token (older deploys, or auth disabled) sends a harmless empty bearer. JSON payloads are streamed
 // via stdin to avoid shell-escaping bugs and to keep large bodies out of logs.
 func buildAgentHTTPCommand(method, url string, payload any) string {
-	tokenPrelude := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); ", deploy.RemoteDir)
+	tokenPrelude := fmt.Sprintf("OVPN_AGENT_TOKEN=$(sudo -n sed -n 's/^OVPN_AGENT_TOKEN=//p' %s/.env 2>/dev/null | head -n1); ", deploy.RemoteDir)
 	if payload == nil {
 		return tokenPrelude + fmt.Sprintf("curl --max-time 10 -sS -H \"Authorization: Bearer ${OVPN_AGENT_TOKEN}\" -w '\\nOVPN_HTTP_STATUS:%%{http_code}' -X %s '%s'", method, url)
 	}

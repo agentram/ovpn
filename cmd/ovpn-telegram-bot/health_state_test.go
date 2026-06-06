@@ -52,7 +52,7 @@ func TestBotHealthTransitionsAndMetrics(t *testing.T) {
 func TestBotEnsureHealthCreatesMissingState(t *testing.T) {
 	t.Parallel()
 
-	b := newCoverageBot(t, &telegramRecorder{}, false)
+	b := newBotTestHarness(t, &telegramRecorder{}, false)
 	b.health = nil
 	if got := b.ensureHealth(); got == nil {
 		t.Fatalf("expected health object")

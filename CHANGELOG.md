@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.6.0
+
+### Added
+- Added lightweight per-user connection diagnostics based on bounded Xray access-log aggregates, including `ovpn user diagnose` and targeted `ovpn user debug` sessions for short support windows. Diagnostics default to `basic`; set `OVPN_CONNECTION_DIAGNOSTICS=off` before deploy if the operator does not want per-user connection metadata collected.
+- Added low-cardinality Prometheus metrics for recent per-user connection activity, approximate source-network counts, IPv6 destination attempts, parse errors, and tailer health.
+- Added `ovpn user debug list` so operators can see currently active targeted debug sessions.
+- Added `docs/cli.md` with a practical command map, per-user diagnostics workflow, and targeted debug usage notes.
+
+### Changed
+- Xray access logs are now rendered when connection diagnostics are enabled, shared with `ovpn-agent`, and capped at `30 MiB` as scratch data that is not backed up.
+- Xray routing now uses `domainStrategy=AsIs` so destination domains remain available to routing and diagnostics instead of being resolved during routing. On proxy-role servers, GeoIP direct rules now apply to IP-literal destinations; required country-local domain traffic should be covered by the preset's geosite/domain rules.
+- Minimal security routing now blocks IPv6-literal egress by default (`::/0 -> block`). This is a partial guard under `domainStrategy=AsIs`: it catches IPv6-literal destinations, while domain destinations are still handled by domain rules and the IPv4-preferred freedom outbound.
+- `server list` now renders a proper CLI table with headers instead of raw tab-separated columns.
+- `user reconcile` is now hidden from normal help and documented as an advanced local-state repair command rather than a routine user sync step.
+- Fresh-host Ansible bootstrap now ensures the local hostname resolves through `/etc/hosts`, avoiding noisy `sudo: unable to resolve host` warnings on template-based images.
+
+### Fixed
+- Stopping a targeted debug session now deletes that user's captured debug events immediately while leaving aggregate diagnostics intact.
+- `doctor` now reads root-owned `.env` values through `sudo` after deploy hardening locks runtime secrets down, so Xray validation and runtime probes do not fail with `.env: Permission denied`.
+- CLI calls to protected `ovpn-agent` endpoints now read `OVPN_AGENT_TOKEN` through `sudo`, keeping user/quota/runtime operations compatible with hardened remote file permissions.
+- `doctor` now checks the agent SQLite database through `sudo`, avoiding false missing-database warnings for Docker volumes owned by root.
+- Xray config validation mounts the runtime access-log directory during `xray -test`, matching the deployed diagnostics configuration.
+
 ## 1.5.1
 
 ### Fixed

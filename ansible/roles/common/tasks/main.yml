@@ -9,6 +9,15 @@
   ansible.builtin.command: "timedatectl set-timezone {{ ovpn_timezone }}"
   changed_when: false
 
+- name: Ensure local hostname resolves for sudo
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1\s+'
+    line: "127.0.1.1 {{ ([ansible_hostname, inventory_hostname] | unique) | join(' ') }}"
+    owner: root
+    group: root
+    mode: "0644"
+
 - name: Disable Ubuntu MOTD news (optional)
   ansible.builtin.copy:
     dest: /etc/default/motd-news
