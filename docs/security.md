@@ -53,12 +53,10 @@ Minimal profile runtime controls include:
 
 - `protocol: ["bittorrent"] -> outboundTag: "block"`
 - `domain: ["geosite:category-public-tracker"] -> outboundTag: "block"`
-- `ip: ["::/0"] -> outboundTag: "block"` for IPv6-literal egress attempts
 - Xray `dns.servers` with threat resolvers
 
-The IPv6 egress rule is intentionally conservative and partial.
-The rendered routing uses `domainStrategy=AsIs`, so the rule catches destinations that arrive as IPv6 literals; it is not a DNS-resolution filter for every domain that may have AAAA records.
-The default freedom outbound prefers IPv4 resolution.
+Rendered routing uses `domainStrategy=AsIs`, so IP-literal destinations remain visible to routing and diagnostics.
+The default freedom outbound prefers IPv4 for domain resolution, but IPv6-literal destinations are not blackholed by default because mobile clients may try IPv6 before falling back to IPv4.
 
 If Xray image validation fails because geosite resources are missing:
 
