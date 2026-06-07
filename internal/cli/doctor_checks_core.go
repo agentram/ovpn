@@ -217,7 +217,7 @@ func (a *App) checkDeployFiles(runner *ssh.Runner, cfg ssh.Config, srv model.Ser
 func (a *App) checkProxyServiceRuntimeIdentity(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	cmd := withRemoteTimeout(10, strings.Join([]string{
 		"set -e",
-		fmt.Sprintf("if grep -q %s %s/xray/config.json && grep -q %s %s/xray/config.json; then echo PROXY_SERVICE_IDENTITY=1; else echo PROXY_SERVICE_IDENTITY=0; fi",
+		fmt.Sprintf("if sudo -n grep -q %s %s/xray/config.json && sudo -n grep -q %s %s/xray/config.json; then echo PROXY_SERVICE_IDENTITY=1; else echo PROXY_SERVICE_IDENTITY=0; fi",
 			shellQuote(strings.TrimSpace(srv.ProxyServiceUUID)),
 			shellQuote(deploy.RemoteDir),
 			shellQuote(proxyServiceEmail()),

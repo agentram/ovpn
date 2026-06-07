@@ -356,9 +356,8 @@ For `proxy` servers it means:
 - `geoip:*` direct rules match IP-literal destinations
 - domain destinations not matched by the preset's domain rules fall through to the foreign pool
 
-Minimal security routing also blocks IPv6-literal egress with `ip: ["::/0"] -> block`.
-Under `AsIs`, that block catches IPv6-literal destinations, not every domain that could resolve to IPv6.
-The freedom outbound prefers IPv4 resolution, so this is a conservative partial guard rather than full IPv6 policy routing.
+The freedom outbound prefers IPv4 for domain resolution.
+IPv6-literal destinations are not blocked by default because mobile clients may try IPv6 first and otherwise wait for timeout before IPv4 fallback.
 
 ### Practical support flow
 

@@ -52,15 +52,13 @@ func TestRenderServerJSONIncludesRequiredSections(t *testing.T) {
 		t.Fatalf("routing missing")
 	}
 	rules, _ := routing["rules"].([]any)
-	if len(rules) < 3 {
+	if len(rules) < 2 {
 		t.Fatalf("expected api + security rules, got %d", len(rules))
 	}
 	if got := routing["domainStrategy"]; got != "AsIs" {
 		t.Fatalf("routing domainStrategy = %v, want AsIs", got)
 	}
-	if !hasIPv6BlockRule(rules) {
-		t.Fatalf("expected IPv6 block rule in routing rules: %v", rules)
-	}
+	assertNoIPv6BlockRule(t, rules)
 	outbounds, ok := obj["outbounds"].([]any)
 	if !ok {
 		t.Fatalf("outbounds missing")
@@ -215,7 +213,8 @@ func toStrings(in []any) []string {
 	return out
 }
 
-func hasIPv6BlockRule(rules []any) bool {
+func assertNoIPv6BlockRule(t *testing.T, rules []any) {
+	t.Helper()
 	for _, rule := range rules {
 		r, ok := rule.(map[string]any)
 		if !ok || r["outboundTag"] != "block" {
@@ -224,11 +223,10 @@ func hasIPv6BlockRule(rules []any) bool {
 		ips, _ := r["ip"].([]any)
 		for _, ip := range ips {
 			if ip == "::/0" {
-				return true
+				t.Fatalf("unexpected IPv6 block rule in routing rules: %v", rules)
 			}
 		}
 	}
-	return false
 }
 
 func TestNormalizeX25519KeyBase64(t *testing.T) {
@@ -543,10 +541,8 @@ func TestRenderServerJSONProfileOffSkipsSecurityRoutingAndDNS(t *testing.T) {
 		t.Fatalf("routing missing")
 	}
 	rules, _ := routing["rules"].([]any)
-	if len(rules) != 2 {
-		t.Fatalf("expected api and IPv6 block rules, got %d", len(rules))
+	if len(rules) != 1 {
+		t.Fatalf("expected only api routing rule, got %d", len(rules))
 	}
-	if !hasIPv6BlockRule(rules) {
-		t.Fatalf("expected IPv6 block rule when security profile is off: %v", rules)
-	}
+	assertNoIPv6BlockRule(t, rules)
 }

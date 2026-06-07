@@ -183,13 +183,7 @@ Use `--proxy-preset cn` for China-local direct routing.
   --ssh-port 22
 ```
 
-3. Initialize it:
-
-```bash
-./ovpn server init <proxy>
-```
-
-4. Attach one backend first:
+3. Attach one backend first:
 
 ```bash
 ./ovpn server backend attach --proxy <proxy> --backend <vpn-backend-1>
@@ -197,7 +191,7 @@ Use `--proxy-preset cn` for China-local direct routing.
 
 The first attach lazily provisions the shared backend relay identity if the backend does not have one yet.
 
-5. Deploy the attached backend first:
+4. Deploy the attached backend first:
 
 ```bash
 ./ovpn config validate --server <vpn-backend-1>
@@ -205,15 +199,19 @@ The first attach lazily provisions the shared backend relay identity if the back
 ./ovpn doctor <vpn-backend-1>
 ```
 
-6. Validate and deploy the proxy:
+5. Initialize, validate, and deploy the proxy:
 
 ```bash
+./ovpn server init <proxy>
 ./ovpn config validate --server <proxy>
 ./ovpn deploy <proxy>
 ./ovpn doctor <proxy>
 ```
 
-7. Start monitoring:
+`server init <proxy>` requires at least one attached backend because proxy rendering needs a backend pool.
+Deploying the backend before the proxy makes the backend relay identity live before client traffic reaches the proxy.
+
+6. Start monitoring:
 
 ```bash
 ./ovpn server monitor up <proxy>
@@ -223,7 +221,7 @@ The first attach lazily provisions the shared backend relay identity if the back
 If a fresh host hits public registry pull limits, preload the monitoring images from another ovpn host or redeploy with explicit image overrides before starting monitoring.
 The HA design does not require Docker Hub specifically; it only requires that the configured image references are reachable on the proxy host.
 
-8. Verify:
+7. Verify:
 
 - `haproxy` is running
 - Prometheus scrapes `haproxy`
@@ -232,7 +230,7 @@ The HA design does not require Docker Hub specifically; it only requires that th
 - preset-local routes exit directly
 - foreign routes use the attached backend
 
-9. Attach additional backends one by one:
+8. Attach additional backends one by one:
 
 ```bash
 ./ovpn server backend attach --proxy <proxy> --backend <vpn-backend-2>
@@ -241,9 +239,9 @@ The HA design does not require Docker Hub specifically; it only requires that th
 ./ovpn doctor <proxy>
 ```
 
-10. Pilot proxy links with a small user set.
+9. Pilot proxy links with a small user set.
 
-11. Migrate existing users in batches only after the proxy path is stable.
+10. Migrate existing users in batches only after the proxy path is stable.
 
 ## Monitoring expectations on the proxy
 
