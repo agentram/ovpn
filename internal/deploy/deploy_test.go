@@ -299,6 +299,27 @@ func TestRenderBundleConnectionDiagnosticsModeControlsAccessLog(t *testing.T) {
 	}
 }
 
+func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
+	t.Parallel()
+
+	base := []byte("ports:\n      - \"443:443/tcp\"\n")
+	got := string(injectXrayProfilePorts(base, []string{
+		model.TransportProfileRealityTCPVision,
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+		model.TransportProfileWSTLSWeb,
+	}))
+	if !strings.Contains(got, `- "8443:8443/tcp"`) {
+		t.Fatalf("expected xhttp port mapping, got:\n%s", got)
+	}
+	if !strings.Contains(got, `- "13179:13179/tcp"`) {
+		t.Fatalf("expected plain xhttp port mapping, got:\n%s", got)
+	}
+	if strings.Contains(got, "8445") {
+		t.Fatalf("planned ws/tls profile must not expose a port, got:\n%s", got)
+	}
+}
+
 func TestRenderBundleAppliesMonitoringAndTelegramDefaults(t *testing.T) {
 	t.Parallel()
 

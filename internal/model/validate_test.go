@@ -67,6 +67,12 @@ func TestServerValidate(t *testing.T) {
 	if err := invalidVPNPreset.Validate(); err == nil || !strings.Contains(err.Error(), "only supported for proxy role") {
 		t.Fatalf("expected vpn proxy_preset validation error, got %v", err)
 	}
+
+	invalidProfile := valid
+	invalidProfile.EnabledProfiles = "vless-reality-tcp-vision,nope"
+	if err := invalidProfile.Validate(); err == nil || !strings.Contains(err.Error(), "enabled_profiles contains unsupported transport profile nope") {
+		t.Fatalf("expected enabled profile validation error, got %v", err)
+	}
 }
 
 func TestUserValidate(t *testing.T) {

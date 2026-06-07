@@ -152,10 +152,16 @@ Generate the client credential:
 ./ovpn user link --server <server> --username alice
 ./ovpn user link --server <server> --username alice --qr=false
 ./ovpn user link --server <server> --username alice --qr-file ~/Desktop/alice.png
+./ovpn user link --server <server> --username alice --profile vless-reality-xhttp
+./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --out ~/Desktop/alice-xhttp.png
+./ovpn user link --server <server> --username alice --profile vless-xhttp-plain
+./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
 ```
 
 The `vless://` link and QR code are secrets.
 Anyone who has them can use that profile until you disable or remove the user.
+
+Transport profiles are server-side opt-in. See [`docs/transports.md`](transports.md) for the profile list, client compatibility notes, and rollout workflow.
 
 Enable, disable, or remove:
 
@@ -195,6 +201,33 @@ Top traffic consumers:
 
 When you add a new enabled VPN server, users are materialized from canonical local state during deploy.
 You should not need a separate sync command for normal multi-server operation.
+
+## Transport Profiles
+
+List the profiles known to a server:
+
+```bash
+./ovpn server profile list <server>
+```
+
+Enable an extra deployable profile and redeploy:
+
+```bash
+./ovpn server profile enable <server> vless-reality-xhttp
+./ovpn server profile enable <server> vless-xhttp-plain
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+Change the primary profile used by `user link` when `--profile` is omitted:
+
+```bash
+./ovpn server profile switch <server> vless-xhttp-plain
+./ovpn deploy <server>
+```
+
+The deprecated compatibility `vless-reality-tcp-vision` profile remains enabled unless you deliberately edit local server state.
+Use profile-specific links for A/B testing before switching the primary profile.
 
 ## Traffic stats
 

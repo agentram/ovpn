@@ -114,6 +114,118 @@ func TestUserLinkPrintsAndWritesQR(t *testing.T) {
 	assertPNGQRCodeFile(t, qrPath)
 }
 
+func TestUserLinkCanSelectTransportProfile(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfileRealityXHTTP)
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", "xhttp", "--qr=false"})
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("user link --profile xhttp: %v", err)
+	}
+	link := strings.TrimSpace(stdout)
+	for _, want := range []string{":8443?", "type=xhttp", "path=%2Fovpn-xhttp", "#ovpn-alice-vless-reality-xhttp"} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("profile link missing %q: %s", want, link)
+		}
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+}
+
+func TestPlainXHTTPProfileLinkDoesNotRequireRealityShortID(t *testing.T) {
+	link, err := buildUserProfileLink(model.Server{
+		Name:            "main",
+		Host:            "203.0.113.10",
+		Domain:          "example.org",
+		PrimaryProfile:  model.TransportProfilePlainXHTTP,
+		EnabledProfiles: model.TransportProfilePlainXHTTP,
+	}, model.User{
+		Username: "alice",
+		UUID:     "11111111-1111-1111-1111-111111111111",
+	}, model.TransportProfilePlainXHTTP)
+	if err != nil {
+		t.Fatalf("plain XHTTP link should not need REALITY short-id: %v", err)
+	}
+	for _, want := range []string{"vless://11111111-1111-1111-1111-111111111111@example.org:13179", "security=none", "type=xhttp", "path=%2F"} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("plain XHTTP link missing %q: %s", want, link)
+		}
+	}
+	for _, forbidden := range []string{"pbk=", "sid=", "sni="} {
+		if strings.Contains(link, forbidden) {
+			t.Fatalf("plain XHTTP link should not contain %s: %s", forbidden, link)
+		}
+	}
+}
+
+func TestUserLinkRejectsUnknownExplicitTransportProfile(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", "typo", "--qr=false"})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), `unsupported transport profile "typo"`) {
+		t.Fatalf("expected explicit profile validation error, got err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("invalid profile should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestUserExportAllProfilesWritesLinksAndQRs(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join([]string{
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+	}, ","))
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+	out := t.TempDir()
+	cmd := app.newUserExportCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--all-profiles", "--out", out})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("user export: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if strings.Count(stdout, "exported ") != 3 {
+		t.Fatalf("expected three exported profiles, got:\n%s", stdout)
+	}
+	for _, profile := range []string{
+		model.TransportProfileRealityTCPVision,
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+	} {
+		base := filepath.Join(out, "main-alice-"+profile)
+		raw, err := os.ReadFile(base + ".txt")
+		if err != nil {
+			t.Fatalf("read exported link for %s: %v", profile, err)
+		}
+		if !strings.Contains(string(raw), "#ovpn-alice-"+profile) {
+			t.Fatalf("exported link for %s missing profile label: %s", profile, string(raw))
+		}
+		assertPNGQRCodeFile(t, base+".png")
+	}
+}
+
 func TestTerminalQRCodeTrimsQuietZone(t *testing.T) {
 	t.Parallel()
 

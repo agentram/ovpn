@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.0
+
+### Added
+- Added transport profile metadata and server policy fields so operators can keep the deprecated compatibility `vless-reality-tcp-vision` profile while enabling opt-in fallback profiles.
+- Added `server profile list`, `server profile enable`, and `server profile switch` for controlled profile rollout.
+- Added profile-aware `user link --profile`, `user qr`, and `user export --all-profiles` commands for per-user fallback links and QR codes.
+- Added optional Xray inbounds for `vless-reality-xhttp` and `vless-xhttp-plain`; deploy exposes their ports only when those profiles are enabled.
+- Added a preferred `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
+- Added `docs/transports.md` with practical rollout notes, client compatibility warnings, and diagnostics workflow.
+
+### Changed
+- Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can switch the primary generated-link profile to plain XHTTP after testing.
+
 ## 1.6.1
 
 ### Changed

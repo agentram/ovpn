@@ -3,6 +3,7 @@ package remote
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -82,12 +83,13 @@ func (s *Store) migrate(ctx context.Context) error {
 			updated_at TEXT NOT NULL
 		);`,
 		`CREATE TABLE IF NOT EXISTS quota_policy (
-			email TEXT PRIMARY KEY,
+			email TEXT NOT NULL,
 			uuid TEXT NOT NULL,
 			inbound_tag TEXT NOT NULL,
 			quota_enabled INTEGER NOT NULL DEFAULT 1,
 			monthly_quota_byte INTEGER,
-			updated_at TEXT NOT NULL
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (email, inbound_tag)
 		);`,
 		`CREATE TABLE IF NOT EXISTS quota_state (
 				email TEXT PRIMARY KEY,
@@ -97,13 +99,14 @@ func (s *Store) migrate(ctx context.Context) error {
 				updated_at TEXT NOT NULL
 			);`,
 		`CREATE TABLE IF NOT EXISTS user_policy (
-				email TEXT PRIMARY KEY,
+				email TEXT NOT NULL,
 				username TEXT NOT NULL,
 				uuid TEXT NOT NULL,
 				enabled INTEGER NOT NULL DEFAULT 1,
 				expiry_at TEXT,
 				inbound_tag TEXT NOT NULL,
-				updated_at TEXT NOT NULL
+				updated_at TEXT NOT NULL,
+				PRIMARY KEY (email, inbound_tag)
 			);`,
 		`CREATE TABLE IF NOT EXISTS connection_hourly (
 				email TEXT NOT NULL,
@@ -162,7 +165,83 @@ func (s *Store) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := s.ensureCompositePolicyPK(ctx, "quota_policy", `CREATE TABLE quota_policy (
+			email TEXT NOT NULL,
+			uuid TEXT NOT NULL,
+			inbound_tag TEXT NOT NULL,
+			quota_enabled INTEGER NOT NULL DEFAULT 1,
+			monthly_quota_byte INTEGER,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (email, inbound_tag)
+		);`, "email, uuid, inbound_tag, quota_enabled, monthly_quota_byte, updated_at"); err != nil {
+		return err
+	}
+	if err := s.ensureCompositePolicyPK(ctx, "user_policy", `CREATE TABLE user_policy (
+			email TEXT NOT NULL,
+			username TEXT NOT NULL,
+			uuid TEXT NOT NULL,
+			enabled INTEGER NOT NULL DEFAULT 1,
+			expiry_at TEXT,
+			inbound_tag TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			PRIMARY KEY (email, inbound_tag)
+		);`, "email, username, uuid, enabled, expiry_at, inbound_tag, updated_at"); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (s *Store) ensureCompositePolicyPK(ctx context.Context, table string, createSQL string, columns string) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA table_info(`+table+`)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var pkCols []string
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if pk > 0 {
+			pkCols = append(pkCols, name)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(pkCols) == 2 && pkCols[0] == "email" && pkCols[1] == "inbound_tag" {
+		return nil
+	}
+	if len(pkCols) == 0 {
+		return fmt.Errorf("%s has no primary key after migration", table)
+	}
+	legacy := table + "_legacy_single_inbound"
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS `+legacy); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE `+table+` RENAME TO `+legacy); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, createSQL); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO `+table+` (`+columns+`) SELECT `+columns+` FROM `+legacy+` WHERE TRIM(COALESCE(email, '')) != '' AND TRIM(COALESCE(inbound_tag, '')) != ''`); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DROP TABLE `+legacy); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // UpsertCounter stores the latest cumulative value for a named Xray counter.

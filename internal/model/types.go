@@ -7,6 +7,13 @@ const (
 	ServerRoleProxy = "proxy"
 )
 
+const (
+	TransportProfileRealityTCPVision = "vless-reality-tcp-vision"
+	TransportProfileRealityXHTTP     = "vless-reality-xhttp"
+	TransportProfilePlainXHTTP       = "vless-xhttp-plain"
+	TransportProfileWSTLSWeb         = "vless-ws-tls-web"
+)
+
 type SSHConfig struct {
 	User            string `json:"user"`
 	Port            int    `json:"port"`
@@ -33,6 +40,8 @@ type Server struct {
 	RealityShortIDs   string     `json:"reality_short_ids"`
 	RealityServerName string     `json:"reality_server_name"`
 	RealityTarget     string     `json:"reality_target"`
+	PrimaryProfile    string     `json:"primary_profile"`
+	EnabledProfiles   string     `json:"enabled_profiles"`
 	ProxyPreset       string     `json:"proxy_preset"`
 	ProxyServiceUUID  string     `json:"proxy_service_uuid"`
 	Enabled           bool       `json:"enabled"`
@@ -200,6 +209,15 @@ type ConnectionDebugSessionsResponse struct {
 type LinkOptions struct {
 	Fragment string
 	Label    string
+}
+
+type TransportProfile struct {
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Port        int    `json:"port"`
+	InboundTag  string `json:"inbound_tag"`
+	Description string `json:"description"`
 }
 
 type QuotaUserPolicy struct {

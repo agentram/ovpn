@@ -239,15 +239,31 @@ func (s *Store) QuotaStatus(ctx context.Context, now time.Time, window time.Dura
 		return model.QuotaStatusResponse{}, err
 	}
 	filter := strings.TrimSpace(email)
+	inboundTagsByEmail := make(map[string][]string)
+	firstPolicyByEmail := make(map[string]model.QuotaUserPolicy)
+	for _, p := range policies {
+		if filter != "" && p.Email != filter {
+			continue
+		}
+		if _, ok := firstPolicyByEmail[p.Email]; !ok {
+			firstPolicyByEmail[p.Email] = p
+		}
+		if strings.TrimSpace(p.InboundTag) != "" {
+			inboundTagsByEmail[p.Email] = append(inboundTagsByEmail[p.Email], p.InboundTag)
+		}
+	}
+	emails := make([]string, 0, len(firstPolicyByEmail))
+	for email := range firstPolicyByEmail {
+		emails = append(emails, email)
+	}
+	sort.Strings(emails)
 	resp := model.QuotaStatusResponse{
 		Window30DStart:   start.Format(time.RFC3339),
 		Window30DEnd:     end.Format(time.RFC3339),
 		DefaultQuotaByte: defaultQuotaByte,
 	}
-	for _, p := range policies {
-		if filter != "" && p.Email != filter {
-			continue
-		}
+	for _, email := range emails {
+		p := firstPolicyByEmail[email]
 		quota := defaultQuotaByte
 		if p.MonthlyQuotaByte != nil && *p.MonthlyQuotaByte > 0 {
 			quota = *p.MonthlyQuotaByte
@@ -260,8 +276,8 @@ func (s *Store) QuotaStatus(ctx context.Context, now time.Time, window time.Dura
 			Window30DUsageByte: usage[p.Email],
 			BlockedByQuota:     st.Blocked,
 			BlockedAt:          st.BlockedAt,
-			InboundTag:         p.InboundTag,
-			HasRuntimeIdentity: strings.TrimSpace(p.UUID) != "" && strings.TrimSpace(p.InboundTag) != "",
+			InboundTag:         strings.Join(uniqueStrings(inboundTagsByEmail[p.Email]), ","),
+			HasRuntimeIdentity: strings.TrimSpace(p.UUID) != "" && len(inboundTagsByEmail[p.Email]) > 0,
 		}
 		if row.QuotaEnabled {
 			resp.QuotaEnabledUsers++
@@ -271,8 +287,22 @@ func (s *Store) QuotaStatus(ctx context.Context, now time.Time, window time.Dura
 		}
 		resp.Users = append(resp.Users, row)
 	}
-	sort.Slice(resp.Users, func(i, j int) bool { return resp.Users[i].Email < resp.Users[j].Email })
 	return resp, nil
+}
+
+func uniqueStrings(in []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(in))
+	for _, raw := range in {
+		value := strings.TrimSpace(raw)
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // boolToInt maps a bool to its 0/1 SQLite representation.

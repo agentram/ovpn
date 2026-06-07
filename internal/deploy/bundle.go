@@ -113,6 +113,23 @@ func defaultString(v string, fallback string) string {
 	return v
 }
 
+func injectXrayProfilePorts(composeTpl []byte, profiles []string) []byte {
+	var extra []string
+	for _, profile := range profiles {
+		meta, ok := model.LookupTransportProfile(profile)
+		if !ok || meta.Port == 443 || meta.Port <= 0 || meta.Status == "planned" {
+			continue
+		}
+		extra = append(extra, fmt.Sprintf("      - \"%d:%d/tcp\"", meta.Port, meta.Port))
+	}
+	if len(extra) == 0 {
+		return composeTpl
+	}
+	text := string(composeTpl)
+	needle := "      - \"443:443/tcp\"\n"
+	return []byte(strings.Replace(text, needle, needle+strings.Join(extra, "\n")+"\n", 1))
+}
+
 type Bundle struct {
 	Dir       string
 	ConfigRaw []byte
@@ -137,6 +154,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		LimitFallbackUpload:   in.RealityLimitFallbackUpload,
 		LimitFallbackDownload: in.RealityLimitFallbackDownload,
 		ShortIDs:              util.ParseCSV(in.Server.RealityShortIDs),
+		EnabledProfiles:       in.Server.NormalizedEnabledProfiles(),
 		APIListen:             "0.0.0.0",
 		APIPort:               10085,
 		LogLevel:              in.XrayLogLevel,
@@ -188,6 +206,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 	if err != nil {
 		return nil, err
 	}
+	composeTpl = injectXrayProfilePorts(composeTpl, in.Server.NormalizedEnabledProfiles())
 	if err := os.WriteFile(filepath.Join(tmpDir, "docker-compose.yml"), composeTpl, 0o644); err != nil {
 		return nil, err
 	}
