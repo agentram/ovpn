@@ -8,8 +8,9 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ### Added
 - Added transport profile metadata and server policy fields so operators can keep the deprecated compatibility `vless-reality-tcp-vision` profile while enabling opt-in fallback profiles.
-- Added `server profile list`, `server profile enable`, and `server profile switch` for controlled profile rollout.
+- Added `server profile list`, `server profile enable`, `server profile disable`, and `server profile switch` for controlled profile rollout with primary-profile guard rails.
 - Added profile-aware `user link --profile`, `user qr`, and `user export --all-profiles` commands for per-user fallback links and QR codes.
+- Added profile-aware validation errors so link and QR commands explain how to enable/deploy a disabled profile instead of printing broken credentials.
 - Added optional Xray inbounds for `vless-reality-xhttp` and `vless-xhttp-plain`; deploy exposes their ports only when those profiles are enabled.
 - Added a preferred `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
 - Added `docs/transports.md` with practical rollout notes, client compatibility warnings, and diagnostics workflow.

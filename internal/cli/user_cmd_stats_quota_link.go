@@ -415,20 +415,20 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 	if requestedProfile {
 		profile = model.NormalizeTransportProfile(rawProfile)
 		if profile == "" {
-			return "", fmt.Errorf("unsupported transport profile %q", rawProfile)
+			return "", unsupportedTransportProfileError(rawProfile)
 		}
 	} else {
 		profile = srv.NormalizedPrimaryProfile()
 	}
 	meta, ok := model.LookupTransportProfile(profile)
 	if !ok {
-		return "", fmt.Errorf("unsupported transport profile %q", profile)
+		return "", unsupportedTransportProfileError(profile)
 	}
 	if meta.Status == "planned" {
-		return "", fmt.Errorf("%s profile is planned but not deployable yet", profile)
+		return "", plannedTransportProfileError(profile, srv.Name)
 	}
 	if !srv.IsTransportProfileEnabled(profile) {
-		return "", fmt.Errorf("profile %s is not enabled on server %s", profile, srv.Name)
+		return "", fmt.Errorf("profile %s is not enabled on server %s; enable and deploy it first with `ovpn server profile enable %s %s` and `ovpn deploy %s`, or choose an enabled profile from `ovpn server profile list %s`", profile, srv.Name, srv.Name, profile, srv.Name, srv.Name)
 	}
 	address := srv.Domain
 	if address == "" {
@@ -438,7 +438,7 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 	if meta.Kind == "reality" {
 		shortID = firstShortID(srv.RealityShortIDs)
 		if shortID == "" {
-			return "", fmt.Errorf("server %s has no REALITY short-id configured", srv.Name)
+			return "", fmt.Errorf("server %s has no REALITY short-id configured for profile %s; check `ovpn server profile list %s` and try a non-REALITY profile such as %s if it is enabled", srv.Name, profile, srv.Name, model.TransportProfilePlainXHTTP)
 		}
 	}
 	label := "ovpn-" + u.Username

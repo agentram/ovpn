@@ -226,7 +226,31 @@ Change the primary profile used by `user link` when `--profile` is omitted:
 ./ovpn deploy <server>
 ```
 
-The deprecated compatibility `vless-reality-tcp-vision` profile remains enabled unless you deliberately edit local server state.
+Disable a non-primary profile after users have moved away from it:
+
+```bash
+./ovpn server profile disable <server> vless-reality-tcp-vision
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+The CLI refuses to disable the current primary profile.
+Switch the primary first, deploy, verify users have a working replacement link, and only then disable the old profile:
+
+```bash
+./ovpn server profile switch <server> vless-xhttp-plain
+./ovpn deploy <server>
+./ovpn doctor <server>
+./ovpn server profile disable <server> vless-reality-tcp-vision
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+Profile commands change local desired state.
+Old links keep working until the next successful deploy removes that profile's inbound from Xray.
+
+`user link`, `user qr`, and `user export --profile` validate that the requested profile exists, is deployable, and is enabled on that server before printing or writing credentials.
+If you request a disabled profile, the CLI prints the enable/deploy commands to run instead of emitting a broken link.
 Use profile-specific links for A/B testing before switching the primary profile.
 
 ## Traffic stats

@@ -17,6 +17,7 @@ func (a *App) newServerProfileCmd() *cobra.Command {
 	cmd.AddCommand(
 		a.newServerProfileListCmd(),
 		a.newServerProfileEnableCmd(),
+		a.newServerProfileDisableCmd(),
 		a.newServerProfileSwitchCmd(),
 	)
 	return cmd
@@ -54,10 +55,10 @@ func (a *App) newServerProfileEnableCmd() *cobra.Command {
 			}
 			profile := model.NormalizeTransportProfile(args[1])
 			if profile == "" {
-				return fmt.Errorf("unsupported transport profile %q", args[1])
+				return unsupportedTransportProfileError(args[1])
 			}
 			if profile == model.TransportProfileWSTLSWeb {
-				return fmt.Errorf("%s is planned but not deployable yet; use tcp/xhttp/plain-xhttp profiles for this release", profile)
+				return plannedTransportProfileError(profile, srv.Name)
 			}
 			profiles := append(srv.NormalizedEnabledProfiles(), profile)
 			srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join(profiles, ","))
@@ -66,6 +67,49 @@ func (a *App) newServerProfileEnableCmd() *cobra.Command {
 			}
 			fmt.Printf("enabled profile %s on %s\n", profile, srv.Name)
 			fmt.Println("redeploy the server before using generated links for newly enabled profiles")
+			return nil
+		},
+	}
+}
+
+func (a *App) newServerProfileDisableCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "disable <server> <profile>",
+		Short: "Disable a non-primary transport profile on a server",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			srv, err := a.store.GetServerByName(a.ctx, args[0])
+			if err != nil {
+				return err
+			}
+			profile := model.NormalizeTransportProfile(args[1])
+			if profile == "" {
+				return unsupportedTransportProfileError(args[1])
+			}
+			primary := srv.NormalizedPrimaryProfile()
+			if profile == primary {
+				return fmt.Errorf("cannot disable primary profile %s on %s; switch primary first with `ovpn server profile switch %s <other-profile>`, then redeploy", profile, srv.Name, srv.Name)
+			}
+			current := srv.NormalizedEnabledProfiles()
+			next := make([]string, 0, len(current))
+			removed := false
+			for _, item := range current {
+				if item == profile {
+					removed = true
+					continue
+				}
+				next = append(next, item)
+			}
+			if !removed {
+				fmt.Printf("profile %s is already disabled on %s\n", profile, srv.Name)
+				return nil
+			}
+			srv.EnabledProfiles = model.EnabledProfilesCSV(primary, strings.Join(next, ","))
+			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
+				return err
+			}
+			fmt.Printf("disabled profile %s on %s\n", profile, srv.Name)
+			fmt.Println("redeploy the server before assuming old links for this profile have stopped working")
 			return nil
 		},
 	}
@@ -83,10 +127,10 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 			}
 			profile := model.NormalizeTransportProfile(args[1])
 			if profile == "" {
-				return fmt.Errorf("unsupported transport profile %q", args[1])
+				return unsupportedTransportProfileError(args[1])
 			}
 			if profile == model.TransportProfileWSTLSWeb {
-				return fmt.Errorf("%s is planned but not deployable yet; use tcp/xhttp/plain-xhttp profiles for this release", profile)
+				return plannedTransportProfileError(profile, srv.Name)
 			}
 			srv.PrimaryProfile = profile
 			srv.EnabledProfiles = model.EnabledProfilesCSV(profile, srv.EnabledProfiles)
@@ -98,4 +142,12 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func unsupportedTransportProfileError(raw string) error {
+	return fmt.Errorf("unsupported transport profile %q; supported profiles: %s", raw, model.SupportedTransportProfilesText())
+}
+
+func plannedTransportProfileError(profile string, serverName string) error {
+	return fmt.Errorf("%s is planned but not deployable yet; choose an enabled deployable profile from `ovpn server profile list %s`", profile, serverName)
 }

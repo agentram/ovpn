@@ -177,8 +177,35 @@ func TestUserLinkRejectsUnknownExplicitTransportProfile(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), `unsupported transport profile "typo"`) {
 		t.Fatalf("expected explicit profile validation error, got err=%v stdout=%q stderr=%q", err, stdout, stderr)
 	}
+	if !strings.Contains(err.Error(), model.TransportProfilePlainXHTTP) {
+		t.Fatalf("expected supported-profile hint, got %v", err)
+	}
 	if stdout != "" {
 		t.Fatalf("invalid profile should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestUserLinkRejectsDisabledTransportProfileWithTip(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfilePlainXHTTP, "--qr=false"})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil {
+		t.Fatalf("expected disabled profile error")
+	}
+	for _, want := range []string{
+		"profile " + model.TransportProfilePlainXHTTP + " is not enabled on server main",
+		"ovpn server profile enable main " + model.TransportProfilePlainXHTTP,
+		"ovpn deploy main",
+		"ovpn server profile list main",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected error to contain %q, got %v", want, err)
+		}
+	}
+	if stdout != "" {
+		t.Fatalf("disabled profile should not print link or QR output, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 

@@ -44,6 +44,15 @@ func SupportedTransportProfiles() []TransportProfile {
 	return out
 }
 
+// SupportedTransportProfilesText returns supported profile names for help text and errors.
+func SupportedTransportProfilesText() string {
+	names := make([]string, 0, len(transportProfiles))
+	for _, profile := range transportProfiles {
+		names = append(names, profile.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
 // LookupTransportProfile returns profile metadata and whether it exists.
 func LookupTransportProfile(name string) (TransportProfile, bool) {
 	name = NormalizeTransportProfile(name)

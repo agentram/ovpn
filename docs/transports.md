@@ -60,7 +60,19 @@ Switch the default profile used by `user link` when no `--profile` is passed:
 ./ovpn deploy <server>
 ```
 
-Keep the old profile enabled during testing. Disable/removal is intentionally not a first-class command yet; removing a live profile can strand users quickly, so do it as a deliberate local-state edit only after users have migrated.
+Keep the old profile enabled during testing.
+After users have migrated, disable a non-primary profile and redeploy:
+
+```bash
+./ovpn server profile disable <server> vless-reality-tcp-vision
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+`disable` updates local desired state only. Old links for that profile keep working until the next successful deploy removes the Xray inbound.
+The CLI refuses to disable the current primary profile; switch primary first, deploy, verify, then disable the old profile.
+
+Link and QR commands fail early when a requested profile is unknown, planned, or disabled. That is intentional: they should not print a secret that cannot work on the selected server.
 
 ## Client Compatibility
 
