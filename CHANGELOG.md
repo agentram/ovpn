@@ -17,6 +17,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ### Changed
 - Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can switch the primary generated-link profile to plain XHTTP after testing.
+- Human-readable CLI list outputs for stats, top users, proxy backends, and per-user diagnostics now use the same bordered table style as `server list`.
 
 ## 1.6.1
 

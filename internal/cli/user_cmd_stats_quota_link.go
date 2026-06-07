@@ -58,23 +58,7 @@ func (a *App) newUserTopCmd() *cobra.Command {
 				fmt.Println("no traffic rows")
 				return nil
 			}
-			fmt.Println("rank\tusername\temail\ttotal_bytes\tuplink\tdownlink\tquota_pct\tblocked")
-			for _, row := range rows {
-				quotaPct := "-"
-				if row.QuotaPercent != nil {
-					quotaPct = fmt.Sprintf("%.1f", *row.QuotaPercent)
-				}
-				fmt.Printf("%d\t%s\t%s\t%d\t%d\t%d\t%s\t%v\n",
-					row.Rank,
-					row.Username,
-					row.Email,
-					row.TotalBytes,
-					row.UplinkBytes,
-					row.DownlinkBytes,
-					quotaPct,
-					row.BlockedByQuota,
-				)
-			}
+			fmt.Println(renderUserTopTable(rows))
 			return nil
 		},
 	}
