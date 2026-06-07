@@ -126,7 +126,6 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			"inboundTag":  []string{"api"},
 			"outboundTag": "api",
 		},
-		ipv6BlockRule(),
 	}
 	logConfig := map[string]any{
 		"loglevel": normalizeLogLevel(spec.LogLevel),
@@ -314,14 +313,6 @@ func freedomOutbound(tag string) map[string]any {
 		"settings": map[string]any{
 			"domainStrategy": "UseIPv4",
 		},
-	}
-}
-
-func ipv6BlockRule() map[string]any {
-	return map[string]any{
-		"type":        "field",
-		"ip":          []string{"::/0"},
-		"outboundTag": "block",
 	}
 }
 

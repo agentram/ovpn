@@ -699,6 +699,10 @@ func TestUploadBundleCopiesAndExtracts(t *testing.T) {
 	if len(r.execCmds) != 1 || !strings.Contains(r.execCmds[0], "tar --no-same-owner -xzf") {
 		t.Fatalf("expected extract command, got %#v", r.execCmds)
 	}
+	if !strings.Contains(r.execCmds[0], "sudo rm -rf /opt/ovpn/.incoming") ||
+		!strings.Contains(r.execCmds[0], "sudo install -d -m 755 -o \"$USER\" -g \"$(id -gn)\" /opt/ovpn/.incoming") {
+		t.Fatalf("extract command should recreate staged dir with sudo before extracting, got %#v", r.execCmds)
+	}
 	if !strings.Contains(r.execCmds[0], "timeout 30 sh -c") {
 		t.Fatalf("expected extract command to use bounded remote timeout, got %#v", r.execCmds)
 	}

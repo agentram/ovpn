@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	uploadCopyTimeout            = 2 * time.Minute
+	uploadCopyTimeout            = 15 * time.Minute
 	uploadExtractTimeout         = 30 * time.Second
 	deployBackupTimeout          = 30 * time.Second
 	deployComposeValidateTimeout = 30 * time.Second
@@ -109,7 +109,7 @@ func buildExtractCommand(remoteTar string) string {
 	// user (config validation, the agent-token lookup) work for non-root deployers; root still reads
 	// it via sudo for `docker compose`. config.json instead targets the xray runtime group because
 	// only the xray container needs to read it.
-	return fmt.Sprintf("set -e; mkdir -p %[1]s; find %[1]s -mindepth 1 -maxdepth 1 -exec rm -rf {} +; tar --no-same-owner -xzf %[2]s -C %[1]s; rm -f %[2]s; mkdir -p %[1]s/logs; sudo chown %[3]d:%[3]d %[1]s/logs; sudo chmod 770 %[1]s/logs; if [ -f %[1]s/.env ]; then chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown 0:%[3]d %[1]s/xray/config.json; sudo chmod 640 %[1]s/xray/config.json; fi", RemoteStageDir, remoteTar, XrayRuntimeGID)
+	return fmt.Sprintf("set -e; sudo rm -rf %[1]s; sudo install -d -m 755 -o \"$USER\" -g \"$(id -gn)\" %[1]s; tar --no-same-owner -xzf %[2]s -C %[1]s; rm -f %[2]s; mkdir -p %[1]s/logs; sudo chown %[3]d:%[3]d %[1]s/logs; sudo chmod 770 %[1]s/logs; if [ -f %[1]s/.env ]; then chmod 600 %[1]s/.env; fi; if [ -f %[1]s/xray/config.json ]; then sudo chown 0:%[3]d %[1]s/xray/config.json; sudo chmod 640 %[1]s/xray/config.json; fi", RemoteStageDir, remoteTar, XrayRuntimeGID)
 }
 
 func shellQuote(v string) string {

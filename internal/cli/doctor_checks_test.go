@@ -146,7 +146,10 @@ func TestDoctorCheckCoreFailureBranches(t *testing.T) {
 	proxySrv := *srv
 	proxySrv.Role = model.ServerRoleVPN
 	proxySrv.ProxyServiceUUID = "proxy-uuid"
-	app.remoteExecHook = func(ssh.Config, time.Duration, string) (ssh.Result, error) {
+	app.remoteExecHook = func(_ ssh.Config, _ time.Duration, cmd string) (ssh.Result, error) {
+		if !strings.Contains(cmd, "sudo -n grep -q") {
+			t.Fatalf("proxy identity check must read root-owned config via sudo, got %s", cmd)
+		}
 		return ssh.Result{Stdout: "PROXY_SERVICE_IDENTITY=0\n"}, nil
 	}
 	if got := app.checkProxyServiceRuntimeIdentity(runner, cfg, proxySrv); got.Status != doctor.StatusFail || !strings.Contains(got.Message, "missing") {

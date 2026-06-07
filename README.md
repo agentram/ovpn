@@ -113,7 +113,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.6.0`
+- Current pinned version: `1.6.1`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -298,15 +298,16 @@ Available proxy presets are `ru` and `cn` (`china` is accepted as an alias for `
   --ssh-user root \
   --ssh-port 22
 
-./ovpn server init <proxy>
 ./ovpn server backend attach --proxy <proxy> --backend <vpn-backend>
 ./ovpn deploy <vpn-backend>
+./ovpn server init <proxy>
 ./ovpn config validate --server <proxy>
 ./ovpn deploy <proxy>
 ./ovpn doctor <proxy>
 ```
 
-Deploy the backend after attaching it so the backend runtime receives the proxy relay identity.
+Attach and deploy the backend before initializing the proxy.
+The proxy render requires at least one backend, and the backend deploy makes the relay identity live before proxy traffic arrives.
 
 See [`docs/ha.md`](docs/ha.md) for the full HA design and troubleshooting guide.
 
