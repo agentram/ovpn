@@ -221,6 +221,7 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
 		server   string
 		username string
+		profile  string
 		qr       bool
 		qrFile   string
 	}
@@ -247,15 +248,28 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			profile := model.EffectivePrimaryTransportProfile(srv.PrimaryProfile, srv.EnabledProfiles)
+			if strings.TrimSpace(link.profile) != "" {
+				profile = model.NormalizeTransportProfile(link.profile)
+				if profile == "" {
+					return fmt.Errorf("unknown profile %q; known profiles: %s", link.profile, supportedTransportProfilesText())
+				}
+				if !model.TransportProfileRenderSupported(profile) {
+					return fmt.Errorf("profile %s is not supported by deploy in this build; supported now: %s", profile, model.RenderSupportedTransportProfilesText())
+				}
+				if !model.TransportProfileEnabled(srv.EnabledProfiles, profile) {
+					return fmt.Errorf("profile %s is not enabled on %s; run `ovpn server profile enable %s %s` and then `ovpn deploy %s`", profile, srv.Name, srv.Name, profile, srv.Name)
+				}
+			}
 			address := srv.Domain
 			if address == "" {
 				address = srv.Host
 			}
 			shortID := firstShortID(srv.RealityShortIDs)
-			if shortID == "" {
+			if shortID == "" && profile == model.TransportProfileRealityTCPVision {
 				return fmt.Errorf("server %s has no REALITY short-id configured", srv.Name)
 			}
-			vless := xraycfg.BuildVLESSLink(xraycfg.LinkInput{Address: address, Port: 443, UUID: u.UUID, ServerName: srv.RealityServerName, Password: srv.RealityPublicKey, ShortID: shortID, Label: "ovpn-" + u.Username})
+			vless := xraycfg.BuildVLESSLink(xraycfg.LinkInput{Address: address, UUID: u.UUID, Profile: profile, ServerName: srv.RealityServerName, Password: srv.RealityPublicKey, ShortID: shortID, Label: "ovpn-" + u.Username + profileLabelSuffix(profile)})
 			fmt.Println(vless)
 			if link.qr {
 				qrText, err := renderTerminalQRCode(vless)
@@ -275,9 +289,17 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&link.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&link.username, "username", "", "Username")
+	cmd.Flags().StringVar(&link.profile, "profile", "", "Transport profile; defaults to the server primary profile")
 	cmd.Flags().BoolVar(&link.qr, "qr", true, "Print a terminal QR code after the link; use --qr=false for link-only output")
 	cmd.Flags().StringVar(&link.qrFile, "qr-file", "", "Save a PNG QR code to this path")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
+}
+
+func profileLabelSuffix(profile string) string {
+	if model.NormalizeTransportProfile(profile) == model.TransportProfileXHTTPPlain {
+		return "-vless-xhttp-plain"
+	}
+	return ""
 }

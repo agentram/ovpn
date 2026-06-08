@@ -18,7 +18,8 @@ func scanServer(row scanner) (*model.Server, error) {
 	if err := row.Scan(
 		&srv.ID, &srv.Name, &srv.Role, &srv.Host, &srv.Domain, &srv.SSHUser, &srv.SSHPort, &srv.SSHIdentityFile, &srv.SSHKnownHostsFile,
 		&strict, &srv.XrayVersion, &srv.RealityPrivateKey, &srv.RealityPublicKey, &srv.RealityShortIDs,
-		&srv.RealityServerName, &srv.RealityTarget, &srv.ProxyPreset, &srv.ProxyServiceUUID, &enabled, &created, &updated, &lastDeploy,
+		&srv.RealityServerName, &srv.RealityTarget, &srv.ProxyPreset, &srv.ProxyServiceUUID, &srv.PrimaryProfile,
+		&srv.EnabledProfiles, &enabled, &created, &updated, &lastDeploy,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("not found")
@@ -31,6 +32,8 @@ func scanServer(row scanner) (*model.Server, error) {
 	if srv.IsProxy() {
 		srv.ProxyPreset = model.NormalizeProxyPreset(srv.ProxyPreset)
 	}
+	srv.EnabledProfiles = model.JoinTransportProfiles(model.ParseTransportProfilesCSV(srv.EnabledProfiles))
+	srv.PrimaryProfile = model.EffectivePrimaryTransportProfile(srv.PrimaryProfile, srv.EnabledProfiles)
 	srv.CreatedAt, _ = time.Parse(time.RFC3339, created)
 	srv.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
 	if lastDeploy.Valid {

@@ -35,6 +35,8 @@ type Server struct {
 	RealityTarget     string     `json:"reality_target"`
 	ProxyPreset       string     `json:"proxy_preset"`
 	ProxyServiceUUID  string     `json:"proxy_service_uuid"`
+	PrimaryProfile    string     `json:"primary_profile"`
+	EnabledProfiles   string     `json:"enabled_profiles"`
 	Enabled           bool       `json:"enabled"`
 	CreatedAt         time.Time  `json:"created_at"`
 	UpdatedAt         time.Time  `json:"updated_at"`

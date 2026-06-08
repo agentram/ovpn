@@ -9,11 +9,15 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ### Changed
 - IPv6-literal destinations are no longer blackholed by the base Xray routing. Mobile clients such as iOS/Streisand can prefer IPv6 addresses before falling back to IPv4, and silently blocking `::/0` caused slow page loads and repeated app "Updating..." states.
 - Clarified HA proxy rollout order so operators attach and deploy a backend before initializing the proxy.
+- Ansible host maintenance now tunes conntrack for VPN/NAT workloads (`65536` entries, `24h` established idle timeout), reducing the chance that bursts of short-lived user connections fill the kernel connection table.
+- Monitoring now exports host conntrack usage through node-exporter's textfile collector and alerts on missing/high/critical usage, so packet-drop risk is visible before the server becomes unreachable.
+- Ansible production/example firewall defaults now open `13179/tcp` for the enabled XHTTP fallback profile.
 
 ### Fixed
 - Deploy staging now recreates `/opt/ovpn/.incoming` with `sudo` before extracting, so non-root deploy users can recover from stale staged directories containing Xray-owned access-log paths.
 - Deploy bundle uploads now allow slower WAN links up to fifteen minutes before timing out, avoiding false failures while copying multi-megabyte runtime bundles.
 - `doctor` now reads the proxy relay service identity from the root-owned Xray config through `sudo`, avoiding false backend identity failures for non-root deploy users.
+- Host maintenance now preserves the hardened Xray config ownership/mode (`root:65532`, `0640`) instead of loosening it while locking down runtime files.
 
 ## 1.6.0
 

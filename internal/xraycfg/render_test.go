@@ -132,6 +132,90 @@ func TestBuildVLESSLink(t *testing.T) {
 	}
 }
 
+func TestBuildVLESSLinkXHTTPPlain(t *testing.T) {
+	link := BuildVLESSLink(LinkInput{
+		Address: "example.com",
+		UUID:    "11111111-1111-1111-1111-111111111111",
+		Profile: model.TransportProfileXHTTPPlain,
+		Label:   "ovpn alice",
+	})
+	if !strings.HasPrefix(link, "vless://") {
+		t.Fatalf("bad prefix: %s", link)
+	}
+	for _, want := range []string{
+		"@example.com:13179",
+		"security=none",
+		"encryption=none",
+		"type=xhttp",
+		"path=%2F",
+		"mode=auto",
+		"packetEncoding=xudp",
+		"#ovpn%20alice",
+	} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("link missing %q: %s", want, link)
+		}
+	}
+	if strings.Contains(link, "pbk=") || strings.Contains(link, "flow=") {
+		t.Fatalf("xhttp plain link should not include REALITY fields: %s", link)
+	}
+}
+
+func TestRenderServerJSONIncludesXHTTPPlainProfile(t *testing.T) {
+	raw, err := RenderServerJSON(Spec{
+		EnabledProfiles:   []string{model.TransportProfileRealityTCPVision, model.TransportProfileXHTTPPlain},
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd1234"},
+		Users:             []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "u@example.com", Enabled: true}},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	inbounds, ok := cfg["inbounds"].([]any)
+	if !ok {
+		t.Fatalf("inbounds missing")
+	}
+	var xhttp map[string]any
+	for _, inbound := range inbounds {
+		item, _ := inbound.(map[string]any)
+		if item["tag"] == "vless-xhttp-plain" {
+			xhttp = item
+			break
+		}
+	}
+	if xhttp == nil {
+		t.Fatalf("xhttp inbound missing")
+	}
+	if got := xhttp["port"]; got != float64(13179) {
+		t.Fatalf("xhttp port = %v, want 13179", got)
+	}
+	stream := xhttp["streamSettings"].(map[string]any)
+	if got := stream["network"]; got != "xhttp" {
+		t.Fatalf("network = %v, want xhttp", got)
+	}
+	if got := stream["security"]; got != "none" {
+		t.Fatalf("security = %v, want none", got)
+	}
+	settings := stream["xhttpSettings"].(map[string]any)
+	if got := settings["path"]; got != "/" {
+		t.Fatalf("path = %v, want /", got)
+	}
+	if got := settings["mode"]; got != "auto" {
+		t.Fatalf("mode = %v, want auto", got)
+	}
+	clients := xhttp["settings"].(map[string]any)["clients"].([]any)
+	first := clients[0].(map[string]any)
+	if _, ok := first["flow"]; ok {
+		t.Fatalf("xhttp clients must not include xtls flow: %v", first)
+	}
+}
+
 func TestValidateSpec(t *testing.T) {
 	t.Parallel()
 

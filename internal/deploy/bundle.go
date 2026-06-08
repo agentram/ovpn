@@ -126,6 +126,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		Role:                  in.Server.NormalizedRole(),
 		ProxyPreset:           in.Server.NormalizedProxyPreset(),
 		Domain:                in.Server.Domain,
+		EnabledProfiles:       model.ParseTransportProfilesCSV(in.Server.EnabledProfiles),
 		RealityPrivateKey:     in.Server.RealityPrivateKey,
 		RealityPublicKey:      in.Server.RealityPublicKey,
 		RealityServerName:     in.Server.RealityServerName,

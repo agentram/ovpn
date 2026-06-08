@@ -29,6 +29,8 @@ func (s *Store) migrate(ctx context.Context) error {
 			reality_target TEXT NOT NULL,
 			proxy_preset TEXT NOT NULL DEFAULT '',
 			proxy_service_uuid TEXT NOT NULL DEFAULT '',
+			primary_profile TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision',
+			enabled_profiles TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision',
 			enabled INTEGER NOT NULL DEFAULT 1,
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
@@ -119,6 +121,8 @@ func (s *Store) migrate(ctx context.Context) error {
 		`ALTER TABLE servers ADD COLUMN role TEXT NOT NULL DEFAULT 'vpn';`,
 		`ALTER TABLE servers ADD COLUMN proxy_preset TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE servers ADD COLUMN proxy_service_uuid TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE servers ADD COLUMN primary_profile TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision';`,
+		`ALTER TABLE servers ADD COLUMN enabled_profiles TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision';`,
 	}
 	for _, stmt := range optionalMigrations {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
@@ -129,6 +133,12 @@ func (s *Store) migrate(ctx context.Context) error {
 		return err
 	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET proxy_preset='ru' WHERE role='proxy' AND TRIM(COALESCE(proxy_preset, ''))=''`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET primary_profile='vless-reality-tcp-vision' WHERE TRIM(COALESCE(primary_profile, ''))=''`); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE servers SET enabled_profiles='vless-reality-tcp-vision' WHERE TRIM(COALESCE(enabled_profiles, ''))=''`); err != nil {
 		return err
 	}
 	return nil

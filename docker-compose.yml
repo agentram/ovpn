@@ -6,6 +6,7 @@ services:
     command: ["run", "-config", "/etc/xray/config.json"]
     ports:
       - "443:443/tcp"
+      - "13179:13179/tcp"
     expose:
       - "10085"
     volumes:

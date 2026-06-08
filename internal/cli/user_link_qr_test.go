@@ -51,6 +51,51 @@ func TestUserLinkCanDisableTerminalQR(t *testing.T) {
 	}
 }
 
+func TestUserLinkSupportsEnabledProfile(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = strings.Join([]string{model.TransportProfileRealityTCPVision, model.TransportProfileXHTTPPlain}, ",")
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileXHTTPPlain, "--qr=false"})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("user link --profile xhttp: %v", err)
+	}
+	link := strings.TrimSpace(stdout)
+	for _, want := range []string{"@example.com:13179", "security=none", "type=xhttp", "path=%2F", "#ovpn-alice-vless-xhttp-plain"} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("link missing %q: %s", want, link)
+		}
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+}
+
+func TestUserLinkRejectsDisabledProfileWithHint(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileXHTTPPlain, "--qr=false"})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "ovpn server profile enable main vless-xhttp-plain") {
+		t.Fatalf("expected profile enable hint, got err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("expected no stdout on disabled profile, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "profile vless-xhttp-plain is not enabled") {
+		t.Fatalf("expected cobra error on stderr, got %q", stderr)
+	}
+}
+
 func TestUserLinkWritesQRFile(t *testing.T) {
 	app := newTestAppWithLinkedUser(t)
 	qrPath := filepath.Join(t.TempDir(), "alice.png")

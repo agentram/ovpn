@@ -31,7 +31,7 @@ It is intended for operators who prefer a local CLI and SSH workflow over a web 
 - `ovpn` owns the VPN runtime: Xray config, users, quotas, monitoring, backups, and cleanup.
 - Desired state stays local under `~/.ovpn`; deploys render runtime files and push them over SSH/SCP.
 - Remote services run as Docker Compose under `/opt/ovpn`, which keeps maintenance and recovery predictable.
-- Xray REALITY listens on `443/tcp`; internal agent and monitoring endpoints stay private by default.
+- Xray REALITY listens on `443/tcp`; the optional XHTTP fallback profile uses `13179/tcp`. Internal agent and monitoring endpoints stay private by default.
 - Real inventory, hostnames, IPs, tokens, and private keys stay outside the public repository.
 
 ## Architecture
@@ -155,6 +155,8 @@ export OVPN_SECURITY_PROFILE=off
 
 - Default quota: rolling `30d`, `300 GB` per user when no per-user limit is set.
 - Optional host-level Tor exit-node blocking exists in Ansible and is off by default.
+- Ansible tunes host conntrack for VPN/NAT workloads (`65536` entries, `24h` established idle timeout) and monitoring alerts before the table is exhausted.
+- When the XHTTP fallback profile is enabled, Ansible opens `13179/tcp` through `ovpn_firewall_extra_tcp_ports`.
 
 See [`docs/security.md`](docs/security.md) for the full security model.
 

@@ -1,0 +1,6 @@
+[Unit]
+Description=Write OVPN conntrack metrics for node-exporter
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ovpn-conntrack-metrics.sh

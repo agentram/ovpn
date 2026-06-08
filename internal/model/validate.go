@@ -70,6 +70,22 @@ func (s Server) Validate() error {
 	} else if strings.TrimSpace(s.ProxyPreset) != "" {
 		errs = append(errs, "proxy_preset is only supported for proxy role")
 	}
+	for _, rawProfile := range strings.Split(s.EnabledProfiles, ",") {
+		rawProfile = strings.TrimSpace(rawProfile)
+		if rawProfile == "" {
+			continue
+		}
+		if NormalizeTransportProfile(rawProfile) == "" {
+			errs = append(errs, "enabled_profiles contains unsupported profile "+rawProfile)
+		}
+	}
+	if primary := strings.TrimSpace(s.PrimaryProfile); primary != "" {
+		if NormalizeTransportProfile(primary) == "" {
+			errs = append(errs, "primary_profile is unsupported")
+		} else if !TransportProfileEnabled(s.EnabledProfiles, primary) {
+			errs = append(errs, "primary_profile must be enabled")
+		}
+	}
 	if len(errs) == 0 {
 		return nil
 	}
