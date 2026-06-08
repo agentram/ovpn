@@ -12,11 +12,11 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Added profile-aware `user link --profile`, `user qr`, and `user export --all-profiles` commands for per-user fallback links and QR codes.
 - Added profile-aware validation errors so link and QR commands explain how to enable/deploy a disabled profile instead of printing broken credentials.
 - Added optional Xray inbounds for `vless-reality-xhttp` and `vless-xhttp-plain`; deploy exposes their ports only when those profiles are enabled.
-- Added a preferred `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
+- Added a `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
 - Added `docs/transports.md` with practical rollout notes, client compatibility warnings, and diagnostics workflow.
 
 ### Changed
-- Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can switch the primary generated-link profile to plain XHTTP after testing.
+- Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can opt into plain XHTTP after testing and accepting its lack of transport security.
 - Human-readable CLI list outputs for stats, top users, proxy backends, and per-user diagnostics now use the same bordered table style as `server list`.
 
 ## 1.6.1

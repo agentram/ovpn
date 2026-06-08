@@ -302,7 +302,7 @@ func TestRenderBundleConnectionDiagnosticsModeControlsAccessLog(t *testing.T) {
 func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 	t.Parallel()
 
-	base := []byte("ports:\n      - \"443:443/tcp\"\n")
+	base := []byte("ports:\n      - \"443:443/tcp\"\n      # OVPN_XRAY_PROFILE_PORTS\n")
 	got := string(injectXrayProfilePorts(base, []string{
 		model.TransportProfileRealityTCPVision,
 		model.TransportProfileRealityXHTTP,
@@ -317,6 +317,9 @@ func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 	}
 	if strings.Contains(got, "8445") {
 		t.Fatalf("planned ws/tls profile must not expose a port, got:\n%s", got)
+	}
+	if !strings.Contains(got, "# OVPN_XRAY_PROFILE_PORTS") {
+		t.Fatalf("profile port marker should stay in the rendered compose for future insertions, got:\n%s", got)
 	}
 }
 

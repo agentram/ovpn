@@ -527,6 +527,7 @@ func runtimeInboundTagsForServer(srv model.Server) []string {
 
 // applyRuntimeUser adds or removes a user from every enabled live Xray inbound via the agent.
 func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) error {
+	inboundTags := runtimeInboundTagsForServer(srv)
 	path := "/runtime/user/remove"
 	if enable {
 		blockedByQuota, err := a.isUserBlockedByQuota(srv, user.Email)
@@ -542,14 +543,15 @@ func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) e
 		"email": user.Email,
 		"uuid":  user.UUID,
 	}
-	for _, inboundTag := range runtimeInboundTagsForServer(srv) {
+	for _, inboundTag := range inboundTags {
 		payload["inbound_tag"] = inboundTag
 		a.log().Debug("applying runtime user operation", "server", srv.Name, "host", srv.Host, "username", user.Username, "email", user.Email, "inbound_tag", inboundTag, "operation", path)
-		// Runtime operations are best-effort fast path. Callers fall back to full deploy when this fails.
+		// Runtime operations are a best-effort fast path. If one inbound fails after earlier inbounds changed,
+		// callers fall back to a full deploy to reconcile live Xray state from local policy.
 		if _, err := a.fetchRemoteAgent(srv, "POST", a.agentURL(path), payload); err != nil {
 			return err
 		}
 	}
-	a.log().Info("runtime user operation applied", "server", srv.Name, "username", user.Username, "email", user.Email, "inbounds", strings.Join(runtimeInboundTagsForServer(srv), ","), "operation", path)
+	a.log().Info("runtime user operation applied", "server", srv.Name, "username", user.Username, "email", user.Email, "inbounds", strings.Join(inboundTags, ","), "operation", path)
 	return nil
 }

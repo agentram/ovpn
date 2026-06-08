@@ -254,6 +254,50 @@ func TestQuotaEnforcerUsageBandsRollingWindow(t *testing.T) {
 	}
 }
 
+func TestQuotaEnforcerMetricsDeduplicateProfileRows(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, err := remote.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	quota := int64(100)
+	if err := store.ReplaceQuotaPolicies(ctx, []model.QuotaUserPolicy{
+		{Email: "shared@example.com", UUID: "uuid-shared", InboundTag: "vless-reality", QuotaEnabled: true, MonthlyQuotaByte: &quota},
+		{Email: "shared@example.com", UUID: "uuid-shared", InboundTag: "vless-xhttp-plain", QuotaEnabled: true, MonthlyQuotaByte: &quota},
+	}); err != nil {
+		t.Fatalf("replace quota policies: %v", err)
+	}
+	now := time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC)
+	if err := store.AddDelta(ctx, "shared@example.com", 100, 0, now); err != nil {
+		t.Fatalf("add delta: %v", err)
+	}
+
+	var blockedUsers, got80, got95 int
+	rt := &fakeRuntimeManager{}
+	enforcer := &QuotaEnforcer{
+		Store:          store,
+		Runtime:        rt,
+		OnBlockedUsers: func(blocked int) { blockedUsers = blocked },
+		OnUsageBands: func(over80 int, over95 int) {
+			got80 = over80
+			got95 = over95
+		},
+	}
+	if err := enforcer.Enforce(ctx, now); err != nil {
+		t.Fatalf("enforce: %v", err)
+	}
+	if len(rt.removes) != 2 {
+		t.Fatalf("expected runtime remove for both profile inbounds, got %+v", rt.removes)
+	}
+	if blockedUsers != 1 || got80 != 1 || got95 != 1 {
+		t.Fatalf("expected per-user metrics, got blocked=%d over80=%d over95=%d", blockedUsers, got80, got95)
+	}
+}
+
 func TestQuotaEnforcerRuntimeErrorAndCallbackBranches(t *testing.T) {
 	t.Parallel()
 

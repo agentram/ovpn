@@ -22,10 +22,10 @@ var transportProfiles = []TransportProfile{
 	{
 		Name:        TransportProfilePlainXHTTP,
 		Kind:        "plain-xhttp",
-		Status:      "preferred",
+		Status:      "fallback",
 		Port:        13179,
 		InboundTag:  "vless-xhttp-plain",
-		Description: "VLESS over XHTTP without stream security on a high port; current preferred fallback for degraded REALITY paths.",
+		Description: "VLESS over XHTTP without stream security on a high port; operator-controlled fallback for degraded REALITY paths.",
 	},
 	{
 		Name:        TransportProfileWSTLSWeb,

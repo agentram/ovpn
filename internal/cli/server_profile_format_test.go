@@ -20,7 +20,7 @@ func TestRenderServerProfileTableUsesReadableColumns(t *testing.T) {
 
 	out := renderServerProfileTable(srv, enabled)
 
-	for _, want := range []string{"PROFILE", "STATUS", "PORT", "ENABLED", "PRIMARY", "DESCRIPTION", model.TransportProfilePlainXHTTP, "preferred", "13179"} {
+	for _, want := range []string{"PROFILE", "STATUS", "PORT", "ENABLED", "PRIMARY", "DESCRIPTION", model.TransportProfilePlainXHTTP, "fallback", "13179"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in profile table:\n%s", want, out)
 		}

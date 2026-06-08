@@ -126,6 +126,10 @@ func injectXrayProfilePorts(composeTpl []byte, profiles []string) []byte {
 		return composeTpl
 	}
 	text := string(composeTpl)
+	marker := "      # OVPN_XRAY_PROFILE_PORTS\n"
+	if strings.Contains(text, marker) {
+		return []byte(strings.Replace(text, marker, strings.Join(extra, "\n")+"\n"+marker, 1))
+	}
 	needle := "      - \"443:443/tcp\"\n"
 	return []byte(strings.Replace(text, needle, needle+strings.Join(extra, "\n")+"\n", 1))
 }

@@ -226,6 +226,8 @@ Change the primary profile used by `user link` when `--profile` is omitted:
 ./ovpn deploy <server>
 ```
 
+Plain XHTTP is a fallback profile without Xray REALITY/TLS transport security. It can still be useful on degraded paths, but switch it to primary only deliberately. Already issued links are not changed by `switch`.
+
 Disable a non-primary profile after users have moved away from it:
 
 ```bash

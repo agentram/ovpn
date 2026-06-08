@@ -8,7 +8,7 @@ vless-reality-tcp-vision = VLESS / TCP / REALITY / xtls-rprx-vision on 443/tcp
 
 That profile is widely supported by current clients and existing links keep working. It is still one traffic shape, though, and in degraded networks it has not been the most reliable option.
 
-Transport profiles make that explicit: keep the deprecated compatibility profile live, enable one fallback profile, test it with a small set of users, and switch the server primary profile only after it works. In the current field tests, plain XHTTP has been the most reliable fallback profile.
+Transport profiles make that explicit: keep the deprecated compatibility profile live, enable one fallback profile, test it with a small set of users, and switch the server primary profile only if the tradeoff is acceptable. In current field tests, plain XHTTP has been the most reliable fallback shape on some degraded paths, but it is not transport-encrypted by itself.
 
 ## Profiles
 
@@ -16,11 +16,11 @@ Transport profiles make that explicit: keep the deprecated compatibility profile
 | --- | --- | ---: | --- |
 | `vless-reality-tcp-vision` | deprecated | `443/tcp` | Original VLESS + REALITY profile. Best compatibility, less reliable on affected paths. |
 | `vless-reality-xhttp` | experimental | `8443/tcp` | XHTTP + REALITY for clients that support XHTTP. Useful as a different traffic shape. |
-| `vless-xhttp-plain` | preferred | `13179/tcp` | Plain XHTTP shape that currently works best in affected networks. |
+| `vless-xhttp-plain` | fallback | `13179/tcp` | Plain XHTTP shape for affected networks; no transport security unless fronted by TLS separately. |
 | `vless-ws-tls-web` | planned | n/a | WebSocket/TLS behind a real HTTPS site. Not deployable yet because it needs certificate and web-front handling. |
 
 The fallback profiles are not magic. They give you controlled A/B testing and faster rotation when a network path degrades.
-The `vless-xhttp-plain` profile deliberately has `security=none`, `path=/`, and no REALITY parameters because it matches simple XHTTP profiles seen working in the field. Use it when REALITY profiles degrade, and keep monitoring whether it remains reliable for your users.
+The `vless-xhttp-plain` profile deliberately has `security=none`, `path=/`, and no REALITY parameters because it matches simple XHTTP profiles seen working in the field. That means Xray does not add REALITY/TLS transport security on this profile. HTTPS destinations inside the tunnel are still protected by HTTPS, but the VLESS/XHTTP transport itself is not protected like the REALITY profiles. Use it only when that tradeoff is acceptable, and keep monitoring whether it remains reliable for your users.
 
 ## Enable and Test
 
@@ -53,12 +53,14 @@ Export all enabled profiles for a user:
 ./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
 ```
 
-Switch the default profile used by `user link` when no `--profile` is passed:
+Optionally switch the default profile used by `user link` when no `--profile` is passed:
 
 ```bash
 ./ovpn server profile switch <server> vless-xhttp-plain
 ./ovpn deploy <server>
 ```
+
+Do this only after testing with real clients. Switching the primary profile does not change already issued links; it only changes future link generation when `--profile` is omitted.
 
 Keep the old profile enabled during testing.
 After users have migrated, disable a non-primary profile and redeploy:
@@ -80,7 +82,7 @@ Client support differs by transport and version:
 
 - TCP + REALITY + vision is the compatibility baseline.
 - XHTTP is newer. Test the exact client and version before sending it broadly.
-- Plain XHTTP may import in clients that fail REALITY/XHTTP, but it does not provide the same stream-security layer.
+- Plain XHTTP may import in clients that fail REALITY/XHTTP, but it does not provide the same stream-security layer unless you put it behind a separate TLS front.
 - WS/TLS with a real web front is a separate implementation step, not just another link parameter.
 
 When a user reports “connected, but nothing loads”, compare profiles instead of guessing:

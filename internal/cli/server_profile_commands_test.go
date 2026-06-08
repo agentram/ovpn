@@ -91,3 +91,30 @@ func TestServerProfileDisableAlreadyDisabledIsNoop(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 }
+
+func TestServerProfileSwitchAllowsFallbackProfile(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	cmd := app.newServerProfileSwitchCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfilePlainXHTTP})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("profile switch fallback: %v", err)
+	}
+	if !strings.Contains(stdout, "primary profile for main: "+model.TransportProfilePlainXHTTP) {
+		t.Fatalf("unexpected stdout: %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	updated, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("reload server: %v", err)
+	}
+	if updated.NormalizedPrimaryProfile() != model.TransportProfilePlainXHTTP {
+		t.Fatalf("expected plain XHTTP primary, got %s", updated.NormalizedPrimaryProfile())
+	}
+	if !updated.IsTransportProfileEnabled(model.TransportProfilePlainXHTTP) {
+		t.Fatalf("expected primary fallback profile to be enabled, enabled=%v", updated.NormalizedEnabledProfiles())
+	}
+}

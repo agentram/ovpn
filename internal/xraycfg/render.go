@@ -609,7 +609,7 @@ func BuildVLESSLink(in LinkInput) string {
 			"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=chrome&type=xhttp&path=%s&mode=auto&sni=%s&sid=%s#%s",
 			in.UUID,
 			in.Address,
-			defaultPort(in.Port, 8443),
+			in.Port,
 			in.Password,
 			url.QueryEscape("/ovpn-xhttp"),
 			in.ServerName,
@@ -621,7 +621,7 @@ func BuildVLESSLink(in LinkInput) string {
 			"vless://%s@%s:%d?security=none&encryption=none&type=xhttp&path=%s&mode=auto#%s",
 			in.UUID,
 			in.Address,
-			defaultPort(in.Port, 13179),
+			in.Port,
 			url.QueryEscape("/"),
 			urlEscapeLabel(label),
 		)
@@ -638,13 +638,6 @@ func BuildVLESSLink(in LinkInput) string {
 		in.ShortID,
 		urlEscapeLabel(label),
 	)
-}
-
-func defaultPort(port int, fallback int) int {
-	if port == 0 {
-		return fallback
-	}
-	return port
 }
 
 // urlEscapeLabel escapes a value for use as the fragment label of a VLESS link.
