@@ -86,9 +86,7 @@ func NormalizeEnabledProfiles(primary string, raw string) []string {
 	seen := map[string]bool{}
 	var candidates []string
 	if strings.TrimSpace(raw) != "" {
-		for _, part := range strings.Split(raw, ",") {
-			candidates = append(candidates, part)
-		}
+		candidates = append(candidates, strings.Split(raw, ",")...)
 	}
 	candidates = append([]string{primary}, candidates...)
 	out := make([]string, 0, len(candidates))
