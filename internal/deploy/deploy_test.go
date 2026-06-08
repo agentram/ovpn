@@ -250,11 +250,26 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if !strings.Contains(string(alertCfg), "http://ovpn-telegram-bot:8080/alertmanager") {
 		t.Fatalf("expected alertmanager webhook receiver, got:\n%s", string(alertCfg))
 	}
+	gotRules, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "rules", "ovpn-alerts.yml"))
+	if err != nil {
+		t.Fatalf("read alert rules: %v", err)
+	}
+	for _, want := range []string{"OVPNConntrackMetricsMissing", "OVPNConntrackTableHigh", "OVPNConntrackTableCritical"} {
+		if !strings.Contains(string(gotRules), want) {
+			t.Fatalf("expected conntrack alert %q, got:\n%s", want, string(gotRules))
+		}
+	}
 	monitoringCompose, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.monitoring.yml"))
 	if err != nil {
 		t.Fatalf("read monitoring compose: %v", err)
 	}
-	for _, want := range []string{"--data.retention=168h", "/run/udev:/run/udev:ro", "/dev/kmsg:/dev/kmsg:ro"} {
+	for _, want := range []string{
+		"--data.retention=168h",
+		"/run/udev:/run/udev:ro",
+		"/dev/kmsg:/dev/kmsg:ro",
+		"--collector.textfile.directory=/var/lib/node-exporter/textfile",
+		"/var/lib/ovpn-node-exporter-textfile:/var/lib/node-exporter/textfile:ro",
+	} {
 		if !strings.Contains(string(monitoringCompose), want) {
 			t.Fatalf("expected monitoring compose to contain %q, got:\n%s", want, string(monitoringCompose))
 		}

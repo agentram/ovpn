@@ -158,6 +158,7 @@ export OVPN_SECURITY_PROFILE=off
 
 - Default quota: rolling `30d`, `300 GB` per user when no per-user limit is set.
 - Optional host-level Tor exit-node blocking exists in Ansible and is off by default.
+- Ansible tunes host conntrack for VPN/NAT workloads and monitoring alerts on missing/high/critical conntrack usage.
 
 See [`docs/security.md`](docs/security.md) for the full security model.
 

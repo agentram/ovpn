@@ -112,8 +112,8 @@
       mode: "0600"
     - path: "{{ ovpn_xray_config_path }}"
       owner: root
-      group: root
-      mode: "0644"
+      group: "65532"
+      mode: "0640"
   register: security_sensitive_runtime_files
   loop_control:
     label: "{{ item.path }}"
@@ -259,6 +259,85 @@
       when:
         - not ansible_check_mode
         - (security_vm_swappiness_current.stdout | default('') | trim) != (ovpn_swapfile_swappiness | int | string)
+
+- name: Configure conntrack limits for VPN/NAT workloads
+  when: ovpn_manage_conntrack | default(true) | bool
+  block:
+    - name: Validate conntrack limits
+      ansible.builtin.assert:
+        that:
+          - (ovpn_conntrack_max | default(65536) | int) >= 8192
+          - (ovpn_conntrack_tcp_timeout_established | default(86400) | int) >= 3600
+        fail_msg: "Keep ovpn_conntrack_max >= 8192 and ovpn_conntrack_tcp_timeout_established >= 3600."
+
+    - name: Ensure nf_conntrack module is loaded
+      ansible.builtin.command: modprobe nf_conntrack
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Persist conntrack sysctl settings
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/98-ovpn-conntrack.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          net.netfilter.nf_conntrack_max = {{ ovpn_conntrack_max | default(65536) | int }}
+          net.netfilter.nf_conntrack_tcp_timeout_established = {{ ovpn_conntrack_tcp_timeout_established | default(86400) | int }}
+
+    - name: Apply conntrack sysctl settings
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Ensure node-exporter textfile directory exists
+      ansible.builtin.file:
+        path: "{{ ovpn_node_exporter_textfile_dir | default('/var/lib/ovpn-node-exporter-textfile') }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install conntrack metrics writer
+      ansible.builtin.template:
+        src: ovpn-conntrack-metrics.sh.j2
+        dest: /usr/local/sbin/ovpn-conntrack-metrics.sh
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install conntrack metrics service
+      ansible.builtin.template:
+        src: ovpn-conntrack-metrics.service.j2
+        dest: /etc/systemd/system/ovpn-conntrack-metrics.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install conntrack metrics timer
+      ansible.builtin.template:
+        src: ovpn-conntrack-metrics.timer.j2
+        dest: /etc/systemd/system/ovpn-conntrack-metrics.timer
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Flush systemd before conntrack metrics timer operations
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: not ansible_check_mode
+
+    - name: Write initial conntrack metrics
+      ansible.builtin.command: /usr/local/sbin/ovpn-conntrack-metrics.sh
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Enable and start conntrack metrics timer
+      ansible.builtin.systemd:
+        name: ovpn-conntrack-metrics.timer
+        state: started
+        enabled: true
+      when: not ansible_check_mode
 
 - name: Configure UFW firewall (optional)
   when: ovpn_manage_firewall | bool

@@ -124,9 +124,11 @@ services:
     profiles: ["monitoring"]
     command:
       - --path.rootfs=/host
+      - --collector.textfile.directory=/var/lib/node-exporter/textfile
     volumes:
       - /:/host:ro,rslave
       - /run/udev:/run/udev:ro
+      - /var/lib/ovpn-node-exporter-textfile:/var/lib/node-exporter/textfile:ro
     expose:
       - "9100"
     logging:

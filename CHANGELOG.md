@@ -13,11 +13,16 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Added profile-aware validation errors so link and QR commands explain how to enable/deploy a disabled profile instead of printing broken credentials.
 - Added optional Xray inbounds for `vless-reality-xhttp` and `vless-xhttp-plain`; deploy exposes their ports only when those profiles are enabled.
 - Added a `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
+- Added host conntrack metrics through node-exporter's textfile collector, with missing/high/critical conntrack alerts in the bundled Prometheus rules.
 - Added `docs/transports.md` with practical rollout notes, client compatibility warnings, and diagnostics workflow.
 
 ### Changed
 - Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can opt into plain XHTTP after testing and accepting its lack of transport security.
 - Human-readable CLI list outputs for stats, top users, proxy backends, and per-user diagnostics now use the same bordered table style as `server list`.
+- Ansible host maintenance tunes conntrack for VPN/NAT workloads and opens the XHTTP fallback port in the example inventory defaults.
+
+### Fixed
+- Host maintenance preserves the hardened Xray config ownership/mode instead of loosening it while locking down runtime files.
 
 ## 1.6.1
 
