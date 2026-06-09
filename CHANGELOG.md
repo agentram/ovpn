@@ -24,6 +24,47 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ### Fixed
 - Host maintenance preserves the hardened Xray config ownership/mode instead of loosening it while locking down runtime files.
 
+### Upgrade notes
+- To add a fallback profile such as `vless-xhttp-plain`, update the local `ovpn` binary first, make sure the host firewall allows the profile port, deploy the updated runtime, then generate new profile-specific links. Existing links keep using their original profile; users need new QR codes/links only for the newly added profile.
+
+  Example for two VPN servers and three users:
+
+  ```bash
+  # 1. Update ovpn locally or download from releases, then verify the version.
+  # From source:
+  go build -o ./ovpn ./cmd/ovpn
+  ./ovpn version
+
+  # 2. Apply host maintenance so UFW/conntrack/node-exporter textfile metrics match the new runtime.
+  # Make sure production inventory allows 13179/tcp, for example:
+  # ovpn_firewall_extra_tcp_ports:
+  #   - 13179
+  cd ansible
+  ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit vpn-a.example.net,vpn-b.example.net --check --diff
+  ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit vpn-a.example.net,vpn-b.example.net
+  cd ..
+
+  # 3. Enable the fallback profile and deploy both servers.
+  ./ovpn server profile enable vpn-a vless-xhttp-plain
+  ./ovpn server profile enable vpn-b vless-xhttp-plain
+  ./ovpn deploy vpn-a
+  ./ovpn deploy vpn-b
+  ./ovpn doctor vpn-a
+  ./ovpn doctor vpn-b
+
+  # 4. Export fallback-profile credentials for users who need to switch clients.
+  mkdir -p ~/Downloads/ovpn-xhttp
+  for server in vpn-a vpn-b; do
+    for user in user-a user-b user-c; do
+      ./ovpn user export --server "$server" --username "$user" --profile vless-xhttp-plain --out ~/Downloads/ovpn-xhttp
+    done
+  done
+
+  # Optional: make future plain `user link` output use this profile by default.
+  ./ovpn server profile switch vpn-a vless-xhttp-plain
+  ./ovpn server profile switch vpn-b vless-xhttp-plain
+  ```
+
 ## 1.6.1
 
 ### Changed
