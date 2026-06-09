@@ -26,7 +26,8 @@ ovpn_validate_ssh_ports: true
 ovpn_manage_firewall: true
 ovpn_firewall_allow_http: false
 ovpn_firewall_allow_https: true
-ovpn_firewall_extra_tcp_ports: []
+ovpn_firewall_extra_tcp_ports:
+  - 13179 # VLESS XHTTP fallback profile
 ovpn_firewall_extra_udp_ports: []
 ovpn_firewall_remove_tcp_ports: []
 
@@ -68,6 +69,11 @@ ovpn_enable_swapfile: true
 ovpn_swapfile_path: "/swapfile"
 ovpn_swapfile_size_mb: 1024
 ovpn_swapfile_swappiness: 10
+ovpn_manage_conntrack: true
+ovpn_conntrack_max: 65536
+ovpn_conntrack_tcp_timeout_established: 86400
+ovpn_node_exporter_textfile_dir: "/var/lib/ovpn-node-exporter-textfile"
+ovpn_conntrack_metrics_interval: "30s"
 ovpn_journald_system_max_use: "200M"
 ovpn_journald_runtime_max_use: "100M"
 

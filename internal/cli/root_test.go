@@ -132,7 +132,7 @@ func TestServerCommandTreeContainsExpectedSubcommands(t *testing.T) {
 	for _, c := range cmd.Commands() {
 		names = append(names, c.Name())
 	}
-	for _, want := range []string{"add", "init", "list", "set-xray-version", "status", "backup", "restore", "logs", "monitor", "cleanup", "backend"} {
+	for _, want := range []string{"add", "init", "list", "set-xray-version", "status", "backup", "restore", "logs", "monitor", "cleanup", "backend", "profile"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("expected server subcommand %q, got %v", want, names)
 		}

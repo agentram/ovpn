@@ -106,11 +106,27 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 		quotaByEmail[row.Email] = row
 	}
 	filter := strings.TrimSpace(email)
-	resp := model.UserStatusResponse{Time: now.UTC().Format(time.RFC3339)}
+	policiesByEmail := make(map[string]model.UserPolicy)
+	inboundTagsByEmail := make(map[string][]string)
 	for _, policy := range policies {
 		if filter != "" && policy.Email != filter {
 			continue
 		}
+		if _, ok := policiesByEmail[policy.Email]; !ok {
+			policiesByEmail[policy.Email] = policy
+		}
+		if strings.TrimSpace(policy.InboundTag) != "" {
+			inboundTagsByEmail[policy.Email] = append(inboundTagsByEmail[policy.Email], policy.InboundTag)
+		}
+	}
+	emails := make([]string, 0, len(policiesByEmail))
+	for email := range policiesByEmail {
+		emails = append(emails, email)
+	}
+	sort.Strings(emails)
+	resp := model.UserStatusResponse{Time: now.UTC().Format(time.RFC3339)}
+	for _, email := range emails {
+		policy := policiesByEmail[email]
 		expired := model.IsExpiredAt(policy.ExpiryAt, now)
 		effectiveEnabled := model.IsEffectivelyEnabled(policy.Enabled, policy.ExpiryAt, now)
 		row := model.UserAccessStatus{
@@ -122,7 +138,7 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 			ExpiryDate:       model.ExpiryDateString(policy.ExpiryAt),
 			Expired:          expired,
 			EffectiveEnabled: effectiveEnabled,
-			InboundTag:       policy.InboundTag,
+			InboundTag:       strings.Join(uniqueStrings(inboundTagsByEmail[policy.Email]), ","),
 		}
 		if days, ok := model.DaysUntilExpiry(policy.ExpiryAt, now); ok {
 			row.DaysUntilExpiry = &days
@@ -146,6 +162,5 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 		}
 		resp.Users = append(resp.Users, row)
 	}
-	sort.Slice(resp.Users, func(i, j int) bool { return resp.Users[i].Email < resp.Users[j].Email })
 	return resp, nil
 }

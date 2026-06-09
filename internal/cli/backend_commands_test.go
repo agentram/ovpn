@@ -52,8 +52,13 @@ func TestServerBackendListAndDetachFlows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("backend list: %v", err)
 	}
-	if !strings.Contains(stdout, "backend\tpriority=7\tenabled") {
-		t.Fatalf("unexpected backend list output: %s", stdout)
+	for _, want := range []string{"BACKEND", "PRIORITY", "STATE", "backend", "7", "enabled"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected %q in backend list output:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "\t") {
+		t.Fatalf("backend list output should not use raw tabs:\n%s", stdout)
 	}
 
 	stdout, _, err = captureStdoutStderr(t, func() error {

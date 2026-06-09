@@ -32,8 +32,13 @@ func TestStatsCommandsFetchPrintAndCacheRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stats total: %v", err)
 	}
-	if !strings.Contains(stdout, "alice@global\tuplink=10\tdownlink=20") || !strings.Contains(stdout, "bob@global") {
-		t.Fatalf("unexpected stats output:\n%s", stdout)
+	for _, want := range []string{"EMAIL", "TOTAL", "UPLINK", "DOWNLINK", "alice@global", "30B", "10B", "20B", "bob@global", "70B"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected %q in stats output:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "\t") {
+		t.Fatalf("stats output should not use raw tabs:\n%s", stdout)
 	}
 
 	stdout, _, err = captureStdoutStderr(t, func() error {
@@ -44,8 +49,13 @@ func TestStatsCommandsFetchPrintAndCacheRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stats user: %v", err)
 	}
-	if !strings.Contains(stdout, "alice@global\t2026-05-29\tuplink=3\tdownlink=4") {
-		t.Fatalf("unexpected daily stats output:\n%s", stdout)
+	for _, want := range []string{"EMAIL", "DATE", "TOTAL", "UPLINK", "DOWNLINK", "alice@global", "2026-05-29", "7B", "3B", "4B"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected %q in daily stats output:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "\t") {
+		t.Fatalf("daily stats output should not use raw tabs:\n%s", stdout)
 	}
 
 	stdout, _, err = captureStdoutStderr(t, func() error {
