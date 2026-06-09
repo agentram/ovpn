@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh OVPN conntrack metrics for node-exporter
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec={{ ovpn_conntrack_metrics_interval | default('30s') }}
+AccuracySec=5s
+Unit=ovpn-conntrack-metrics.service
+
+[Install]
+WantedBy=timers.target

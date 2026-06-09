@@ -118,6 +118,7 @@ Prometheus receives only low-cardinality connection metrics:
 Default alerts cover:
 
 - host resource pressure (CPU, memory, low memory available, disk, inodes, disk-fill forecast)
+- conntrack pressure (`OVPNConntrackTableHigh`, `OVPNConntrackTableCritical`) and missing conntrack metrics
 - container presence/restart bursts
 - service pressure (`xray` high CPU, `prometheus` high memory, `grafana` high memory)
 - agent health, collector runtime errors, cert expiry
@@ -125,6 +126,8 @@ Default alerts cover:
 - bot health (`OVPNTelegramBotDown`, `OVPNTelegramBotPollingStale`, `OVPNTelegramBotSendFailures`)
 
 Alertmanager starts with `--data.retention=168h` so weekly user-expiry repeats fit within retention.
+
+Conntrack metrics are written by a tiny host-side systemd timer into node-exporter's textfile collector. This avoids relying on container namespace conntrack counters and keeps node-exporter inside the private monitoring network.
 
 Proxy nodes add:
 

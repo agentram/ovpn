@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -23,6 +24,7 @@ type Spec struct {
 	LimitFallbackUpload   *FallbackRateLimit
 	LimitFallbackDownload *FallbackRateLimit
 	ShortIDs              []string
+	EnabledProfiles       []string
 	APIListen             string
 	APIPort               int
 	LogLevel              string
@@ -92,10 +94,12 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	if len(spec.ShortIDs) == 0 {
 		return nil, fmt.Errorf("at least one short ID is required")
 	}
+	spec.EnabledProfiles = normalizeEnabledProfiles(spec.EnabledProfiles)
 	// Backward compatibility: older ovpn versions persisted REALITY keys in std-base64.
 	// Normalize to URL-safe raw base64 before rendering, so existing local DB state still deploys.
 	spec.RealityPrivateKey = normalizeX25519KeyBase64(spec.RealityPrivateKey)
-	users := buildClientUsers(spec.Users, spec.ServiceUsers)
+	users := buildClientUsers(spec.Users, spec.ServiceUsers, "xtls-rprx-vision")
+	plainUsers := buildClientUsers(spec.Users, spec.ServiceUsers, "")
 
 	realitySettings := map[string]any{
 		"show":        false,
@@ -165,29 +169,10 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 				"settings": map[string]any{"address": "127.0.0.1"},
 				"tag":      "api",
 			},
-			map[string]any{
-				"tag":      "vless-reality",
-				"listen":   "0.0.0.0",
-				"port":     443,
-				"protocol": "vless",
-				"settings": map[string]any{
-					"clients":    users,
-					"decryption": "none",
-				},
-				"streamSettings": map[string]any{
-					"network":         "tcp",
-					"security":        "reality",
-					"realitySettings": realitySettings,
-				},
-				"sniffing": map[string]any{
-					"enabled":      true,
-					"destOverride": []string{"http", "tls", "quic"},
-					"routeOnly":    true,
-				},
-			},
 		},
 		Outbounds: baseOutbounds(spec),
 	}
+	cfg.Inbounds = append(cfg.Inbounds, buildProfileInbounds(spec.EnabledProfiles, users, plainUsers, realitySettings)...)
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		cfg.DNS = map[string]any{
 			"queryStrategy": "UseIPv4",
@@ -224,7 +209,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			},
 			map[string]any{
 				"type":        "field",
-				"inboundTag":  []string{"vless-reality"},
+				"inboundTag":  profileInboundTags(spec.EnabledProfiles),
 				"outboundTag": "foreign-pool",
 			},
 		)
@@ -236,29 +221,123 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	return b, nil
 }
 
-func buildClientUsers(users []model.User, serviceUsers []ServiceUser) []map[string]any {
+func buildClientUsers(users []model.User, serviceUsers []ServiceUser, flow string) []map[string]any {
 	out := make([]map[string]any, 0, len(users)+len(serviceUsers))
 	for _, u := range users {
 		if !u.Enabled {
 			continue
 		}
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"id":    u.UUID,
 			"email": u.Email,
-			"flow":  "xtls-rprx-vision",
-		})
+		}
+		if strings.TrimSpace(flow) != "" {
+			row["flow"] = flow
+		}
+		out = append(out, row)
 	}
 	for _, svc := range serviceUsers {
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"id":    svc.UUID,
 			"email": svc.Email,
-			"flow":  "xtls-rprx-vision",
-		})
+		}
+		if strings.TrimSpace(flow) != "" {
+			row["flow"] = flow
+		}
+		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i]["email"].(string) < out[j]["email"].(string)
 	})
 	return out
+}
+
+func normalizeEnabledProfiles(raw []string) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(raw)+1)
+	if len(raw) == 0 {
+		raw = []string{model.TransportProfileRealityTCPVision}
+	}
+	for _, p := range raw {
+		name := model.NormalizeTransportProfile(p)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	if len(out) == 0 {
+		return []string{model.TransportProfileRealityTCPVision}
+	}
+	return out
+}
+
+func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plainUsers []map[string]any, realitySettings map[string]any) []any {
+	out := make([]any, 0, len(profiles))
+	for _, profile := range profiles {
+		switch profile {
+		case model.TransportProfileRealityTCPVision:
+			out = append(out, vlessInbound("vless-reality", 443, visionUsers, map[string]any{
+				"network":         "tcp",
+				"security":        "reality",
+				"realitySettings": realitySettings,
+			}))
+		case model.TransportProfileRealityXHTTP:
+			out = append(out, vlessInbound("vless-reality-xhttp", 8443, plainUsers, map[string]any{
+				"network":         "xhttp",
+				"security":        "reality",
+				"realitySettings": realitySettings,
+				"xhttpSettings": map[string]any{
+					"path": "/ovpn-xhttp",
+					"mode": "auto",
+				},
+			}))
+		case model.TransportProfilePlainXHTTP:
+			out = append(out, vlessInbound("vless-xhttp-plain", 13179, plainUsers, map[string]any{
+				"network":  "xhttp",
+				"security": "none",
+				"xhttpSettings": map[string]any{
+					"path": "/",
+					"mode": "auto",
+				},
+			}))
+		}
+	}
+	return out
+}
+
+func vlessInbound(tag string, port int, users []map[string]any, streamSettings map[string]any) map[string]any {
+	return map[string]any{
+		"tag":      tag,
+		"listen":   "0.0.0.0",
+		"port":     port,
+		"protocol": "vless",
+		"settings": map[string]any{
+			"clients":    users,
+			"decryption": "none",
+		},
+		"streamSettings": streamSettings,
+		"sniffing": map[string]any{
+			"enabled":      true,
+			"destOverride": []string{"http", "tls", "quic"},
+			"routeOnly":    true,
+		},
+	}
+}
+
+func profileInboundTags(profiles []string) []string {
+	tags := make([]string, 0, len(profiles))
+	for _, profile := range normalizeEnabledProfiles(profiles) {
+		meta, ok := model.LookupTransportProfile(profile)
+		if !ok || strings.TrimSpace(meta.InboundTag) == "" {
+			continue
+		}
+		tags = append(tags, meta.InboundTag)
+	}
+	if len(tags) == 0 {
+		return []string{"vless-reality"}
+	}
+	return tags
 }
 
 func baseOutbounds(spec Spec) []any {
@@ -432,6 +511,14 @@ func ValidateSpec(spec Spec) error {
 	if len(spec.ShortIDs) == 0 {
 		return fmt.Errorf("at least one short ID is required")
 	}
+	for _, raw := range spec.EnabledProfiles {
+		if model.NormalizeTransportProfile(raw) == "" {
+			return fmt.Errorf("unsupported transport profile %q", raw)
+		}
+	}
+	if includesProfile(spec.EnabledProfiles, model.TransportProfileWSTLSWeb) {
+		return fmt.Errorf("%s profile requires a TLS web front end and is not renderable yet", model.TransportProfileWSTLSWeb)
+	}
 	if spec.Role != "" && spec.Role != model.ServerRoleVPN && spec.Role != model.ServerRoleProxy {
 		return fmt.Errorf("role must be %q or %q", model.ServerRoleVPN, model.ServerRoleProxy)
 	}
@@ -471,6 +558,16 @@ func ValidateSpec(spec Spec) error {
 	return nil
 }
 
+func includesProfile(profiles []string, want string) bool {
+	want = model.NormalizeTransportProfile(want)
+	for _, profile := range profiles {
+		if model.NormalizeTransportProfile(profile) == want {
+			return true
+		}
+	}
+	return false
+}
+
 type LinkInput struct {
 	Address    string
 	Port       int
@@ -480,12 +577,24 @@ type LinkInput struct {
 	ShortID    string
 	Flow       string
 	Label      string
+	Profile    string
 }
 
-// BuildVLESSLink renders a client VLESS+REALITY connection URL from in.
+// BuildVLESSLink renders a client VLESS connection URL from in.
 func BuildVLESSLink(in LinkInput) string {
+	profile := model.NormalizeTransportProfile(in.Profile)
+	if profile == "" {
+		profile = model.TransportProfileRealityTCPVision
+	}
 	if in.Port == 0 {
-		in.Port = 443
+		switch profile {
+		case model.TransportProfileRealityXHTTP:
+			in.Port = 8443
+		case model.TransportProfilePlainXHTTP:
+			in.Port = 13179
+		default:
+			in.Port = 443
+		}
 	}
 	if in.Flow == "" {
 		in.Flow = "xtls-rprx-vision"
@@ -493,6 +602,29 @@ func BuildVLESSLink(in LinkInput) string {
 	label := in.Label
 	if strings.TrimSpace(label) == "" {
 		label = "ovpn"
+	}
+	switch profile {
+	case model.TransportProfileRealityXHTTP:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=chrome&type=xhttp&path=%s&mode=auto&sni=%s&sid=%s#%s",
+			in.UUID,
+			in.Address,
+			in.Port,
+			in.Password,
+			url.QueryEscape("/ovpn-xhttp"),
+			in.ServerName,
+			in.ShortID,
+			urlEscapeLabel(label),
+		)
+	case model.TransportProfilePlainXHTTP:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?security=none&encryption=none&type=xhttp&path=%s&mode=auto#%s",
+			in.UUID,
+			in.Address,
+			in.Port,
+			url.QueryEscape("/"),
+			urlEscapeLabel(label),
+		)
 	}
 	// Keep pbk query key for broad client compatibility.
 	return fmt.Sprintf(

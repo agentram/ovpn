@@ -352,18 +352,21 @@ func (a *App) syncQuotaPolicy(srv model.Server) error {
 	if err != nil {
 		return err
 	}
-	policies := make([]model.QuotaUserPolicy, 0, len(users))
+	inboundTags := runtimeInboundTagsForServer(srv)
+	policies := make([]model.QuotaUserPolicy, 0, len(users)*len(inboundTags))
 	for _, u := range users {
 		if !effectiveUserEnabled(u) {
 			continue
 		}
-		policies = append(policies, model.QuotaUserPolicy{
-			Email:            u.Email,
-			UUID:             u.UUID,
-			InboundTag:       "vless-reality",
-			QuotaEnabled:     u.QuotaEnabled,
-			MonthlyQuotaByte: u.TrafficLimitByte,
-		})
+		for _, inboundTag := range inboundTags {
+			policies = append(policies, model.QuotaUserPolicy{
+				Email:            u.Email,
+				UUID:             u.UUID,
+				InboundTag:       inboundTag,
+				QuotaEnabled:     u.QuotaEnabled,
+				MonthlyQuotaByte: u.TrafficLimitByte,
+			})
+		}
 	}
 	var lastErr error
 	for attempt := 1; attempt <= 15; attempt++ {
@@ -395,16 +398,19 @@ func (a *App) syncUserPolicies(srv model.Server) error {
 	if err != nil {
 		return err
 	}
-	policies := make([]model.UserPolicy, 0, len(users))
+	inboundTags := runtimeInboundTagsForServer(srv)
+	policies := make([]model.UserPolicy, 0, len(users)*len(inboundTags))
 	for _, u := range users {
-		policies = append(policies, model.UserPolicy{
-			Username:   u.Username,
-			Email:      u.Email,
-			UUID:       u.UUID,
-			Enabled:    u.Enabled,
-			ExpiryAt:   cloneTimePtr(u.ExpiryDate),
-			InboundTag: "vless-reality",
-		})
+		for _, inboundTag := range inboundTags {
+			policies = append(policies, model.UserPolicy{
+				Username:   u.Username,
+				Email:      u.Email,
+				UUID:       u.UUID,
+				Enabled:    u.Enabled,
+				ExpiryAt:   cloneTimePtr(u.ExpiryDate),
+				InboundTag: inboundTag,
+			})
+		}
 	}
 	var lastErr error
 	for attempt := 1; attempt <= 15; attempt++ {
@@ -498,8 +504,30 @@ func effectiveUserEnabled(u model.User) bool {
 	return model.IsEffectivelyEnabled(u.Enabled, u.ExpiryDate, time.Now().UTC())
 }
 
-// applyRuntimeUser adds or removes a single user from the live Xray inbound via the agent.
+func runtimeInboundTagsForServer(srv model.Server) []string {
+	profiles := srv.NormalizedEnabledProfiles()
+	tags := make([]string, 0, len(profiles))
+	seen := map[string]bool{}
+	for _, profile := range profiles {
+		meta, ok := model.LookupTransportProfile(profile)
+		if !ok || strings.TrimSpace(meta.InboundTag) == "" || meta.Status == "planned" {
+			continue
+		}
+		if seen[meta.InboundTag] {
+			continue
+		}
+		seen[meta.InboundTag] = true
+		tags = append(tags, meta.InboundTag)
+	}
+	if len(tags) == 0 {
+		return []string{"vless-reality"}
+	}
+	return tags
+}
+
+// applyRuntimeUser adds or removes a user from every enabled live Xray inbound via the agent.
 func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) error {
+	inboundTags := runtimeInboundTagsForServer(srv)
 	path := "/runtime/user/remove"
 	if enable {
 		blockedByQuota, err := a.isUserBlockedByQuota(srv, user.Email)
@@ -512,15 +540,18 @@ func (a *App) applyRuntimeUser(srv model.Server, user model.User, enable bool) e
 		path = "/runtime/user/add"
 	}
 	payload := map[string]string{
-		"inbound_tag": "vless-reality",
-		"email":       user.Email,
-		"uuid":        user.UUID,
+		"email": user.Email,
+		"uuid":  user.UUID,
 	}
-	a.log().Debug("applying runtime user operation", "server", srv.Name, "host", srv.Host, "username", user.Username, "email", user.Email, "operation", path)
-	// Runtime operations are best-effort fast path. Callers fall back to full deploy when this fails.
-	_, err := a.fetchRemoteAgent(srv, "POST", a.agentURL(path), payload)
-	if err == nil {
-		a.log().Info("runtime user operation applied", "server", srv.Name, "username", user.Username, "email", user.Email, "operation", path)
+	for _, inboundTag := range inboundTags {
+		payload["inbound_tag"] = inboundTag
+		a.log().Debug("applying runtime user operation", "server", srv.Name, "host", srv.Host, "username", user.Username, "email", user.Email, "inbound_tag", inboundTag, "operation", path)
+		// Runtime operations are a best-effort fast path. If one inbound fails after earlier inbounds changed,
+		// callers fall back to a full deploy to reconcile live Xray state from local policy.
+		if _, err := a.fetchRemoteAgent(srv, "POST", a.agentURL(path), payload); err != nil {
+			return err
+		}
 	}
-	return err
+	a.log().Info("runtime user operation applied", "server", srv.Name, "username", user.Username, "email", user.Email, "inbounds", strings.Join(inboundTags, ","), "operation", path)
+	return nil
 }

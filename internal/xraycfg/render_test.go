@@ -132,6 +132,109 @@ func TestBuildVLESSLink(t *testing.T) {
 	}
 }
 
+func TestBuildVLESSLinkProfiles(t *testing.T) {
+	t.Parallel()
+
+	xhttp := BuildVLESSLink(LinkInput{
+		Address:    "example.com",
+		UUID:       "11111111-1111-1111-1111-111111111111",
+		ServerName: "www.microsoft.com",
+		Password:   "pubkey",
+		ShortID:    "abcd",
+		Profile:    model.TransportProfileRealityXHTTP,
+		Label:      "ovpn xhttp",
+	})
+	for _, want := range []string{":8443?", "type=xhttp", "path=%2Fovpn-xhttp", "mode=auto", "#ovpn%20xhttp"} {
+		if !strings.Contains(xhttp, want) {
+			t.Fatalf("xhttp link missing %q: %s", want, xhttp)
+		}
+	}
+	if strings.Contains(xhttp, "flow=xtls-rprx-vision") {
+		t.Fatalf("xhttp link should not include vision flow: %s", xhttp)
+	}
+
+	plainXHTTP := BuildVLESSLink(LinkInput{
+		Address: "example.com",
+		UUID:    "11111111-1111-1111-1111-111111111111",
+		Profile: model.TransportProfilePlainXHTTP,
+		Label:   "ovpn plain",
+	})
+	for _, want := range []string{":13179?", "security=none", "type=xhttp", "path=%2F", "mode=auto", "#ovpn%20plain"} {
+		if !strings.Contains(plainXHTTP, want) {
+			t.Fatalf("plain xhttp link missing %q: %s", want, plainXHTTP)
+		}
+	}
+	if strings.Contains(plainXHTTP, "pbk=") || strings.Contains(plainXHTTP, "sni=") || strings.Contains(plainXHTTP, "sid=") {
+		t.Fatalf("plain xhttp link should not include REALITY params: %s", plainXHTTP)
+	}
+}
+
+func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
+	t.Parallel()
+
+	raw, err := RenderServerJSON(Spec{
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd1234"},
+		EnabledProfiles: []string{
+			model.TransportProfileRealityTCPVision,
+			model.TransportProfileRealityXHTTP,
+			model.TransportProfilePlainXHTTP,
+		},
+		Users: []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "u@example.com", Enabled: true}},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal rendered config: %v", err)
+	}
+	inbounds, _ := cfg["inbounds"].([]any)
+	tags := map[string]map[string]any{}
+	for _, rawInbound := range inbounds {
+		inbound, _ := rawInbound.(map[string]any)
+		tag, _ := inbound["tag"].(string)
+		tags[tag] = inbound
+	}
+	if tags["vless-reality"] == nil || tags["vless-reality-xhttp"] == nil || tags["vless-xhttp-plain"] == nil {
+		t.Fatalf("expected tcp, reality xhttp, and plain xhttp inbounds, got tags %#v", tags)
+	}
+	xhttpStream, _ := tags["vless-reality-xhttp"]["streamSettings"].(map[string]any)
+	if got := xhttpStream["network"]; got != "xhttp" {
+		t.Fatalf("xhttp network = %v", got)
+	}
+	xhttpSettings, _ := xhttpStream["xhttpSettings"].(map[string]any)
+	if got := xhttpSettings["path"]; got != "/ovpn-xhttp" {
+		t.Fatalf("xhttp path = %v", got)
+	}
+	plainStream, _ := tags["vless-xhttp-plain"]["streamSettings"].(map[string]any)
+	if got := plainStream["security"]; got != "none" {
+		t.Fatalf("plain xhttp security = %v", got)
+	}
+	plainXHTTPSettings, _ := plainStream["xhttpSettings"].(map[string]any)
+	if got := plainXHTTPSettings["path"]; got != "/" {
+		t.Fatalf("plain xhttp path = %v", got)
+	}
+}
+
+func TestValidateSpecRejectsPlannedTransportProfile(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateSpec(Spec{
+		RealityPrivateKey: "priv",
+		RealityServerName: "www.microsoft.com",
+		RealityTarget:     "www.microsoft.com:443",
+		ShortIDs:          []string{"abcd"},
+		ThreatDNSServers:  []string{"9.9.9.9"},
+		EnabledProfiles:   []string{model.TransportProfileWSTLSWeb},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not renderable yet") {
+		t.Fatalf("expected planned profile validation error, got %v", err)
+	}
+}
+
 func TestValidateSpec(t *testing.T) {
 	t.Parallel()
 

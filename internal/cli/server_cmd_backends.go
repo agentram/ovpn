@@ -133,17 +133,7 @@ func (a *App) newServerBackendListCmd() *cobra.Command {
 				fmt.Println("no backends")
 				return nil
 			}
-			for _, mapping := range mappings {
-				name := fmt.Sprintf("%d", mapping.BackendServerID)
-				if mapping.BackendServer != nil {
-					name = mapping.BackendServer.Name
-				}
-				state := "disabled"
-				if mapping.Enabled {
-					state = "enabled"
-				}
-				fmt.Printf("%s\tpriority=%d\t%s\n", name, mapping.Priority, state)
-			}
+			fmt.Println(renderProxyBackendTable(mappings))
 			return nil
 		},
 	}

@@ -6,6 +6,7 @@ services:
     command: ["run", "-config", "/etc/xray/config.json"]
     ports:
       - "443:443/tcp"
+      # OVPN_XRAY_PROFILE_PORTS
     expose:
       - "10085"
     volumes:

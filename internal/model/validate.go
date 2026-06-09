@@ -63,6 +63,34 @@ func (s Server) Validate() error {
 	if strings.TrimSpace(s.RealityTarget) == "" {
 		errs = append(errs, "reality_target is required")
 	}
+	primary := NormalizeTransportProfile(s.PrimaryProfile)
+	if primary == "" {
+		errs = append(errs, "primary_profile must be a supported transport profile")
+	}
+	enabled := NormalizeEnabledProfiles(primary, s.EnabledProfiles)
+	if len(enabled) == 0 {
+		errs = append(errs, "enabled_profiles must contain at least one supported transport profile")
+	}
+	if strings.TrimSpace(s.EnabledProfiles) != "" {
+		for _, raw := range strings.Split(s.EnabledProfiles, ",") {
+			raw = strings.TrimSpace(raw)
+			if raw != "" && NormalizeTransportProfile(raw) == "" {
+				errs = append(errs, "enabled_profiles contains unsupported transport profile "+raw)
+			}
+		}
+	}
+	if primary != "" {
+		found := false
+		for _, p := range enabled {
+			if p == primary {
+				found = true
+				break
+			}
+		}
+		if !found {
+			errs = append(errs, "enabled_profiles must include primary_profile")
+		}
+	}
 	if role == ServerRoleProxy {
 		if NormalizeProxyPreset(s.ProxyPreset) == "" {
 			errs = append(errs, "proxy_preset must be one of: "+SupportedProxyPresetsText())

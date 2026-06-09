@@ -64,9 +64,9 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 		return err
 	}
 
-	var blockedUsers int
-	var over80Users int
-	var over95Users int
+	blockedEmails := map[string]bool{}
+	over80Emails := map[string]bool{}
+	over95Emails := map[string]bool{}
 	var firstErr error
 
 	for _, p := range policies {
@@ -85,12 +85,12 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 			}
 			if err := q.runtimeAdd(ctx, p.InboundTag, p.Email, p.UUID); err != nil {
 				firstErr = combineFirst(firstErr, fmt.Errorf("unblock %s after quota disabled: %w", p.Email, err))
-				blockedUsers++
+				blockedEmails[p.Email] = true
 				continue
 			}
 			if err := q.Store.SetQuotaBlocked(ctx, p.Email, false, nil); err != nil {
 				firstErr = combineFirst(firstErr, fmt.Errorf("clear quota block for %s: %w", p.Email, err))
-				blockedUsers++
+				blockedEmails[p.Email] = true
 				continue
 			}
 			q.recordEvent("unblock", "success")
@@ -105,25 +105,25 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 
 		usageRatio := float64(usage) / float64(quota)
 		if usageRatio >= 0.80 {
-			over80Users++
+			over80Emails[p.Email] = true
 		}
 		if usageRatio >= 0.95 {
-			over95Users++
+			over95Emails[p.Email] = true
 		}
 
 		if isBlocked {
 			if usage >= quota {
-				blockedUsers++
+				blockedEmails[p.Email] = true
 				continue
 			}
 			if err := q.runtimeAdd(ctx, p.InboundTag, p.Email, p.UUID); err != nil {
 				firstErr = combineFirst(firstErr, fmt.Errorf("unblock %s: %w", p.Email, err))
-				blockedUsers++
+				blockedEmails[p.Email] = true
 				continue
 			}
 			if err := q.Store.SetQuotaBlocked(ctx, p.Email, false, nil); err != nil {
 				firstErr = combineFirst(firstErr, fmt.Errorf("clear quota block for %s: %w", p.Email, err))
-				blockedUsers++
+				blockedEmails[p.Email] = true
 				continue
 			}
 			q.recordEvent("unblock", "success")
@@ -145,17 +145,17 @@ func (q *QuotaEnforcer) Enforce(ctx context.Context, now time.Time) error {
 			firstErr = combineFirst(firstErr, fmt.Errorf("persist quota block for %s: %w", p.Email, err))
 			continue
 		}
-		blockedUsers++
+		blockedEmails[p.Email] = true
 		q.recordEvent("block", "success")
 		q.notify("quota_block", fmt.Sprintf("quota block applied for %s in rolling 30d window", p.Email))
 		q.logger().Warn("quota block applied", "email", p.Email, "window_start", windowStart.Format(time.RFC3339), "window_end", windowEnd.Format(time.RFC3339), "window_usage_bytes", usage, "window_quota_bytes", quota)
 	}
 
 	if q.OnBlockedUsers != nil {
-		q.OnBlockedUsers(blockedUsers)
+		q.OnBlockedUsers(len(blockedEmails))
 	}
 	if q.OnUsageBands != nil {
-		q.OnUsageBands(over80Users, over95Users)
+		q.OnUsageBands(len(over80Emails), len(over95Emails))
 	}
 	return firstErr
 }

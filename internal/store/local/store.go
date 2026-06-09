@@ -3,7 +3,9 @@ package local
 import (
 	"context"
 	"database/sql"
+	"net/url"
 	"path/filepath"
+	"strconv"
 
 	_ "modernc.org/sqlite"
 
@@ -11,6 +13,7 @@ import (
 )
 
 const sqliteDriver = "sqlite"
+const sqliteBusyTimeoutMS = 5000
 
 type Store struct {
 	db *sql.DB
@@ -21,8 +24,11 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 	if err := util.EnsureDir(dataDir); err != nil {
 		return nil, err
 	}
-	dbPath := filepath.Join(dataDir, "ovpn.db")
-	db, err := sql.Open(sqliteDriver, dbPath)
+	dbPath, err := filepath.Abs(filepath.Join(dataDir, "ovpn.db"))
+	if err != nil {
+		return nil, err
+	}
+	db, err := sql.Open(sqliteDriver, sqliteDSN(dbPath))
 	if err != nil {
 		return nil, err
 	}
@@ -37,3 +43,11 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 
 // Close closes the underlying database.
 func (s *Store) Close() error { return s.db.Close() }
+
+func sqliteDSN(path string) string {
+	u := url.URL{Scheme: "file", Path: path}
+	q := u.Query()
+	q.Add("_pragma", "busy_timeout("+strconv.Itoa(sqliteBusyTimeoutMS)+")")
+	u.RawQuery = q.Encode()
+	return u.String()
+}

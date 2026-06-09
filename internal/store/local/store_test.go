@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,45 @@ import (
 
 	"ovpn/internal/model"
 )
+
+func TestSQLiteDSNUsesBusyTimeout(t *testing.T) {
+	got := sqliteDSN("/tmp/ovpn.db")
+	parsed, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parse dsn: %v", err)
+	}
+	pragmas := parsed.Query()["_pragma"]
+	if len(pragmas) != 1 || pragmas[0] != "busy_timeout(5000)" {
+		t.Fatalf("unexpected sqlite pragmas: %q", pragmas)
+	}
+}
+
+func TestOpenWithRelativeDataDirCreatesDBUnderWorkingDirectory(t *testing.T) {
+	ctx := context.Background()
+	cwd := t.TempDir()
+	oldCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(oldCwd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	store, err := Open(ctx, "state")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	if _, err := os.Stat(filepath.Join(cwd, "state", "ovpn.db")); err != nil {
+		t.Fatalf("expected db under working directory: %v", err)
+	}
+}
 
 func TestAddServerAndUserValidation(t *testing.T) {
 	ctx := context.Background()

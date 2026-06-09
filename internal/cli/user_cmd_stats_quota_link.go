@@ -58,23 +58,7 @@ func (a *App) newUserTopCmd() *cobra.Command {
 				fmt.Println("no traffic rows")
 				return nil
 			}
-			fmt.Println("rank\tusername\temail\ttotal_bytes\tuplink\tdownlink\tquota_pct\tblocked")
-			for _, row := range rows {
-				quotaPct := "-"
-				if row.QuotaPercent != nil {
-					quotaPct = fmt.Sprintf("%.1f", *row.QuotaPercent)
-				}
-				fmt.Printf("%d\t%s\t%s\t%d\t%d\t%d\t%s\t%v\n",
-					row.Rank,
-					row.Username,
-					row.Email,
-					row.TotalBytes,
-					row.UplinkBytes,
-					row.DownlinkBytes,
-					quotaPct,
-					row.BlockedByQuota,
-				)
-			}
+			fmt.Println(renderUserTopTable(rows))
 			return nil
 		},
 	}
@@ -221,6 +205,7 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
 		server   string
 		username string
+		profile  string
 		qr       bool
 		qrFile   string
 	}
@@ -247,15 +232,10 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			address := srv.Domain
-			if address == "" {
-				address = srv.Host
+			vless, err := buildUserProfileLink(*srv, *u, link.profile)
+			if err != nil {
+				return err
 			}
-			shortID := firstShortID(srv.RealityShortIDs)
-			if shortID == "" {
-				return fmt.Errorf("server %s has no REALITY short-id configured", srv.Name)
-			}
-			vless := xraycfg.BuildVLESSLink(xraycfg.LinkInput{Address: address, Port: 443, UUID: u.UUID, ServerName: srv.RealityServerName, Password: srv.RealityPublicKey, ShortID: shortID, Label: "ovpn-" + u.Username})
 			fmt.Println(vless)
 			if link.qr {
 				qrText, err := renderTerminalQRCode(vless)
@@ -275,9 +255,188 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&link.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&link.username, "username", "", "Username")
+	cmd.Flags().StringVar(&link.profile, "profile", "", "Transport profile (default: server primary profile)")
 	cmd.Flags().BoolVar(&link.qr, "qr", true, "Print a terminal QR code after the link; use --qr=false for link-only output")
 	cmd.Flags().StringVar(&link.qrFile, "qr-file", "", "Save a PNG QR code to this path")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
+}
+
+func (a *App) newUserQRCmd() *cobra.Command {
+	var qr struct {
+		server   string
+		username string
+		profile  string
+		out      string
+	}
+	cmd := &cobra.Command{
+		Use:   "qr",
+		Short: "Save a user profile QR code",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", qr.server)
+			if err != nil {
+				return err
+			}
+			username, err := requiredFlagValue("--username", qr.username)
+			if err != nil {
+				return err
+			}
+			out, err := requiredFlagValue("--out", qr.out)
+			if err != nil {
+				return err
+			}
+			srv, err := a.store.GetServerByName(a.ctx, server)
+			if err != nil {
+				return err
+			}
+			u, err := a.store.GetUser(a.ctx, srv.ID, username)
+			if err != nil {
+				return err
+			}
+			vless, err := buildUserProfileLink(*srv, *u, qr.profile)
+			if err != nil {
+				return err
+			}
+			if err := writeQRCodePNG(vless, out); err != nil {
+				return fmt.Errorf("write QR file: %w", err)
+			}
+			fmt.Fprintf(os.Stderr, "QR saved: %s\n", filepath.Clean(out))
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&qr.server, "server", "", "Server name")
+	cmd.Flags().StringVar(&qr.username, "username", "", "Username")
+	cmd.Flags().StringVar(&qr.profile, "profile", "", "Transport profile (default: server primary profile)")
+	cmd.Flags().StringVar(&qr.out, "out", "", "Output PNG path")
+	_ = cmd.MarkFlagRequired("server")
+	_ = cmd.MarkFlagRequired("username")
+	_ = cmd.MarkFlagRequired("out")
+	return cmd
+}
+
+func (a *App) newUserExportCmd() *cobra.Command {
+	var export struct {
+		server      string
+		username    string
+		out         string
+		allProfiles bool
+		profile     string
+	}
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "Export user links and QR codes",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			server, err := requiredFlagValue("--server", export.server)
+			if err != nil {
+				return err
+			}
+			username, err := requiredFlagValue("--username", export.username)
+			if err != nil {
+				return err
+			}
+			out, err := requiredFlagValue("--out", export.out)
+			if err != nil {
+				return err
+			}
+			srv, err := a.store.GetServerByName(a.ctx, server)
+			if err != nil {
+				return err
+			}
+			u, err := a.store.GetUser(a.ctx, srv.ID, username)
+			if err != nil {
+				return err
+			}
+			info, err := os.Stat(out)
+			if err != nil {
+				return fmt.Errorf("output directory %s: %w", out, err)
+			}
+			if !info.IsDir() {
+				return fmt.Errorf("output path is not a directory: %s", out)
+			}
+			profiles := []string{export.profile}
+			if export.allProfiles {
+				profiles = srv.NormalizedEnabledProfiles()
+			}
+			if !export.allProfiles && strings.TrimSpace(export.profile) == "" {
+				profiles = []string{srv.NormalizedPrimaryProfile()}
+			}
+			for _, profile := range profiles {
+				vless, err := buildUserProfileLink(*srv, *u, profile)
+				if err != nil {
+					return err
+				}
+				base := fmt.Sprintf("%s-%s-%s", srv.Name, u.Username, model.NormalizeTransportProfile(profile))
+				linkPath := filepath.Join(out, base+".txt")
+				if err := os.WriteFile(linkPath, []byte(vless+"\n"), 0o600); err != nil {
+					return err
+				}
+				qrPath := filepath.Join(out, base+".png")
+				if err := writeQRCodePNG(vless, qrPath); err != nil {
+					return fmt.Errorf("write QR file: %w", err)
+				}
+				fmt.Printf("exported %s\n", filepath.Clean(qrPath))
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&export.server, "server", "", "Server name")
+	cmd.Flags().StringVar(&export.username, "username", "", "Username")
+	cmd.Flags().StringVar(&export.out, "out", "", "Output directory")
+	cmd.Flags().BoolVar(&export.allProfiles, "all-profiles", false, "Export every enabled server profile")
+	cmd.Flags().StringVar(&export.profile, "profile", "", "Export one profile (default: server primary profile)")
+	_ = cmd.MarkFlagRequired("server")
+	_ = cmd.MarkFlagRequired("username")
+	_ = cmd.MarkFlagRequired("out")
+	return cmd
+}
+
+func buildUserProfileLink(srv model.Server, u model.User, profile string) (string, error) {
+	rawProfile := strings.TrimSpace(profile)
+	requestedProfile := rawProfile != ""
+	if requestedProfile {
+		profile = model.NormalizeTransportProfile(rawProfile)
+		if profile == "" {
+			return "", unsupportedTransportProfileError(rawProfile)
+		}
+	} else {
+		profile = srv.NormalizedPrimaryProfile()
+	}
+	meta, ok := model.LookupTransportProfile(profile)
+	if !ok {
+		return "", unsupportedTransportProfileError(profile)
+	}
+	if meta.Status == "planned" {
+		return "", plannedTransportProfileError(profile, srv.Name)
+	}
+	if !srv.IsTransportProfileEnabled(profile) {
+		return "", fmt.Errorf("profile %s is not enabled on server %s; enable and deploy it first with `ovpn server profile enable %s %s` and `ovpn deploy %s`, or choose an enabled profile from `ovpn server profile list %s`", profile, srv.Name, srv.Name, profile, srv.Name, srv.Name)
+	}
+	address := srv.Domain
+	if address == "" {
+		address = srv.Host
+	}
+	var shortID string
+	if meta.Kind == "reality" {
+		shortID = firstShortID(srv.RealityShortIDs)
+		if shortID == "" {
+			return "", fmt.Errorf("server %s has no REALITY short-id configured for profile %s; check `ovpn server profile list %s` and try a non-REALITY profile such as %s if it is enabled", srv.Name, profile, srv.Name, model.TransportProfilePlainXHTTP)
+		}
+	}
+	label := "ovpn-" + u.Username
+	if requestedProfile || profile != model.TransportProfileRealityTCPVision {
+		label += "-" + profile
+	}
+	return xraycfg.BuildVLESSLink(xraycfg.LinkInput{
+		Address:    address,
+		Port:       meta.Port,
+		UUID:       u.UUID,
+		ServerName: srv.RealityServerName,
+		Password:   srv.RealityPublicKey,
+		ShortID:    shortID,
+		Profile:    profile,
+		Label:      label,
+	}), nil
 }

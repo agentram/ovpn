@@ -503,10 +503,10 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			return
 		}
 		resp := map[string]any{"ok": true, "email": req.Email, "runtime_readd": false}
-		policy, ok, err := d.store.GetQuotaPolicy(r.Context(), req.Email)
+		policies, err := d.store.ListQuotaPolicies(r.Context())
 		if err != nil {
-			d.logger.Warn("quota reset policy lookup failed", "email", req.Email, "error", err)
-			d.metrics.OnDBWriteError("quota_get_policy")
+			d.logger.Warn("quota reset policies lookup failed", "email", req.Email, "error", err)
+			d.metrics.OnDBWriteError("quota_list_policy")
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
 		}
@@ -517,15 +517,22 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 			return
 		}
-		if ok && strings.TrimSpace(policy.UUID) != "" && userPolicyFound && model.IsEffectivelyEnabled(userPolicy.Enabled, userPolicy.ExpiryAt, time.Now().UTC()) {
-			if err := d.runtime.AddUser(r.Context(), policy.InboundTag, policy.Email, policy.UUID); err != nil {
-				d.logger.Warn("quota reset runtime add failed", "email", req.Email, "error", err)
-				d.metrics.observeQuotaEvent("manual_reset", "error")
-				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
-				return
+		if userPolicyFound && model.IsEffectivelyEnabled(userPolicy.Enabled, userPolicy.ExpiryAt, time.Now().UTC()) {
+			for _, policy := range policies {
+				if policy.Email != req.Email || strings.TrimSpace(policy.UUID) == "" {
+					continue
+				}
+				if err := d.runtime.AddUser(r.Context(), policy.InboundTag, policy.Email, policy.UUID); err != nil {
+					d.logger.Warn("quota reset runtime add failed", "email", req.Email, "inbound_tag", policy.InboundTag, "error", err)
+					d.metrics.observeQuotaEvent("manual_reset", "error")
+					writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+					return
+				}
+				resp["runtime_readd"] = true
 			}
+		}
+		if resp["runtime_readd"] == true {
 			d.metrics.observeQuotaEvent("manual_reset", "success")
-			resp["runtime_readd"] = true
 		}
 		d.refreshOnce(r.Context())
 		writeJSON(w, http.StatusOK, resp)

@@ -56,6 +56,56 @@ func TestRuntimeHelpersQuotaBlockedFilteringAndApply(t *testing.T) {
 	}
 }
 
+func TestApplyRuntimeUserUsesAllEnabledTransportInbounds(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join([]string{
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+	}, ","))
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+	user := model.User{
+		Username: "alice",
+		Email:    "alice@global",
+		UUID:     "11111111-1111-1111-1111-111111111111",
+		Enabled:  true,
+	}
+	var calls []string
+	app.remoteHTTPHook = func(_ model.Server, method, url string, payload any) ([]byte, error) {
+		if method == "GET" && strings.Contains(url, "/quota/status") {
+			return []byte(`{"users":[{"email":"alice@global","blocked_by_quota":false}]}`), nil
+		}
+		body, _ := payload.(map[string]string)
+		calls = append(calls, method+" "+url+" "+body["inbound_tag"])
+		return []byte(`{"ok":true}`), nil
+	}
+
+	if err := app.applyRuntimeUser(*srv, user, true); err != nil {
+		t.Fatalf("runtime add: %v", err)
+	}
+	if err := app.applyRuntimeUser(*srv, user, false); err != nil {
+		t.Fatalf("runtime remove: %v", err)
+	}
+	got := strings.Join(calls, "\n")
+	for _, want := range []string{
+		"POST http://127.0.0.1:19000/runtime/user/add vless-reality",
+		"POST http://127.0.0.1:19000/runtime/user/add vless-reality-xhttp",
+		"POST http://127.0.0.1:19000/runtime/user/add vless-xhttp-plain",
+		"POST http://127.0.0.1:19000/runtime/user/remove vless-reality",
+		"POST http://127.0.0.1:19000/runtime/user/remove vless-reality-xhttp",
+		"POST http://127.0.0.1:19000/runtime/user/remove vless-xhttp-plain",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing runtime call %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestRuntimePolicySyncRetriesReturnActionableErrors(t *testing.T) {
 	app := newTestAppWithServer(t, false)
 	srv, err := app.store.GetServerByName(app.ctx, "main")

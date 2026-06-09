@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+out_dir="{{ ovpn_node_exporter_textfile_dir | default('/var/lib/ovpn-node-exporter-textfile') }}"
+out_file="${out_dir}/conntrack.prom"
+tmp_file="${out_file}.$$"
+
+mkdir -p "$out_dir"
+
+entries="$(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null || printf '0')"
+limit="$(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null || printf '0')"
+
+cat > "$tmp_file" <<EOF
+# HELP ovpn_host_conntrack_entries Host nf_conntrack entries currently in use.
+# TYPE ovpn_host_conntrack_entries gauge
+ovpn_host_conntrack_entries ${entries}
+# HELP ovpn_host_conntrack_entries_limit Host nf_conntrack table limit.
+# TYPE ovpn_host_conntrack_entries_limit gauge
+ovpn_host_conntrack_entries_limit ${limit}
+EOF
+
+chmod 0644 "$tmp_file"
+mv -f "$tmp_file" "$out_file"

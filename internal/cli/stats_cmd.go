@@ -40,9 +40,7 @@ func (a *App) statsCmd() *cobra.Command {
 			if err := json.Unmarshal(body, &rows); err != nil {
 				return err
 			}
-			for _, r := range rows {
-				fmt.Printf("%s\tuplink=%d\tdownlink=%d\n", r.Email, r.UplinkBytes, r.DownlinkBytes)
-			}
+			fmt.Println(renderTrafficTotalsTable(rows))
 			return nil
 		},
 	}
@@ -79,9 +77,7 @@ func (a *App) statsCmd() *cobra.Command {
 			if err := json.Unmarshal(body, &rows); err != nil {
 				return err
 			}
-			for _, r := range rows {
-				fmt.Printf("%s\t%s\tuplink=%d\tdownlink=%d\n", r.Email, day, r.UplinkBytes, r.DownlinkBytes)
-			}
+			fmt.Println(renderDailyTrafficTable(rows, day))
 			return nil
 		},
 	}

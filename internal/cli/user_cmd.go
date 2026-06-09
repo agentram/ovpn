@@ -21,6 +21,8 @@ func (a *App) userCmd() *cobra.Command {
 		a.newUserQuotaSetCmd(),
 		a.newUserQuotaResetCmd(),
 		a.newUserLinkCmd(),
+		a.newUserQRCmd(),
+		a.newUserExportCmd(),
 	)
 	return cmd
 }

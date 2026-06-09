@@ -47,10 +47,13 @@ func TestUserTopCommandPrintsQuotaAwareRowsAndEmptyState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("user top: %v", err)
 	}
-	for _, want := range []string{"rank\tusername\temail", "1\talice\talice@global\t30", "50.0\ttrue"} {
+	for _, want := range []string{"RANK", "USER", "EMAIL", "TOTAL", "QUOTA %", "BLOCKED", "alice", "alice@global", "30B", "50.0%", "yes"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("expected %q in user top output:\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "\t") {
+		t.Fatalf("user top output should not use raw tabs:\n%s", stdout)
 	}
 
 	app.remoteHTTPHook = func(model.Server, string, string, any) ([]byte, error) {
@@ -180,10 +183,13 @@ func TestUserDiagnoseAndDebugCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("user diagnose: %v", err)
 	}
-	for _, want := range []string{"user: alice", "quota: 50.0%", "accepted=2 rejected=1", "top_ports=443=2", "shared UUID"} {
+	for _, want := range []string{"user: alice", "quota: 50.0%", "ACCEPTED", "REJECTED", "SOURCE NETS", "PORT", "COUNT", "443", "shared UUID"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("expected %q in diagnose output:\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "\t") {
+		t.Fatalf("diagnose output should not use raw tabs:\n%s", stdout)
 	}
 	for _, args := range [][]string{
 		{"debug", "start", "--server", "main", "--username", "alice"},

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 
 	"ovpn/internal/model"
@@ -261,27 +263,17 @@ func printUserDiagnostics(resp model.UserDiagnosticsResponse) {
 		}
 	}
 	fmt.Println("traffic:")
-	for _, row := range resp.TrafficWindows {
-		total := row.TotalBytes
-		if total == 0 {
-			total = row.UplinkBytes + row.DownlinkBytes
-		}
-		fmt.Printf("  %s\ttotal=%s\tuplink=%s\tdownlink=%s\n", row.Window, formatBytes(total), formatBytes(row.UplinkBytes), formatBytes(row.DownlinkBytes))
-	}
+	fmt.Println(renderTrafficWindowsTable(resp.TrafficWindows))
 	conn := resp.Connections
 	lastSeen := "never"
 	if conn.LastSeenAt != nil {
 		lastSeen = conn.LastSeenAt.UTC().Format(time.RFC3339)
 	}
 	fmt.Println("connections:")
-	fmt.Printf("  last_seen=%s accepted=%d rejected=%d approx_source_networks=%d ipv6_destinations=%d\n",
-		lastSeen, conn.AcceptedCount, conn.RejectedCount, conn.ApproxSourceNetworks, conn.DestinationIPv6Count)
+	fmt.Println(renderConnectionSummaryTable(conn, lastSeen))
 	if len(conn.TopPorts) > 0 {
-		parts := make([]string, 0, len(conn.TopPorts))
-		for _, p := range conn.TopPorts {
-			parts = append(parts, fmt.Sprintf("%d=%d", p.Port, p.Count))
-		}
-		fmt.Println("  top_ports=" + strings.Join(parts, ","))
+		fmt.Println("top ports:")
+		fmt.Println(renderConnectionPortsTable(conn.TopPorts))
 	}
 	if conn.DebugActive && conn.DebugExpiresAt != nil {
 		fmt.Printf("  debug_active=true debug_expires_at=%s\n", conn.DebugExpiresAt.UTC().Format(time.RFC3339))
@@ -296,17 +288,7 @@ func printDebugEvents(resp model.ConnectionDebugEventsResponse) {
 		fmt.Println("no debug events")
 		return
 	}
-	fmt.Println("timestamp\tresult\tsource_network\tdestination\tport\tfamily")
-	for _, ev := range resp.Events {
-		fmt.Printf("%s\t%s\t%s\t%s\t%d\t%s\n",
-			ev.Timestamp.UTC().Format(time.RFC3339),
-			ev.Result,
-			defaultDash(ev.SourceNetwork),
-			defaultDash(ev.Destination),
-			ev.DestinationPort,
-			ev.DestinationFamily,
-		)
-	}
+	fmt.Println(renderDebugEventsTable(resp.Events))
 }
 
 func printDebugSessions(resp model.ConnectionDebugSessionsResponse, users []model.User) {
@@ -319,15 +301,101 @@ func printDebugSessions(resp model.ConnectionDebugSessionsResponse, users []mode
 		usernames[user.Email] = user.Username
 	}
 	fmt.Println("active debug sessions:")
-	for _, session := range resp.Sessions {
+	fmt.Println(renderDebugSessionsTable(resp.Sessions, usernames))
+}
+
+func renderTrafficWindowsTable(rows []model.TrafficWindow) string {
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleRounded)
+	tw.AppendHeader(table.Row{"Window", "Total", "Uplink", "Downlink"})
+	for _, row := range rows {
+		total := row.TotalBytes
+		if total == 0 {
+			total = row.UplinkBytes + row.DownlinkBytes
+		}
+		tw.AppendRow(table.Row{
+			row.Window,
+			formatBytes(total),
+			formatBytes(row.UplinkBytes),
+			formatBytes(row.DownlinkBytes),
+		})
+	}
+	if len(rows) == 0 {
+		tw.AppendRow(table.Row{"-", "-", "-", "-"})
+	}
+	return tw.Render()
+}
+
+func renderConnectionSummaryTable(conn model.UserConnectionDiagnostics, lastSeen string) string {
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleRounded)
+	tw.AppendHeader(table.Row{"Last Seen", "Accepted", "Rejected", "Source Nets", "IPv4 Dest", "IPv6 Dest", "Domain Dest", "Unknown Dest"})
+	tw.AppendRow(table.Row{
+		lastSeen,
+		conn.AcceptedCount,
+		conn.RejectedCount,
+		conn.ApproxSourceNetworks,
+		conn.DestinationIPv4Count,
+		conn.DestinationIPv6Count,
+		conn.DestinationDomainCount,
+		conn.DestinationUnknownCount,
+	})
+	return tw.Render()
+}
+
+func renderConnectionPortsTable(rows []model.ConnectionPortCount) string {
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleRounded)
+	tw.AppendHeader(table.Row{"Port", "Count"})
+	for _, row := range rows {
+		tw.AppendRow(table.Row{row.Port, row.Count})
+	}
+	if len(rows) == 0 {
+		tw.AppendRow(table.Row{"-", "-"})
+	}
+	return tw.Render()
+}
+
+func renderDebugEventsTable(events []model.ConnectionDebugEvent) string {
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleRounded)
+	tw.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "Destination", WidthMax: 42, WidthMaxEnforcer: text.WrapSoft},
+	})
+	tw.AppendHeader(table.Row{"Timestamp", "Result", "Source Network", "Destination", "Port", "Family"})
+	for _, ev := range events {
+		tw.AppendRow(table.Row{
+			ev.Timestamp.UTC().Format(time.RFC3339),
+			ev.Result,
+			defaultDash(ev.SourceNetwork),
+			defaultDash(ev.Destination),
+			ev.DestinationPort,
+			ev.DestinationFamily,
+		})
+	}
+	if len(events) == 0 {
+		tw.AppendRow(table.Row{"-", "-", "-", "-", "-", "-"})
+	}
+	return tw.Render()
+}
+
+func renderDebugSessionsTable(sessions []model.ConnectionDebugSession, usernames map[string]string) string {
+	tw := table.NewWriter()
+	tw.SetStyle(table.StyleRounded)
+	tw.AppendHeader(table.Row{"Username", "Email", "Started", "Expires"})
+	for _, session := range sessions {
 		username := defaultDash(usernames[session.Email])
-		fmt.Printf("- username=%s email=%s started=%s expires=%s\n",
+		tw.AppendRow(table.Row{
 			username,
 			session.Email,
 			session.StartedAt.UTC().Format(time.RFC3339),
 			session.ExpiresAt.UTC().Format(time.RFC3339),
-		)
+		})
 	}
+	if len(sessions) == 0 {
+		tw.AppendRow(table.Row{"-", "-", "-", "-"})
+	}
+	return tw.Render()
 }
 
 func formatBytes(v int64) string {

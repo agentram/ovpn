@@ -22,6 +22,7 @@ It is intended for operators who prefer a local CLI and SSH workflow over a web 
 - [HA proxy rollout](#4a-optional-ha-proxy-rollout)
 - [User operations](#6-add-users-and-deliver-links)
 - [CLI guide](docs/cli.md)
+- [Transport profiles](docs/transports.md)
 - [Monitoring](#7-optional-monitoring)
 - [Documentation map](#documentation-map)
 
@@ -95,6 +96,7 @@ flowchart LR
 - SSH/SCP deploy path: commands render files locally and apply them through normal server access.
 - Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
 - Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
+- Transport profiles: keep deprecated TCP/REALITY links for compatibility and use opt-in fallback profiles for degraded networks; plain XHTTP is available when operators accept its lack of transport security.
 - Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
 - Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering. The rendered Xray config (REALITY private key + client UUIDs) is stored `0640 root:<xray-gid>`, and `ovpn-agent` mutating endpoints require a bearer token (`OVPN_AGENT_TOKEN`, auto-provisioned on deploy).
 - Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
@@ -105,6 +107,7 @@ flowchart LR
 - Remote Docker Compose runtime in `/opt/ovpn`
 - User lifecycle commands and VLESS link generation
 - Global-by-default user provisioning across enabled servers
+- Profile-aware VLESS link, QR, and export commands
 - Rolling `30d` traffic quota enforcement
 - Lightweight per-user connection diagnostics and short targeted debug windows (`basic` mode is on by default; see `docs/cli.md`)
 - Optional Prometheus, Alertmanager, Grafana, and Telegram bot monitoring
@@ -113,7 +116,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.6.1`
+- Current pinned version: `1.7.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -155,6 +158,7 @@ export OVPN_SECURITY_PROFILE=off
 
 - Default quota: rolling `30d`, `300 GB` per user when no per-user limit is set.
 - Optional host-level Tor exit-node blocking exists in Ansible and is off by default.
+- Ansible tunes host conntrack for VPN/NAT workloads and monitoring alerts on missing/high/critical conntrack usage.
 
 See [`docs/security.md`](docs/security.md) for the full security model.
 
@@ -194,6 +198,7 @@ Use this flow for a first small server. Replace placeholders with your own value
 ```
 
 `user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
+See [`docs/transports.md`](docs/transports.md) before enabling fallback profiles or switching the default generated link profile.
 
 `server init` performs the first bootstrap/deploy for the VPN runtime. Use `deploy` later when you change runtime settings:
 
@@ -439,6 +444,7 @@ make docs-pdf
 - [`README.ansible.md`](README.ansible.md): host bootstrap and hardening
 - [`DEVELOPMENT.md`](DEVELOPMENT.md): contributor and architecture guide
 - [`docs/cli.md`](docs/cli.md): CLI command map and practical operator workflows
+- [`docs/transports.md`](docs/transports.md): transport profiles, fallback links, and rollout notes
 - [`docs/clients.md`](docs/clients.md): English client guide
 - [`docs/clients-ru.md`](docs/clients-ru.md): Russian client guide
 - [`docs/security.md`](docs/security.md): security and hardening model

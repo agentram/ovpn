@@ -4,6 +4,67 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.0
+
+### Added
+- Added transport profile metadata and server policy fields so operators can keep the deprecated compatibility `vless-reality-tcp-vision` profile while enabling opt-in fallback profiles.
+- Added `server profile list`, `server profile enable`, `server profile disable`, and `server profile switch` for controlled profile rollout with primary-profile guard rails.
+- Added profile-aware `user link --profile`, `user qr`, and `user export --all-profiles` commands for per-user fallback links and QR codes.
+- Added profile-aware validation errors so link and QR commands explain how to enable/deploy a disabled profile instead of printing broken credentials.
+- Added optional Xray inbounds for `vless-reality-xhttp` and `vless-xhttp-plain`; deploy exposes their ports only when those profiles are enabled.
+- Added a `vless-xhttp-plain` fallback profile for networks where REALITY profiles fail or stall before traffic flows reliably.
+- Added host conntrack metrics through node-exporter's textfile collector, with missing/high/critical conntrack alerts in the bundled Prometheus rules.
+- Added `docs/transports.md` with practical rollout notes, client compatibility warnings, and diagnostics workflow.
+
+### Changed
+- Existing servers keep the original TCP/REALITY/vision profile for compatibility, while operators can opt into plain XHTTP after testing and accepting its lack of transport security.
+- Human-readable CLI list outputs for stats, top users, proxy backends, and per-user diagnostics now use the same bordered table style as `server list`.
+- Ansible host maintenance tunes conntrack for VPN/NAT workloads and opens the XHTTP fallback port in the example inventory defaults.
+
+### Fixed
+- Host maintenance preserves the hardened Xray config ownership/mode instead of loosening it while locking down runtime files.
+
+### Upgrade notes
+- To add a fallback profile such as `vless-xhttp-plain`, update the local `ovpn` binary first, make sure the host firewall allows the profile port, deploy the updated runtime, then generate new profile-specific links. Existing links keep using their original profile; users need new QR codes/links only for the newly added profile.
+
+  Example for two VPN servers and three users:
+
+  ```bash
+  # 1. Update ovpn locally or download from releases, then verify the version.
+  # From source:
+  go build -o ./ovpn ./cmd/ovpn
+  ./ovpn version
+
+  # 2. Apply host maintenance so UFW/conntrack/node-exporter textfile metrics match the new runtime.
+  # Make sure production inventory allows 13179/tcp, for example:
+  # ovpn_firewall_extra_tcp_ports:
+  #   - 13179
+  cd ansible
+  ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit vpn-a.example.net,vpn-b.example.net --check --diff
+  ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit vpn-a.example.net,vpn-b.example.net
+  cd ..
+
+  # 3. Enable the fallback profile and deploy both servers.
+  ./ovpn server profile enable vpn-a vless-xhttp-plain
+  ./ovpn server profile enable vpn-b vless-xhttp-plain
+  ./ovpn deploy vpn-a
+  ./ovpn deploy vpn-b
+  ./ovpn doctor vpn-a
+  ./ovpn doctor vpn-b
+
+  # 4. Export fallback-profile credentials for users who need to switch clients.
+  mkdir -p ~/Downloads/ovpn-xhttp
+  for server in vpn-a vpn-b; do
+    for user in user-a user-b user-c; do
+      ./ovpn user export --server "$server" --username "$user" --profile vless-xhttp-plain --out ~/Downloads/ovpn-xhttp
+    done
+  done
+
+  # Optional: make future plain `user link` output use this profile by default.
+  ./ovpn server profile switch vpn-a vless-xhttp-plain
+  ./ovpn server profile switch vpn-b vless-xhttp-plain
+  ```
+
 ## 1.6.1
 
 ### Changed

@@ -46,6 +46,33 @@ groups:
           summary: "Low available memory on host"
           description: "MemAvailable is below 150 MiB for 10 minutes."
 
+      - alert: OVPNConntrackMetricsMissing
+        expr: absent(ovpn_host_conntrack_entries{job="node_exporter"}) or absent(ovpn_host_conntrack_entries_limit{job="node_exporter"})
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conntrack metrics are missing"
+          description: "Node exporter is not exposing ovpn host conntrack usage from the textfile collector."
+
+      - alert: OVPNConntrackTableHigh
+        expr: max by(instance) (ovpn_host_conntrack_entries{job="node_exporter"}) / max by(instance) (ovpn_host_conntrack_entries_limit{job="node_exporter"}) > 0.70
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conntrack table usage is high"
+          description: "Connection tracking table is above 70%; new connections may start failing if it reaches the limit."
+
+      - alert: OVPNConntrackTableCritical
+        expr: max by(instance) (ovpn_host_conntrack_entries{job="node_exporter"}) / max by(instance) (ovpn_host_conntrack_entries_limit{job="node_exporter"}) > 0.90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Conntrack table is almost full"
+          description: "Connection tracking table is above 90%; the kernel may soon drop packets."
+
       - alert: OVPNHostDiskLowWarning
         expr: node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.15
         for: 15m

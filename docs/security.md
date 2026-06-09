@@ -7,6 +7,7 @@ This document defines the practical security posture for `ovpn`.
 Recommended host model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
+- Optional XHTTP fallback profile on `13179/tcp`
 - SSH control plane on `22/tcp`
 - Ansible for host baseline and hardening
 - `ovpn` for runtime lifecycle
@@ -17,6 +18,7 @@ Recommended host model:
 Public surface should stay minimal:
 
 - Xray transport port (`443/tcp`)
+- Optional XHTTP fallback port (`13179/tcp`) when that profile is enabled
 - SSH (`22/tcp`)
 
 Internal-only surfaces:
@@ -92,6 +94,7 @@ Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentiona
 - The optional OVPN MOTD summarizes host role, domain, deploy root, VPN port, monitoring tunnel policy, and the no-auto-reboot policy.
 - Journald limits are enforced by default (`ovpn_journald_system_max_use=200M`, `ovpn_journald_runtime_max_use=100M`).
 - Swapfile is enabled by default (`ovpn_enable_swapfile: true`, `ovpn_swapfile_size_mb: 1024`, `ovpn_swapfile_swappiness: 10`).
+- Conntrack is tuned for VPN/NAT workloads by default (`ovpn_conntrack_max=65536`, `ovpn_conntrack_tcp_timeout_established=86400`) to avoid packet drops when many short-lived connections are active. A host-side timer writes conntrack usage into node-exporter's textfile collector every 30 seconds.
 
 Use `playbooks/bootstrap.yml` for fresh hosts. Use `playbooks/host-maintenance.yml` for already-deployed hosts when you need to apply host baseline changes without rewriting `/opt/ovpn` runtime scaffolding.
 

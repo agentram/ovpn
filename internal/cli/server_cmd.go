@@ -8,6 +8,7 @@ func (a *App) serverCmd() *cobra.Command {
 	cmd.AddCommand(
 		a.newServerAddCmd(),
 		a.newServerBackendCmd(),
+		a.newServerProfileCmd(),
 		a.newServerInitCmd(),
 		a.newServerListCmd(),
 		a.newServerSetXrayVersionCmd(),
