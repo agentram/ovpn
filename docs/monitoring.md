@@ -194,9 +194,12 @@ If a fresh host cannot pull the monitoring images because of public-registry rat
 
 Monitoring runtime defaults:
 
-- Prometheus scrape/evaluation interval: `30s`
+- Prometheus scrape/evaluation interval: `60s`
 - Prometheus retention: `10d`
-- cAdvisor housekeeping: `30s` (max `2m`)
+- Prometheus WAL compression: enabled
+- cAdvisor housekeeping: `60s` (max `5m`)
+- Grafana background reporting and update checks: disabled
+- Host memory and transient collector warnings use longer windows before firing, but still send resolved Telegram notifications.
 
 If `monitoring/secrets/telegram_bot_token` is empty, `ovpn server monitor up` now starts the monitoring stack with `ovpn-telegram-bot` scaled to `0` (no restart loop).
 

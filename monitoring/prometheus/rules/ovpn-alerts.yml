@@ -20,31 +20,31 @@ groups:
           description: "CPU usage is above 90% for 10 minutes."
 
       - alert: OVPNHostHighMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 90
-        for: 10m
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 92
+        for: 20m
         labels:
           severity: warning
         annotations:
           summary: "High memory usage on host"
-          description: "Memory usage is above 90% for 10 minutes."
+          description: "Memory usage is above 92% for 20 minutes."
 
       - alert: OVPNHostMemoryCritical
-        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 95
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 97
         for: 5m
         labels:
           severity: critical
         annotations:
           summary: "Critical memory usage on host"
-          description: "Memory usage is above 95% for 5 minutes."
+          description: "Memory usage is above 97% for 5 minutes."
 
       - alert: OVPNHostLowMemAvailable
         expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 157286400
-        for: 10m
+        for: 20m
         labels:
           severity: warning
         annotations:
           summary: "Low available memory on host"
-          description: "MemAvailable is below 150 MiB for 10 minutes."
+          description: "MemAvailable is below 150 MiB for 20 minutes."
 
       - alert: OVPNHostDiskLowWarning
         expr: node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.15
@@ -186,13 +186,13 @@ groups:
           description: "No successful stats collection for more than 5 minutes."
 
       - alert: OVPNCollectorErrors
-        expr: increase(ovpn_agent_collector_runs_total{result="error"}[10m]) >= 2
-        for: 3m
+        expr: increase(ovpn_agent_collector_runs_total{result="error"}[15m]) >= 5
+        for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Collector errors threshold exceeded"
-          description: "ovpn-agent collector reported at least 2 errors in the last 10 minutes."
+          description: "ovpn-agent collector reported at least 5 errors in the last 15 minutes."
 
       - alert: OVPNRuntimeOperationErrors
         expr: increase(ovpn_agent_runtime_operations_total{result="error"}[15m]) > 0

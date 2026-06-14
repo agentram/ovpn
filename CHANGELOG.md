@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.1
+
+### Changed
+- Monitoring now samples host/container metrics every `60s`, enables Prometheus WAL compression, reduces cAdvisor housekeeping overhead, disables Grafana background reporting/update checks, and makes memory/collector warning alerts less noisy while keeping resolved notifications.
+- CI tool pins were refreshed for `golangci-lint`, `gosec`, `govulncheck`, and Trivy.
+
 ## 1.7.0
 
 ### Added

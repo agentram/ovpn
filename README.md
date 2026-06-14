@@ -116,7 +116,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.7.0`
+- Current pinned version: `1.7.1`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -168,9 +168,12 @@ See [`docs/security.md`](docs/security.md) for the full security model.
 - Local backups: keep latest `7`
 - Remote pre-deploy snapshots: keep latest `7`
 - Monitoring defaults are sized for small hosts:
-  - Prometheus scrape/evaluation interval: `30s`
+  - Prometheus scrape/evaluation interval: `60s`
   - Prometheus retention: `10d`
-  - cAdvisor housekeeping: `30s`
+  - Prometheus WAL compression: enabled
+  - cAdvisor housekeeping: `60s` (max `5m`)
+  - Grafana background reporting and update checks: disabled
+  - Memory and transient collector warnings use longer windows before firing, but still send resolved Telegram notifications.
 
 ## Quick start
 

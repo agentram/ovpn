@@ -168,9 +168,12 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 - Local backup archives: keep latest `7`.
 - Remote pre-deploy snapshots (`ovpn-*`): keep latest `7`.
 - Monitoring defaults are tuned for small 1GB-class hosts:
-  - Prometheus scrape/evaluation interval `30s`
+  - Prometheus scrape/evaluation interval `60s`
   - Prometheus TSDB retention `10d`
-  - cAdvisor housekeeping `30s`, max `2m`
+  - Prometheus WAL compression enabled
+  - cAdvisor housekeeping `60s`, max `5m`
+  - Grafana background reporting and update checks disabled
+  - Warning memory/collector alerts use longer windows before firing, but still send resolved Telegram notifications.
 
 ## Telegram bot boundaries
 
