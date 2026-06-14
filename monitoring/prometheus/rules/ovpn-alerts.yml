@@ -20,13 +20,13 @@ groups:
           description: "CPU usage is above 90% for 10 minutes."
 
       - alert: OVPNHostHighMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 92
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 94
         for: 20m
         labels:
           severity: warning
         annotations:
           summary: "High memory usage on host"
-          description: "Memory usage is above 92% for 20 minutes."
+          description: "Memory usage is above 94% for 20 minutes."
 
       - alert: OVPNHostMemoryCritical
         expr: (1 - (node_memory_MemAvailable_bytes{job="node_exporter"} / node_memory_MemTotal_bytes{job="node_exporter"})) * 100 > 97
@@ -38,13 +38,13 @@ groups:
           description: "Memory usage is above 97% for 5 minutes."
 
       - alert: OVPNHostLowMemAvailable
-        expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 157286400
+        expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 104857600
         for: 20m
         labels:
           severity: warning
         annotations:
           summary: "Low available memory on host"
-          description: "MemAvailable is below 150 MiB for 20 minutes."
+          description: "MemAvailable is below 100 MiB for 20 minutes."
 
       - alert: OVPNHostDiskLowWarning
         expr: node_filesystem_avail_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{job="node_exporter",mountpoint="/",fstype!~"tmpfs|overlay|squashfs"} < 0.15
