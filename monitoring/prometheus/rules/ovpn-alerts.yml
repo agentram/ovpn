@@ -37,6 +37,15 @@ groups:
           summary: "Critical memory usage on host"
           description: "Memory usage is above 97% for 5 minutes."
 
+      - alert: OVPNHostMemoryImminentOOM
+        expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 67108864
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host memory is almost exhausted"
+          description: "MemAvailable is below 64 MiB for 2 minutes."
+
       - alert: OVPNHostLowMemAvailable
         expr: node_memory_MemAvailable_bytes{job="node_exporter"} < 104857600
         for: 20m
@@ -129,6 +138,15 @@ groups:
           summary: "Container restart burst detected"
           description: "One or more ovpn containers restarted more than twice in 15 minutes."
 
+      - alert: OVPNContainerOOMKilled
+        expr: increase(container_oom_events_total{job="cadvisor",container_label_com_docker_compose_service=~"xray|ovpn-agent|prometheus|alertmanager|grafana|node-exporter|cadvisor|ovpn-telegram-bot"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container was OOM killed"
+          description: "An ovpn container reported at least one OOM event in the last 10 minutes."
+
       - alert: OVPNXrayHighCPU
         expr: sum(rate(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="xray"}[5m])) * 100 > 70
         for: 15m
@@ -195,13 +213,13 @@ groups:
           description: "ovpn-agent collector reported at least 5 errors in the last 15 minutes."
 
       - alert: OVPNRuntimeOperationErrors
-        expr: increase(ovpn_agent_runtime_operations_total{result="error"}[15m]) > 0
+        expr: increase(ovpn_agent_runtime_operations_total{result="error"}[15m]) >= 2
         for: 2m
         labels:
           severity: warning
         annotations:
           summary: "Runtime API operation errors detected"
-          description: "ovpn-agent runtime add/remove operations had errors in the last 15 minutes."
+          description: "ovpn-agent runtime add/remove operations had at least 2 errors in the last 15 minutes."
 
       - alert: OVPNUserExpirySoon
         expr: ovpn_agent_user_effective_enabled > 0 and ovpn_agent_user_days_until_expiry >= 0 and ovpn_agent_user_days_until_expiry <= 2

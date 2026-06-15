@@ -119,15 +119,16 @@ Default alerts cover:
 
 - host resource pressure (CPU, memory, low memory available, disk, inodes, disk-fill forecast)
 - conntrack pressure (`OVPNConntrackTableHigh`, `OVPNConntrackTableCritical`) and missing conntrack metrics
-- container presence/restart bursts
+- container presence/restart bursts and cAdvisor OOM events
 - service pressure (`xray` high CPU, `prometheus` high memory, `grafana` high memory)
 - agent health, collector runtime errors, cert expiry
 - user expiry warning (`OVPNUserExpirySoon`) when an effectively enabled user is within the next 2 days of expiry
 - bot health (`OVPNTelegramBotDown`, `OVPNTelegramBotPollingStale`, `OVPNTelegramBotSendFailures`)
 
+Prometheus keeps up to `10d` of samples with a `512MB` TSDB size cap and WAL compression enabled.
 Alertmanager starts with `--data.retention=168h` so weekly user-expiry repeats fit within retention.
 
-Conntrack metrics are written by a tiny host-side systemd timer into node-exporter's textfile collector. This avoids relying on container namespace conntrack counters and keeps node-exporter inside the private monitoring network.
+Conntrack metrics are written every `60s` by a tiny host-side systemd timer into node-exporter's textfile collector. This avoids relying on container namespace conntrack counters and keeps node-exporter inside the private monitoring network.
 
 Proxy nodes add:
 
@@ -195,9 +196,11 @@ If a fresh host cannot pull the monitoring images because of public-registry rat
 Monitoring runtime defaults:
 
 - Prometheus scrape/evaluation interval: `60s`
-- Prometheus retention: `10d`
+- Prometheus retention: `10d` with a `512MB` size cap
 - Prometheus WAL compression: enabled
 - cAdvisor housekeeping: `60s` (max `5m`)
+- Critical host memory guard: `MemAvailable < 64MiB` for `2m`
+- Container OOM events: alerted from cAdvisor
 - Grafana background reporting and update checks: disabled
 - Host memory and transient collector warnings use longer windows before firing, but still send resolved Telegram notifications.
 

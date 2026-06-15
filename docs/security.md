@@ -94,7 +94,7 @@ Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentiona
 - The optional OVPN MOTD summarizes host role, domain, deploy root, VPN port, monitoring tunnel policy, and the no-auto-reboot policy.
 - Journald limits are enforced by default (`ovpn_journald_system_max_use=200M`, `ovpn_journald_runtime_max_use=100M`).
 - Swapfile is enabled by default (`ovpn_enable_swapfile: true`, `ovpn_swapfile_size_mb: 1024`, `ovpn_swapfile_swappiness: 10`).
-- Conntrack is tuned for VPN/NAT workloads by default (`ovpn_conntrack_max=65536`, `ovpn_conntrack_tcp_timeout_established=86400`) to avoid packet drops when many short-lived connections are active. A host-side timer writes conntrack usage into node-exporter's textfile collector every 30 seconds.
+- Conntrack is tuned for VPN/NAT workloads by default (`ovpn_conntrack_max=65536`, `ovpn_conntrack_tcp_timeout_established=86400`) to avoid packet drops when many short-lived connections are active. A host-side timer writes conntrack usage into node-exporter's textfile collector every 60 seconds.
 
 Use `playbooks/bootstrap.yml` for fresh hosts. Use `playbooks/host-maintenance.yml` for already-deployed hosts when you need to apply host baseline changes without rewriting `/opt/ovpn` runtime scaffolding.
 
@@ -169,9 +169,11 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 - Remote pre-deploy snapshots (`ovpn-*`): keep latest `7`.
 - Monitoring defaults are tuned for small 1GB-class hosts:
   - Prometheus scrape/evaluation interval `60s`
-  - Prometheus TSDB retention `10d`
+  - Prometheus TSDB retention `10d` with a `512MB` size cap
   - Prometheus WAL compression enabled
   - cAdvisor housekeeping `60s`, max `5m`
+  - Critical host memory guard at `MemAvailable < 64MiB` for `2m`
+  - Container OOM events alerted from cAdvisor
   - Grafana background reporting and update checks disabled
   - Warning memory/collector alerts use longer windows before firing, but still send resolved Telegram notifications.
 

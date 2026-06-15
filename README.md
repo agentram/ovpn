@@ -169,9 +169,11 @@ See [`docs/security.md`](docs/security.md) for the full security model.
 - Remote pre-deploy snapshots: keep latest `7`
 - Monitoring defaults are sized for small hosts:
   - Prometheus scrape/evaluation interval: `60s`
-  - Prometheus retention: `10d`
+  - Prometheus retention: `10d` with a `512MB` size cap
   - Prometheus WAL compression: enabled
   - cAdvisor housekeeping: `60s` (max `5m`)
+  - Critical host memory guard: `MemAvailable < 64MiB` for `2m`
+  - Container OOM events: alerted from cAdvisor
   - Grafana background reporting and update checks: disabled
   - Memory and transient collector warnings use longer windows before firing, but still send resolved Telegram notifications.
 

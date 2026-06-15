@@ -287,10 +287,18 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		"description: \"Memory usage is above 94% for 20 minutes.\"",
 		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 97",
 		"description: \"Memory usage is above 97% for 5 minutes.\"",
+		"OVPNHostMemoryImminentOOM",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 67108864",
+		"description: \"MemAvailable is below 64 MiB for 2 minutes.\"",
 		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 104857600",
 		"description: \"MemAvailable is below 100 MiB for 20 minutes.\"",
 		"expr: increase(ovpn_agent_collector_runs_total{result=\"error\"}[15m]) >= 5",
 		"description: \"ovpn-agent collector reported at least 5 errors in the last 15 minutes.\"",
+		"expr: increase(ovpn_agent_runtime_operations_total{result=\"error\"}[15m]) >= 2",
+		"description: \"ovpn-agent runtime add/remove operations had at least 2 errors in the last 15 minutes.\"",
+		"OVPNContainerOOMKilled",
+		"expr: increase(container_oom_events_total{job=\"cadvisor\",container_label_com_docker_compose_service=~\"xray|ovpn-agent|prometheus|alertmanager|grafana|node-exporter|cadvisor|ovpn-telegram-bot\"}[10m]) > 0",
+		"description: \"An ovpn container reported at least one OOM event in the last 10 minutes.\"",
 	} {
 		if !strings.Contains(string(gotRules), want) {
 			t.Fatalf("expected conntrack alert %q, got:\n%s", want, string(gotRules))
@@ -304,6 +312,7 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		"--data.retention=168h",
 		"/run/udev:/run/udev:ro",
 		"/dev/kmsg:/dev/kmsg:ro",
+		"--storage.tsdb.retention.size=512MB",
 		"--storage.tsdb.wal-compression",
 		"--housekeeping_interval=60s",
 		"--max_housekeeping_interval=5m",
@@ -546,10 +555,18 @@ func TestRenderBundleProxyIncludesHAProxyAndGeodata(t *testing.T) {
 		"description: \"Memory usage is above 94% for 20 minutes.\"",
 		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 97",
 		"description: \"Memory usage is above 97% for 5 minutes.\"",
+		"OVPNHostMemoryImminentOOM",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 67108864",
+		"description: \"MemAvailable is below 64 MiB for 2 minutes.\"",
 		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 104857600",
 		"description: \"MemAvailable is below 100 MiB for 20 minutes.\"",
 		"expr: increase(ovpn_agent_collector_runs_total{result=\"error\"}[15m]) >= 5",
 		"description: \"ovpn-agent collector reported at least 5 errors in the last 15 minutes.\"",
+		"expr: increase(ovpn_agent_runtime_operations_total{result=\"error\"}[15m]) >= 2",
+		"description: \"ovpn-agent runtime add/remove operations had at least 2 errors in the last 15 minutes.\"",
+		"OVPNContainerOOMKilled",
+		"expr: increase(container_oom_events_total{job=\"cadvisor\",container_label_com_docker_compose_service=~\"xray|haproxy|ovpn-agent|prometheus|alertmanager|grafana|node-exporter|cadvisor|ovpn-telegram-bot\"}[10m]) > 0",
+		"description: \"An ovpn container reported at least one OOM event in the last 10 minutes.\"",
 	} {
 		if !strings.Contains(string(gotRules), want) {
 			t.Fatalf("expected proxy alert rule %q, got:\n%s", want, string(gotRules))

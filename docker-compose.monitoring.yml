@@ -8,6 +8,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=10d
+      - --storage.tsdb.retention.size=512MB
       - --storage.tsdb.wal-compression
       - --web.enable-lifecycle
     volumes:
