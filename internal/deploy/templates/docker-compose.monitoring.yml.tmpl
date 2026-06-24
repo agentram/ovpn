@@ -8,6 +8,8 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=10d
+      - --storage.tsdb.retention.size=512MB
+      - --storage.tsdb.wal-compression
       - --web.enable-lifecycle
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -103,6 +105,10 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-ovpn}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-now}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_LOG_LEVEL: warn
     volumes:
       - ovpn-grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -146,8 +152,8 @@ services:
     profiles: ["monitoring"]
     command:
       - --docker_only=true
-      - --housekeeping_interval=30s
-      - --max_housekeeping_interval=2m
+      - --housekeeping_interval=60s
+      - --max_housekeeping_interval=5m
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw

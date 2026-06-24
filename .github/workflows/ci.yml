@@ -145,14 +145,14 @@ jobs:
         # golangci/golangci-lint-action v9.2.1
         uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee
         with:
-          version: v2.11.4
+          version: v2.12.2
           args: --timeout=5m
 
       - name: Install gosec
         id: install_gosec
         run: |
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.25.0
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.27.1
 
       - name: Gosec gate (high confidence/high severity)
         id: gosec_gate
