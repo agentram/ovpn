@@ -1,0 +1,138 @@
+- name: Manage swapfile (optional)
+  when: ovpn_enable_swapfile | bool
+  block:
+    - name: Check if swapfile already exists
+      ansible.builtin.stat:
+        path: "{{ ovpn_swapfile_path }}"
+      register: security_swapfile_stat
+
+    - name: Compute desired swapfile size
+      ansible.builtin.set_fact:
+        security_swapfile_desired_bytes: "{{ (ovpn_swapfile_size_mb | int) * 1024 * 1024 }}"
+        security_swapfile_needs_resize: "{{ (not security_swapfile_stat.stat.exists) or ((security_swapfile_stat.stat.size | default(0) | int) != ((ovpn_swapfile_size_mb | int) * 1024 * 1024)) }}"
+
+    - name: Create or resize swapfile
+      ansible.builtin.shell: |
+        set -eu
+        swapfile="{{ ovpn_swapfile_path }}"
+        desired_mb="{{ ovpn_swapfile_size_mb | int }}"
+        desired_bytes=$((desired_mb * 1024 * 1024))
+        tmp_swap="${swapfile}.ovpn-grow"
+
+        is_active_swap() {
+          swapon --show=NAME --noheadings | awk '{print $1}' | grep -Fxq "$1"
+        }
+
+        allocate_swapfile() {
+          path="$1"
+          size_mb="$2"
+          rm -f "$path"
+          if ! fallocate -l "${size_mb}M" "$path"; then
+            dd if=/dev/zero of="$path" bs=1M count="$size_mb"
+          fi
+          chmod 0600 "$path"
+          mkswap "$path" >/dev/null
+        }
+
+        if [ -e "$swapfile" ]; then
+          current_bytes=$(stat -c %s "$swapfile")
+        else
+          current_bytes=0
+        fi
+
+        if [ "$current_bytes" -eq "$desired_bytes" ]; then
+          exit 0
+        fi
+
+        if [ -e "$swapfile" ] && is_active_swap "$swapfile"; then
+          if [ "$current_bytes" -lt "$desired_bytes" ]; then
+            current_mb=$(( (current_bytes + 1024 * 1024 - 1) / (1024 * 1024) ))
+            if [ "$current_mb" -lt 64 ]; then
+              current_mb=64
+            fi
+            if ! is_active_swap "$tmp_swap"; then
+              allocate_swapfile "$tmp_swap" "$current_mb"
+              swapon "$tmp_swap"
+            fi
+          fi
+          swapoff "$swapfile"
+        fi
+
+        allocate_swapfile "$swapfile" "$desired_mb"
+        if ! is_active_swap "$swapfile"; then
+          swapon "$swapfile"
+        fi
+
+        if is_active_swap "$tmp_swap"; then
+          swapoff "$tmp_swap"
+        fi
+        rm -f "$tmp_swap"
+      when:
+        - not ansible_check_mode
+        - security_swapfile_needs_resize | bool
+      changed_when: security_swapfile_needs_resize | bool
+
+    - name: Refresh swapfile state after create or resize
+      ansible.builtin.stat:
+        path: "{{ ovpn_swapfile_path }}"
+      register: security_swapfile_stat
+
+    - name: Set swapfile permissions
+      ansible.builtin.file:
+        path: "{{ ovpn_swapfile_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      when: security_swapfile_stat.stat.exists or not ansible_check_mode
+
+    - name: Check swap signature
+      ansible.builtin.command: "blkid -o value -s TYPE {{ ovpn_swapfile_path }}"
+      register: security_swapfile_blkid
+      failed_when: false
+      changed_when: false
+      when: security_swapfile_stat.stat.exists
+
+    - name: Initialize swap signature
+      ansible.builtin.command: "mkswap {{ ovpn_swapfile_path }}"
+      when:
+        - not ansible_check_mode
+        - not security_swapfile_stat.stat.exists or (security_swapfile_blkid.stdout | default('') | trim) != "swap"
+
+    - name: Ensure swapfile entry in fstab
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "{{ ovpn_swapfile_path }} none swap sw 0 0"
+        state: present
+
+    - name: Read active swap devices
+      ansible.builtin.command: swapon --show=NAME --noheadings
+      register: security_swap_active
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Enable swapfile
+      ansible.builtin.command: "swapon {{ ovpn_swapfile_path }}"
+      when:
+        - not ansible_check_mode
+        - ovpn_swapfile_path not in (security_swap_active.stdout_lines | default([]))
+
+    - name: Ensure vm.swappiness persists across reboots
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.d/99-ovpn-swap.conf
+        regexp: '^vm\.swappiness='
+        line: "vm.swappiness={{ ovpn_swapfile_swappiness | int }}"
+        create: true
+        mode: "0644"
+
+    - name: Read current vm.swappiness
+      ansible.builtin.command: sysctl -n vm.swappiness
+      register: security_vm_swappiness_current
+      changed_when: false
+      failed_when: false
+      when: not ansible_check_mode
+
+    - name: Apply vm.swappiness at runtime
+      ansible.builtin.command: "sysctl -w vm.swappiness={{ ovpn_swapfile_swappiness | int }}"
+      when:
+        - not ansible_check_mode
+        - (security_vm_swappiness_current.stdout | default('') | trim) != (ovpn_swapfile_swappiness | int | string)
