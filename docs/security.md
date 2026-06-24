@@ -93,7 +93,7 @@ Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentiona
 - Docker daemon defaults are merged into existing `/etc/docker/daemon.json` content so unrelated daemon settings are preserved.
 - The optional OVPN MOTD summarizes host role, domain, deploy root, VPN port, monitoring tunnel policy, and the no-auto-reboot policy.
 - Journald limits are enforced by default (`ovpn_journald_system_max_use=200M`, `ovpn_journald_runtime_max_use=100M`).
-- Swapfile is enabled by default (`ovpn_enable_swapfile: true`, `ovpn_swapfile_size_mb: 1024`, `ovpn_swapfile_swappiness: 10`).
+- Swapfile is enabled by default (`ovpn_enable_swapfile: true`, `ovpn_swapfile_size_mb: 2048`, `ovpn_swapfile_swappiness: 10`). Host maintenance resizes an existing swapfile to the configured size; when growing an active swapfile it uses a temporary swapfile first so memory pressure does not make `swapoff` fail.
 - Conntrack is tuned for VPN/NAT workloads by default (`ovpn_conntrack_max=65536`, `ovpn_conntrack_tcp_timeout_established=86400`) to avoid packet drops when many short-lived connections are active. A host-side timer writes conntrack usage into node-exporter's textfile collector every 60 seconds.
 
 Use `playbooks/bootstrap.yml` for fresh hosts. Use `playbooks/host-maintenance.yml` for already-deployed hosts when you need to apply host baseline changes without rewriting `/opt/ovpn` runtime scaffolding.
