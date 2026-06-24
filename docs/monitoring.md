@@ -210,15 +210,61 @@ Security note: enabling `telegram_admin_token` grants the bot container controll
 
 ## Telegram setup
 
-1. Create Telegram bot via `@BotFather`.
-2. Put bot token on remote host:
+### 1. Create a bot with BotFather
+
+Open Telegram and start a chat with [@BotFather](https://t.me/BotFather):
+
+```
+/newbot
+```
+
+Follow the prompts — choose a display name (e.g. `My VPN Server`) and a username (e.g. `my_vpn_server_bot`).
+BotFather replies with the bot token:
+
+```
+1234567890:ABCDefGhIJKlmNoPQRsTUvwXyZ-example123
+```
+
+Keep one bot per VPN server so alerts and interactive commands are scoped to that server only.
+
+To retrieve a token for an existing bot: `/mybots` → select the bot → **API Token**.
+
+### 2. Find your Telegram user ID (owner-user-id)
+
+Open a chat with [@RawDataBot](https://t.me/RawDataBot) and send any message.
+It replies with a JSON dump — your numeric user ID is in `message.from.id`:
+
+```json
+{
+  "message": {
+    "from": {
+      "id": 123456789,
+      ...
+    }
+  }
+}
+```
+
+Use that number as `--owner-user-id`. The owner ID controls who can run read-only audit commands (user list, diagnostics, link lookup) from the bot chat.
+
+### 3. Run one-shot setup
+
+```bash
+OVPN_TELEGRAM_BOT_TOKEN=<token> \
+./ovpn server monitor telegram-setup <server> \
+  --owner-user-id <your-numeric-id>
+```
+
+This uploads the token, deploys the runtime bundle, starts the monitoring stack, and sends a test notification confirming the bot is connected.
+
+### 4. Manual setup (alternative to one-shot)
+
+Write the token directly to the host and set environment variables before deploying:
 
 ```bash
 ssh <ssh-user>@<server-ip> 'install -m 600 /dev/null /opt/ovpn/monitoring/secrets/telegram_bot_token'
 ssh <ssh-user>@<server-ip> 'cat > /opt/ovpn/monitoring/secrets/telegram_bot_token'
 ```
-
-3. Set Telegram env before deploy:
 
 ```bash
 export OVPN_TELEGRAM_OWNER_USER_ID=<owner-user-id>  # recommended
@@ -227,22 +273,11 @@ export OVPN_TELEGRAM_NOTIFY_CHAT_IDS=<chat-id-1>
 # Optional: enable owner-only /restart and /heal actions.
 # export OVPN_TELEGRAM_ADMIN_TOKEN=<long-random-secret>
 
-# Optional custom PDF path inside container
-# export OVPN_TELEGRAM_CLIENTS_PDF_PATH=/opt/ovpn/monitoring/telegram-bot/assets/clients.pdf
-# export OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=/opt/ovpn/monitoring/telegram-bot/assets/clients-ru.pdf
-
 # Optional when using non-default bot host port:
 # export OVPN_TELEGRAM_NOTIFY_URL=http://127.0.0.1:19002/notify
 ```
 
-Owner id fallback behavior:
-
-- If `OVPN_TELEGRAM_OWNER_USER_ID` is empty during deploy, `ovpn` writes owner id from the first `OVPN_TELEGRAM_NOTIFY_CHAT_IDS` entry.
-- This prevents `ovpn-telegram-bot` restart loops on re-deploys.
-- Recommended: keep `OVPN_TELEGRAM_OWNER_USER_ID` explicit for predictable access control.
-- If the link config file is missing or invalid after deploy, the bot still starts in alerting and audit mode and marks `User link` as disabled.
-
-4. Re-deploy and (re)start monitoring:
+Then re-deploy and restart monitoring:
 
 ```bash
 ./ovpn deploy <server>
@@ -250,22 +285,13 @@ Owner id fallback behavior:
 ./ovpn server monitor up <server>
 ```
 
-Official `ovpn` release binaries embed the Linux `ovpn-telegram-bot` runtime binary used by this deploy path. Release archives contain only `ovpn`; a normal Telegram setup does not require a sidecar binary, local Go toolchain, or source checkout. `OVPN_REPO_ROOT` is only needed for development builds without embedded runtime assets or unsupported runtime architectures.
+Owner id fallback behavior:
 
-One-shot setup command:
+- If `OVPN_TELEGRAM_OWNER_USER_ID` is empty during deploy, `ovpn` writes owner id from the first `OVPN_TELEGRAM_NOTIFY_CHAT_IDS` entry.
+- Recommended: keep `OVPN_TELEGRAM_OWNER_USER_ID` explicit for predictable access control.
+- If the link config file is missing or invalid after deploy, the bot still starts in alerting and audit mode and marks `User link` as disabled.
 
-```bash
-OVPN_TELEGRAM_BOT_TOKEN=<token> \
-./ovpn server monitor telegram-setup <server> \
-  --owner-user-id <owner-user-id>
-```
-
-`--owner-user-id` is optional in setup mode.
-When omitted, setup falls back to the first notify chat id as owner.
-If provided, `--owner-user-id` (and `OVPN_TELEGRAM_OWNER_USER_ID`) must be exactly one numeric Telegram user ID.
-
-This command uploads the token file, deploys runtime with minimal Telegram env, starts monitoring, and sends a test notification.
-If `--notify-chat-ids` is empty, setup defaults notify target to owner.
+Official release binaries embed the Linux `ovpn-telegram-bot` runtime binary. A normal setup does not require a sidecar binary, local Go toolchain, or source checkout. `OVPN_REPO_ROOT` is only needed for development builds without embedded runtime assets or unsupported runtime architectures.
 
 ## Telegram menu and commands
 

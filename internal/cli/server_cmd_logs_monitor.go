@@ -217,6 +217,13 @@ func (a *App) newServerMonitorTelegramSetupCmd() *cobra.Command {
 			if err := a.uploadTelegramBotToken(*srv, token); err != nil {
 				return err
 			}
+			// Force-recreate the bot container so the newly written token file is picked up.
+			// The deploy above may have started the bot with the old on-disk token before
+			// uploadTelegramBotToken replaced the file.
+			restartRunner := a.newRunner("server.monitor.telegram_setup.restart")
+			if err := deploy.RestartTelegramBotRemote(a.ctx, restartRunner, sshFromServer(*srv)); err != nil {
+				return err
+			}
 			if setup.monitorUp {
 				runner := a.newRunner("server.monitor.telegram_setup.up")
 				if err := deploy.MonitoringUpRemote(a.ctx, runner, sshFromServer(*srv)); err != nil {
