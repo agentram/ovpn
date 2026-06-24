@@ -72,7 +72,7 @@ jobs:
       - name: Install govulncheck
         run: |
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
       - name: Run govulncheck
         run: govulncheck ./...
@@ -86,7 +86,7 @@ jobs:
       actions: read
       security-events: write
     env:
-      TRIVY_VERSION: v0.70.0
+      TRIVY_VERSION: v0.71.0
       TRIVY_CACHE_DIR: .cache/trivy
       DOCKER_CONFIG: /tmp/trivy-docker-config
 

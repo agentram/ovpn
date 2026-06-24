@@ -250,11 +250,56 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if !strings.Contains(string(alertCfg), "http://ovpn-telegram-bot:8080/alertmanager") {
 		t.Fatalf("expected alertmanager webhook receiver, got:\n%s", string(alertCfg))
 	}
+	for _, want := range []string{
+		"name: telegram-webhook",
+		"send_resolved: true",
+		"name: telegram-webhook-expiry",
+	} {
+		if !strings.Contains(string(alertCfg), want) {
+			t.Fatalf("expected alertmanager config to contain %q, got:\n%s", want, string(alertCfg))
+		}
+	}
+	if strings.Contains(string(alertCfg), "telegram-webhook-warning-no-resolved") {
+		t.Fatalf("warning alerts should use the default receiver so resolved notifications are sent, got:\n%s", string(alertCfg))
+	}
+	gotPrometheus, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "prometheus.yml"))
+	if err != nil {
+		t.Fatalf("read prometheus config: %v", err)
+	}
+	for _, want := range []string{
+		"scrape_interval: 60s",
+		"evaluation_interval: 60s",
+	} {
+		if !strings.Contains(string(gotPrometheus), want) {
+			t.Fatalf("expected prometheus config to contain %q, got:\n%s", want, string(gotPrometheus))
+		}
+	}
 	gotRules, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "rules", "ovpn-alerts.yml"))
 	if err != nil {
 		t.Fatalf("read alert rules: %v", err)
 	}
-	for _, want := range []string{"OVPNConntrackMetricsMissing", "OVPNConntrackTableHigh", "OVPNConntrackTableCritical"} {
+	for _, want := range []string{
+		"OVPNConntrackMetricsMissing",
+		"OVPNConntrackTableHigh",
+		"OVPNConntrackTableCritical",
+		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 94",
+		"for: 20m",
+		"description: \"Memory usage is above 94% for 20 minutes.\"",
+		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 97",
+		"description: \"Memory usage is above 97% for 5 minutes.\"",
+		"OVPNHostMemoryImminentOOM",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 67108864",
+		"description: \"MemAvailable is below 64 MiB for 2 minutes.\"",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 104857600",
+		"description: \"MemAvailable is below 100 MiB for 20 minutes.\"",
+		"expr: increase(ovpn_agent_collector_runs_total{result=\"error\"}[15m]) >= 5",
+		"description: \"ovpn-agent collector reported at least 5 errors in the last 15 minutes.\"",
+		"expr: increase(ovpn_agent_runtime_operations_total{result=\"error\"}[15m]) >= 2",
+		"description: \"ovpn-agent runtime add/remove operations had at least 2 errors in the last 15 minutes.\"",
+		"OVPNContainerOOMKilled",
+		"expr: increase(container_oom_events_total{job=\"cadvisor\",container_label_com_docker_compose_service=~\"xray|ovpn-agent|prometheus|alertmanager|grafana|node-exporter|cadvisor|ovpn-telegram-bot\"}[10m]) > 0",
+		"description: \"An ovpn container reported at least one OOM event in the last 10 minutes.\"",
+	} {
 		if !strings.Contains(string(gotRules), want) {
 			t.Fatalf("expected conntrack alert %q, got:\n%s", want, string(gotRules))
 		}
@@ -267,8 +312,16 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		"--data.retention=168h",
 		"/run/udev:/run/udev:ro",
 		"/dev/kmsg:/dev/kmsg:ro",
+		"--storage.tsdb.retention.size=512MB",
+		"--storage.tsdb.wal-compression",
+		"--housekeeping_interval=60s",
+		"--max_housekeeping_interval=5m",
 		"--collector.textfile.directory=/var/lib/node-exporter/textfile",
 		"/var/lib/ovpn-node-exporter-textfile:/var/lib/node-exporter/textfile:ro",
+		"GF_ANALYTICS_REPORTING_ENABLED: \"false\"",
+		"GF_ANALYTICS_CHECK_FOR_UPDATES: \"false\"",
+		"GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: \"false\"",
+		"GF_LOG_LEVEL: warn",
 	} {
 		if !strings.Contains(string(monitoringCompose), want) {
 			t.Fatalf("expected monitoring compose to contain %q, got:\n%s", want, string(monitoringCompose))
@@ -480,12 +533,41 @@ func TestRenderBundleProxyIncludesHAProxyAndGeodata(t *testing.T) {
 	if !strings.Contains(string(gotProm), "job_name: haproxy") || !strings.Contains(string(gotProm), "haproxy:8404") {
 		t.Fatalf("expected proxy prometheus scrape config for haproxy, got:\n%s", string(gotProm))
 	}
+	for _, want := range []string{
+		"scrape_interval: 60s",
+		"evaluation_interval: 60s",
+	} {
+		if !strings.Contains(string(gotProm), want) {
+			t.Fatalf("expected proxy prometheus config to contain %q, got:\n%s", want, string(gotProm))
+		}
+	}
 
 	gotRules, err := os.ReadFile(filepath.Join(bundle.Dir, "monitoring", "prometheus", "rules", "ovpn-alerts.yml"))
 	if err != nil {
 		t.Fatalf("read proxy alert rules: %v", err)
 	}
-	for _, want := range []string{"OVPNHAProxyMetricsDown", "OVPNForeignBackendPoolDown", "OVPNHAProxyContainerMissing"} {
+	for _, want := range []string{
+		"OVPNHAProxyMetricsDown",
+		"OVPNForeignBackendPoolDown",
+		"OVPNHAProxyContainerMissing",
+		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 94",
+		"for: 20m",
+		"description: \"Memory usage is above 94% for 20 minutes.\"",
+		"expr: (1 - (node_memory_MemAvailable_bytes{job=\"node_exporter\"} / node_memory_MemTotal_bytes{job=\"node_exporter\"})) * 100 > 97",
+		"description: \"Memory usage is above 97% for 5 minutes.\"",
+		"OVPNHostMemoryImminentOOM",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 67108864",
+		"description: \"MemAvailable is below 64 MiB for 2 minutes.\"",
+		"expr: node_memory_MemAvailable_bytes{job=\"node_exporter\"} < 104857600",
+		"description: \"MemAvailable is below 100 MiB for 20 minutes.\"",
+		"expr: increase(ovpn_agent_collector_runs_total{result=\"error\"}[15m]) >= 5",
+		"description: \"ovpn-agent collector reported at least 5 errors in the last 15 minutes.\"",
+		"expr: increase(ovpn_agent_runtime_operations_total{result=\"error\"}[15m]) >= 2",
+		"description: \"ovpn-agent runtime add/remove operations had at least 2 errors in the last 15 minutes.\"",
+		"OVPNContainerOOMKilled",
+		"expr: increase(container_oom_events_total{job=\"cadvisor\",container_label_com_docker_compose_service=~\"xray|haproxy|ovpn-agent|prometheus|alertmanager|grafana|node-exporter|cadvisor|ovpn-telegram-bot\"}[10m]) > 0",
+		"description: \"An ovpn container reported at least one OOM event in the last 10 minutes.\"",
+	} {
 		if !strings.Contains(string(gotRules), want) {
 			t.Fatalf("expected proxy alert rule %q, got:\n%s", want, string(gotRules))
 		}
