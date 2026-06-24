@@ -4,6 +4,12 @@
   become: true
   gather_facts: true
 
+  pre_tasks:
+    - name: Apply swapfile baseline before package maintenance
+      ansible.builtin.include_role:
+        name: security
+        tasks_from: swapfile
+
   roles:
     - role: common
     - role: docker

@@ -23,6 +23,11 @@
           - ovpn_deploy_root | length > 0
         fail_msg: "Set ovpn_domain and ovpn_deploy_root in inventory/group_vars before bootstrap"
 
+    - name: Apply swapfile baseline before package installation
+      ansible.builtin.include_role:
+        name: security
+        tasks_from: swapfile
+
   roles:
     - role: common
     - role: docker

@@ -67,7 +67,7 @@ ovpn_unattended_package_blacklist: []
 # Clean-server optimization defaults
 ovpn_enable_swapfile: true
 ovpn_swapfile_path: "/swapfile"
-ovpn_swapfile_size_mb: 1024
+ovpn_swapfile_size_mb: 2048
 ovpn_swapfile_swappiness: 10
 ovpn_manage_conntrack: true
 ovpn_conntrack_max: 65536
