@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.2
+
+### Security
+- Bumped `golang.org/x/net` from `0.54.0` to `0.55.0` to clear six HIGH advisories flagged by the Trivy filesystem scan (`CVE-2026-25680`, `CVE-2026-25681`, `CVE-2026-27136`, `CVE-2026-39821`, `CVE-2026-42502`, `CVE-2026-42506`). These were not reachable per `govulncheck`, but the dependency-scan gate flags them regardless.
+
 ## 1.7.1
 
 ### Changed
