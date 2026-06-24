@@ -333,6 +333,19 @@ func MonitoringUpRemote(ctx context.Context, runner Runner, cfg ssh.Config) erro
 	return nil
 }
 
+// RestartTelegramBotRemote force-recreates the ovpn-telegram-bot container if it is present,
+// so that a freshly written token file is picked up without a full monitoring stack restart.
+func RestartTelegramBotRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
+	cmd := fmt.Sprintf(
+		"set -e; cd %s; if sudo docker ps -a --format '{{.Names}}' | grep -q '^ovpn-telegram-bot$'; then sudo docker compose --env-file .env -f docker-compose.yml -f docker-compose.monitoring.yml --profile monitoring up -d --force-recreate ovpn-telegram-bot; fi",
+		RemoteDir,
+	)
+	if _, err := runner.Exec(ctx, cfg, cmd); err != nil {
+		return fmt.Errorf("restart ovpn-telegram-bot on %s: %w", cfg.Host, err)
+	}
+	return nil
+}
+
 // MonitoringDownRemote stops the optional monitoring stack on the host.
 func MonitoringDownRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	if _, err := runner.Exec(ctx, cfg, buildMonitoringDownCommand()); err != nil {
