@@ -380,12 +380,15 @@ Telegram setup can be done in one command:
 ```bash
 OVPN_TELEGRAM_BOT_TOKEN=<token> \
 ./ovpn server monitor telegram-setup <server> \
-  --owner-user-id <owner-user-id>
+  --owner-user-id <your-numeric-user-id>
 ```
+
+- Get `<token>` from [@BotFather](https://t.me/BotFather) → `/newbot` (one bot per server).
+- Get `<your-numeric-user-id>` by sending any message to [@RawDataBot](https://t.me/RawDataBot) — your ID is `message.from.id` in the reply.
 
 The Telegram bot is read-only by default. Owner-only recovery actions require `OVPN_TELEGRAM_ADMIN_TOKEN`.
 
-See [`docs/monitoring.md`](docs/monitoring.md) for dashboards, alerts, and Telegram behavior.
+See [`docs/monitoring.md`](docs/monitoring.md) for full setup instructions, dashboards, alerts, and Telegram behavior.
 
 ### 8. Backups
 
