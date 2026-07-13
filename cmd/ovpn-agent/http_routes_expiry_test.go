@@ -336,3 +336,53 @@ func TestQuotaResetDoesNotReaddExpiredUser(t *testing.T) {
 		t.Fatalf("expected quota state to be unblocked, got found=%v state=%+v", found, state)
 	}
 }
+
+func TestQuotaResetTreatsAlreadyExistsAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	runtime := &testRuntime{addErr: errors.New("rpc error: code = Unknown desc = proxy/vless: User alice@global already exists.")}
+	store, mux := newTestAgentMuxWithRuntime(t, runtime)
+	ctx := context.Background()
+	quota := int64(200)
+
+	if err := store.ReplaceQuotaPolicies(ctx, []model.QuotaUserPolicy{{
+		Email:            "alice@global",
+		UUID:             "uuid-1",
+		InboundTag:       "vless-reality",
+		QuotaEnabled:     true,
+		MonthlyQuotaByte: &quota,
+	}}); err != nil {
+		t.Fatalf("replace quota policies: %v", err)
+	}
+	if err := store.ReplaceUserPolicies(ctx, []model.UserPolicy{{
+		Username:   "alice",
+		Email:      "alice@global",
+		UUID:       "uuid-1",
+		Enabled:    true,
+		InboundTag: "vless-reality",
+	}}); err != nil {
+		t.Fatalf("replace user policies: %v", err)
+	}
+	blockedAt := time.Now().UTC()
+	if err := store.SetQuotaBlocked(ctx, "alice@global", true, &blockedAt); err != nil {
+		t.Fatalf("set quota blocked: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/quota/reset", bytes.NewBufferString(`{"email":"alice@global"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d want=%d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"runtime_readd":true`)) {
+		t.Fatalf("expected runtime_readd=true, body=%s", rec.Body.String())
+	}
+
+	state, found, err := store.GetQuotaState(ctx, "alice@global")
+	if err != nil {
+		t.Fatalf("get quota state: %v", err)
+	}
+	if !found || state.Blocked {
+		t.Fatalf("expected quota state to be unblocked, got found=%v state=%+v", found, state)
+	}
+}

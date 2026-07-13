@@ -79,6 +79,26 @@ func TestRuntimeGatewayReportsFactoryAndRuntimeErrors(t *testing.T) {
 	}
 }
 
+func TestRuntimeGatewayTreatsAlreadyExistsAsSuccess(t *testing.T) {
+	client := &fakeRuntimeXrayClient{addErr: errors.New("rpc error: code = Unknown desc = proxy/vless: User alice@global already exists.")}
+	restore := replaceRuntimeXrayClient(func(context.Context, string) (runtimeXrayClient, error) {
+		return client, nil
+	})
+	defer restore()
+
+	metrics := newAgentMetrics(prometheus.NewRegistry())
+	g := &runtimeGateway{apiAddr: "xray:10085", mu: &sync.Mutex{}, observer: metrics}
+	if err := g.AddUser(context.Background(), "vless-reality", "alice@global", "uuid-1"); err != nil {
+		t.Fatalf("already-present runtime user should be idempotent: %v", err)
+	}
+	if len(client.adds) != 1 {
+		t.Fatalf("expected one add attempt, got %+v", client.adds)
+	}
+	if got := testutil.ToFloat64(metrics.xrayAPIReachable); got != 1 {
+		t.Fatalf("expected reachable metric, got %v", got)
+	}
+}
+
 func replaceRuntimeXrayClient(fn func(context.Context, string) (runtimeXrayClient, error)) func() {
 	prev := newRuntimeXrayClient
 	newRuntimeXrayClient = fn

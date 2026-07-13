@@ -28,6 +28,7 @@ ovpn_firewall_allow_http: false
 ovpn_firewall_allow_https: true
 ovpn_firewall_extra_tcp_ports:
   - 13179 # VLESS XHTTP fallback profile
+  - 8443 # VLESS over XHTTP with REALITY
 ovpn_firewall_extra_udp_ports: []
 ovpn_firewall_remove_tcp_ports: []
 

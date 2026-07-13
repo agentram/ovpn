@@ -40,6 +40,10 @@ func (g *runtimeGateway) AddUser(ctx context.Context, inboundTag, email, uuid st
 	}
 	defer client.Close()
 	if err := client.AddUser(ctx, inboundTag, email, uuid); err != nil {
+		if isRuntimeUserAlreadyPresentError(err) {
+			g.observer.OnXrayAPIReachable(true)
+			return nil
+		}
 		return err
 	}
 	g.observer.OnXrayAPIReachable(true)

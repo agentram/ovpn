@@ -85,6 +85,14 @@ func TestHTTPHelpersEnvAbsentAndRequestLoggingBranches(t *testing.T) {
 	if isRuntimeUserAbsentError(nil) || isRuntimeUserAbsentError(errors.New("other")) {
 		t.Fatalf("unexpected absent error match")
 	}
+	for _, errText := range []string{"user already exists", "proxy/vless: User alice@global already exists."} {
+		if !isRuntimeUserAlreadyPresentError(errors.New(errText)) {
+			t.Fatalf("expected already-present error match for %q", errText)
+		}
+	}
+	if isRuntimeUserAlreadyPresentError(nil) || isRuntimeUserAlreadyPresentError(errors.New("other")) {
+		t.Fatalf("unexpected already-present error match")
+	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusInternalServerError} {

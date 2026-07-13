@@ -523,6 +523,10 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 					continue
 				}
 				if err := d.runtime.AddUser(r.Context(), policy.InboundTag, policy.Email, policy.UUID); err != nil {
+					if isRuntimeUserAlreadyPresentError(err) {
+						resp["runtime_readd"] = true
+						continue
+					}
 					d.logger.Warn("quota reset runtime add failed", "email", req.Email, "inbound_tag", policy.InboundTag, "error", err)
 					d.metrics.observeQuotaEvent("manual_reset", "error")
 					writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
