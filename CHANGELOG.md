@@ -4,11 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.4
+
+### Security
+- Bumped the GitHub Actions toolchain and Go dependencies from the superseded dependency PRs.
+- Bumped the Go toolchain requirement from `1.26.4` to `1.26.5` to clear the reachable `crypto/tls` finding reported by `govulncheck`.
+
+### Fixed
+- The Ansible security role now persists `nf_conntrack` module loading through `/etc/modules-load.d/98-ovpn-conntrack.conf`, so conntrack sysctl limits are applied reliably after reboot.
+- Quota reset and automatic quota unblock now treat "runtime user already exists" from Xray as an idempotent success. This lets operators reset or re-enable a user when the remote runtime already contains the user but local quota state still marks them as blocked.
+
 ## 1.7.3
 
 ### Fixed
 - `ovpn server monitor telegram-setup` now force-recreates the `ovpn-telegram-bot` container immediately after uploading the new token file, so the bot always starts with the correct token. Previously the deploy step could start the bot with the old on-disk token before the new token was written, and the subsequent `monitor up` call did not force-recreate the already-running container.
-- Quota reset and automatic quota unblock now treat "runtime user already exists" from Xray as an idempotent success. This lets operators reset or re-enable a user when the remote runtime already contains the user but local quota state still marks them as blocked.
 
 ### Docs
 - Expanded `docs/monitoring.md` Telegram setup section with step-by-step BotFather bot creation instructions and a `@RawDataBot` tip for finding your numeric Telegram user ID (`owner-user-id`).
