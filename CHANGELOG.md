@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.7.4
+
+### Security
+- Bumped the GitHub Actions toolchain and Go dependencies from the superseded dependency PRs.
+- Bumped the Go toolchain requirement from `1.26.4` to `1.26.5` to clear the reachable `crypto/tls` finding reported by `govulncheck`.
+
+### Fixed
+- The Ansible security role now persists `nf_conntrack` module loading through `/etc/modules-load.d/98-ovpn-conntrack.conf`, so conntrack sysctl limits are applied reliably after reboot.
+- Quota reset and automatic quota unblock now treat "runtime user already exists" from Xray as an idempotent success. This lets operators reset or re-enable a user when the remote runtime already contains the user but local quota state still marks them as blocked.
+
 ## 1.7.3
 
 ### Fixed

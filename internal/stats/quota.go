@@ -169,6 +169,9 @@ func (q *QuotaEnforcer) runtimeAdd(ctx context.Context, inboundTag, email, uuid 
 		return fmt.Errorf("runtime identity is incomplete")
 	}
 	if err := q.Runtime.AddUser(ctx, inboundTag, email, uuid); err != nil {
+		if isRuntimeAlreadyPresentError(err) {
+			return nil
+		}
 		q.recordEvent("unblock", "error")
 		return err
 	}
@@ -218,4 +221,13 @@ func combineFirst(current error, next error) error {
 		return current
 	}
 	return next
+}
+
+func isRuntimeAlreadyPresentError(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(text, "already exists") ||
+		strings.Contains(text, "already exist")
 }

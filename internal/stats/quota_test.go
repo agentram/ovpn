@@ -166,6 +166,49 @@ func TestQuotaEnforcerUnblocksWhenUsageFallsOutsideRollingWindow(t *testing.T) {
 	}
 }
 
+func TestQuotaEnforcerUnblockTreatsAlreadyExistsAsSuccess(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	store, err := remote.Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	quota := int64(100)
+	if err := store.ReplaceQuotaPolicies(ctx, []model.QuotaUserPolicy{{
+		Email:            "alice@example.com",
+		UUID:             "uuid-alice",
+		InboundTag:       "vless-reality",
+		QuotaEnabled:     true,
+		MonthlyQuotaByte: &quota,
+	}}); err != nil {
+		t.Fatalf("replace quota policies: %v", err)
+	}
+	blockedAt := time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC)
+	if err := store.SetQuotaBlocked(ctx, "alice@example.com", true, &blockedAt); err != nil {
+		t.Fatalf("set blocked: %v", err)
+	}
+
+	rt := &fakeRuntimeManager{addErr: errors.New("rpc error: code = Unknown desc = proxy/vless: User alice@example.com already exists.")}
+	enforcer := &QuotaEnforcer{Store: store, Runtime: rt}
+	now := blockedAt.Add(5 * time.Minute)
+	if err := enforcer.Enforce(ctx, now); err != nil {
+		t.Fatalf("enforce should treat already-present runtime user as unblocked: %v", err)
+	}
+	if len(rt.adds) != 1 || rt.adds[0] != "alice@example.com" {
+		t.Fatalf("expected runtime add attempt, got %+v", rt.adds)
+	}
+	state, ok, err := store.GetQuotaState(ctx, "alice@example.com")
+	if err != nil {
+		t.Fatalf("get quota state: %v", err)
+	}
+	if !ok || state.Blocked {
+		t.Fatalf("expected block cleared, state=%+v ok=%v", state, ok)
+	}
+}
+
 func TestQuotaEnforcerClearsBlockWhenQuotaIsDisabled(t *testing.T) {
 	t.Parallel()
 
@@ -371,5 +414,11 @@ func TestQuotaEnforcerNilAndIncompleteRuntimeIdentity(t *testing.T) {
 	}
 	if err := combineFirst(nil, errors.New("second")); err == nil || err.Error() != "second" {
 		t.Fatalf("unexpected combine first nil result: %v", err)
+	}
+	if !isRuntimeAlreadyPresentError(errors.New("proxy/vless: User alice@example.com already exists.")) {
+		t.Fatalf("expected already-present runtime error match")
+	}
+	if isRuntimeAlreadyPresentError(errors.New("other")) {
+		t.Fatalf("unexpected already-present runtime error match")
 	}
 }

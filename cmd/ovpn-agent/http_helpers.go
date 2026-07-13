@@ -112,6 +112,15 @@ func isRuntimeUserAbsentError(err error) bool {
 		strings.Contains(text, "failed to remove") && strings.Contains(text, "user")
 }
 
+func isRuntimeUserAlreadyPresentError(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(text, "already exists") ||
+		strings.Contains(text, "already exist")
+}
+
 // postNotifyEvent delivers a NotifyEvent to the local Telegram bot notify endpoint with a short timeout.
 func postNotifyEvent(ctx context.Context, payload telegrambot.NotifyEvent) error {
 	raw, err := json.Marshal(payload)
