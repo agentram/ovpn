@@ -202,6 +202,15 @@
       changed_when: false
       when: not ansible_check_mode
 
+    - name: Persist nf_conntrack module loading
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/98-ovpn-conntrack.conf
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          nf_conntrack
+
     - name: Persist conntrack sysctl settings
       ansible.builtin.copy:
         dest: /etc/sysctl.d/98-ovpn-conntrack.conf
