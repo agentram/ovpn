@@ -167,6 +167,7 @@ Anyone who has them can use that profile until you disable or remove the user.
 
 New REALITY/TLS links use `fp=firefox` by default. Existing imported client profiles are not changed.
 Use `--fingerprint` when you need a specific supported client fingerprint. Use `--spider-x` only for REALITY profiles; if omitted, ovpn generates a stable per-user path.
+The self-SNI profile uses normal TLS SNI and fallback routing, so `--spider-x` is rejected for `vless-tcp-tls-selfsni-web`.
 
 Transport profiles are server-side opt-in. See [`docs/transports.md`](transports.md) for the profile list, client compatibility notes, and rollout workflow.
 

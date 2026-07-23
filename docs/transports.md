@@ -77,6 +77,19 @@ Operators can still generate explicit variants:
 ```
 
 `--spider-x` is only for REALITY profiles. If omitted, ovpn generates a stable per-user path, so re-running link export does not create a different client profile each time.
+If you want the client spider to start from the target site's root or from a known real path, pass it explicitly, for example `--spider-x /`.
+
+Profile-specific client fields:
+
+| profile | `--fingerprint` | `--spider-x` | SNI source |
+| --- | --- | --- | --- |
+| `vless-reality-tcp-vision` | yes | yes | `reality_server_name` |
+| `vless-reality-xhttp` | yes | yes | `reality_server_name` |
+| `vless-tcp-tls-selfsni-web` | yes | no | server domain |
+| `vless-xhttp-plain` | no | no | none |
+
+Passing an unsupported field fails before ovpn prints a link or writes a QR code.
+For example, `--spider-x` with `vless-tcp-tls-selfsni-web` fails because self-SNI uses normal TLS and fallback routing, not REALITY spidering.
 
 Export all enabled profiles for a user:
 

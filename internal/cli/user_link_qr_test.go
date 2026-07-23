@@ -285,6 +285,30 @@ func TestUserLinkRejectsFingerprintAndSpiderXForPlainXHTTP(t *testing.T) {
 	}
 }
 
+func TestUserLinkRejectsSpiderXForTLSSelfSNI(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.Domain = "example.org"
+	srv.PrimaryProfile = model.TransportProfileTLSSelfSNIWeb
+	srv.EnabledProfiles = model.TransportProfileTLSSelfSNIWeb
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileTLSSelfSNIWeb, "--spider-x", "/assets/test.js", "--qr=false"})
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "--spider-x is only supported for REALITY profiles") || !strings.Contains(err.Error(), model.TransportProfileTLSSelfSNIWeb) {
+		t.Fatalf("expected unsupported spider-x for TLS self-SNI profile, err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("bad profile option should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
 func TestUserLinkRejectsUnknownExplicitTransportProfile(t *testing.T) {
 	app := newTestAppWithLinkedUser(t)
 	cmd := app.newUserLinkCmd()
