@@ -12,26 +12,29 @@ import (
 )
 
 type Spec struct {
-	Role                  string
-	ProxyPreset           string
-	Domain                string
-	RealityPrivateKey     string
-	RealityServerName     string
-	RealityTarget         string
-	RealityPublicKey      string
-	SecurityProfile       string
-	ThreatDNSServers      []string
-	LimitFallbackUpload   *FallbackRateLimit
-	LimitFallbackDownload *FallbackRateLimit
-	ShortIDs              []string
-	EnabledProfiles       []string
-	APIListen             string
-	APIPort               int
-	LogLevel              string
-	AccessLogPath         string
-	Users                 []model.User
-	ServiceUsers          []ServiceUser
-	ProxyRelay            *ProxyRelay
+	Role                   string
+	ProxyPreset            string
+	Domain                 string
+	RealityPrivateKey      string
+	RealityServerName      string
+	RealityTarget          string
+	RealityPublicKey       string
+	SecurityProfile        string
+	ThreatDNSServers       []string
+	LimitFallbackUpload    *FallbackRateLimit
+	LimitFallbackDownload  *FallbackRateLimit
+	ShortIDs               []string
+	EnabledProfiles        []string
+	APIListen              string
+	APIPort                int
+	LogLevel               string
+	AccessLogPath          string
+	TLSSelfSNICertFile     string
+	TLSSelfSNIKeyFile      string
+	TLSSelfSNIFallbackDest string
+	Users                  []model.User
+	ServiceUsers           []ServiceUser
+	ProxyRelay             *ProxyRelay
 }
 
 type FallbackRateLimit struct {
@@ -68,6 +71,10 @@ type XrayConfig struct {
 const (
 	SecurityProfileMinimal = "minimal"
 	SecurityProfileOff     = "off"
+
+	DefaultTLSSelfSNICertFile     = "/etc/xray/certs/fullchain.pem"
+	DefaultTLSSelfSNIKeyFile      = "/etc/xray/certs/privkey.pem"
+	DefaultTLSSelfSNIFallbackDest = "ovpn-web:8080"
 )
 
 var defaultThreatDNSServers = []string{"9.9.9.9", "149.112.112.112"}
@@ -82,6 +89,18 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	if spec.SecurityProfile == SecurityProfileMinimal && len(spec.ThreatDNSServers) == 0 {
 		spec.ThreatDNSServers = append([]string(nil), defaultThreatDNSServers...)
 	}
+	spec.EnabledProfiles = normalizeEnabledProfiles(spec.EnabledProfiles)
+	if includesProfile(spec.EnabledProfiles, model.TransportProfileTLSSelfSNIWeb) {
+		if strings.TrimSpace(spec.TLSSelfSNICertFile) == "" {
+			spec.TLSSelfSNICertFile = DefaultTLSSelfSNICertFile
+		}
+		if strings.TrimSpace(spec.TLSSelfSNIKeyFile) == "" {
+			spec.TLSSelfSNIKeyFile = DefaultTLSSelfSNIKeyFile
+		}
+		if strings.TrimSpace(spec.TLSSelfSNIFallbackDest) == "" {
+			spec.TLSSelfSNIFallbackDest = DefaultTLSSelfSNIFallbackDest
+		}
+	}
 	if err := ValidateSpec(spec); err != nil {
 		return nil, err
 	}
@@ -91,13 +110,14 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 	if spec.APIPort == 0 {
 		spec.APIPort = 10085
 	}
-	if len(spec.ShortIDs) == 0 {
+	if profilesNeedReality(spec.EnabledProfiles) && len(spec.ShortIDs) == 0 {
 		return nil, fmt.Errorf("at least one short ID is required")
 	}
-	spec.EnabledProfiles = normalizeEnabledProfiles(spec.EnabledProfiles)
 	// Backward compatibility: older ovpn versions persisted REALITY keys in std-base64.
 	// Normalize to URL-safe raw base64 before rendering, so existing local DB state still deploys.
-	spec.RealityPrivateKey = normalizeX25519KeyBase64(spec.RealityPrivateKey)
+	if profilesNeedReality(spec.EnabledProfiles) {
+		spec.RealityPrivateKey = normalizeX25519KeyBase64(spec.RealityPrivateKey)
+	}
 	users := buildClientUsers(spec.Users, spec.ServiceUsers, "xtls-rprx-vision")
 	plainUsers := buildClientUsers(spec.Users, spec.ServiceUsers, "")
 
@@ -172,7 +192,16 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 		},
 		Outbounds: baseOutbounds(spec),
 	}
-	cfg.Inbounds = append(cfg.Inbounds, buildProfileInbounds(spec.EnabledProfiles, users, plainUsers, realitySettings)...)
+	tlsSelfSNISettings := map[string]any{
+		"alpn": []string{"http/1.1"},
+		"certificates": []any{
+			map[string]any{
+				"certificateFile": spec.TLSSelfSNICertFile,
+				"keyFile":         spec.TLSSelfSNIKeyFile,
+			},
+		},
+	}
+	cfg.Inbounds = append(cfg.Inbounds, buildProfileInbounds(spec.EnabledProfiles, users, plainUsers, realitySettings, tlsSelfSNISettings, spec.TLSSelfSNIFallbackDest)...)
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		cfg.DNS = map[string]any{
 			"queryStrategy": "UseIPv4",
@@ -272,7 +301,7 @@ func normalizeEnabledProfiles(raw []string) []string {
 	return out
 }
 
-func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plainUsers []map[string]any, realitySettings map[string]any) []any {
+func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plainUsers []map[string]any, realitySettings map[string]any, tlsSelfSNISettings map[string]any, tlsSelfSNIFallbackDest string) []any {
 	out := make([]any, 0, len(profiles))
 	for _, profile := range profiles {
 		switch profile {
@@ -301,21 +330,39 @@ func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plain
 					"mode": "auto",
 				},
 			}))
+		case model.TransportProfileTLSSelfSNIWeb:
+			out = append(out, vlessInboundWithSettings("vless-tcp-tls-selfsni-web", 443, visionUsers, map[string]any{
+				"network":     "tcp",
+				"security":    "tls",
+				"tlsSettings": tlsSelfSNISettings,
+			}, map[string]any{
+				"fallbacks": []any{
+					map[string]any{"dest": tlsSelfSNIFallbackDest},
+				},
+			}))
 		}
 	}
 	return out
 }
 
 func vlessInbound(tag string, port int, users []map[string]any, streamSettings map[string]any) map[string]any {
+	return vlessInboundWithSettings(tag, port, users, streamSettings, nil)
+}
+
+func vlessInboundWithSettings(tag string, port int, users []map[string]any, streamSettings map[string]any, extraSettings map[string]any) map[string]any {
+	settings := map[string]any{
+		"clients":    users,
+		"decryption": "none",
+	}
+	for k, v := range extraSettings {
+		settings[k] = v
+	}
 	return map[string]any{
-		"tag":      tag,
-		"listen":   "0.0.0.0",
-		"port":     port,
-		"protocol": "vless",
-		"settings": map[string]any{
-			"clients":    users,
-			"decryption": "none",
-		},
+		"tag":            tag,
+		"listen":         "0.0.0.0",
+		"port":           port,
+		"protocol":       "vless",
+		"settings":       settings,
 		"streamSettings": streamSettings,
 		"sniffing": map[string]any{
 			"enabled":      true,
@@ -469,20 +516,26 @@ func ValidateSpec(spec Spec) error {
 	if spec.SecurityProfile == "" {
 		spec.SecurityProfile = SecurityProfileMinimal
 	}
+	spec.EnabledProfiles = normalizeEnabledProfiles(spec.EnabledProfiles)
 	if spec.SecurityProfile != SecurityProfileMinimal && spec.SecurityProfile != SecurityProfileOff {
 		return fmt.Errorf("security profile must be %q or %q", SecurityProfileMinimal, SecurityProfileOff)
 	}
-	if strings.TrimSpace(spec.RealityPrivateKey) == "" {
-		return fmt.Errorf("reality private key is required")
-	}
-	if strings.TrimSpace(spec.RealityServerName) == "" {
-		return fmt.Errorf("reality server name is required")
-	}
-	if strings.Contains(spec.RealityServerName, "*") {
-		return fmt.Errorf("reality server name must not contain wildcard '*'")
-	}
-	if strings.TrimSpace(spec.RealityTarget) == "" {
-		return fmt.Errorf("reality target is required")
+	if profilesNeedReality(spec.EnabledProfiles) {
+		if strings.TrimSpace(spec.RealityPrivateKey) == "" {
+			return fmt.Errorf("reality private key is required")
+		}
+		if strings.TrimSpace(spec.RealityServerName) == "" {
+			return fmt.Errorf("reality server name is required")
+		}
+		if strings.Contains(spec.RealityServerName, "*") {
+			return fmt.Errorf("reality server name must not contain wildcard '*'")
+		}
+		if strings.TrimSpace(spec.RealityTarget) == "" {
+			return fmt.Errorf("reality target is required")
+		}
+		if len(spec.ShortIDs) == 0 {
+			return fmt.Errorf("at least one short ID is required")
+		}
 	}
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		if len(spec.ThreatDNSServers) == 0 {
@@ -508,9 +561,6 @@ func ValidateSpec(spec Spec) error {
 			return fmt.Errorf("limitFallbackDownload values must be >= 0")
 		}
 	}
-	if len(spec.ShortIDs) == 0 {
-		return fmt.Errorf("at least one short ID is required")
-	}
 	for _, raw := range spec.EnabledProfiles {
 		if model.NormalizeTransportProfile(raw) == "" {
 			return fmt.Errorf("unsupported transport profile %q", raw)
@@ -518,6 +568,23 @@ func ValidateSpec(spec Spec) error {
 	}
 	if includesProfile(spec.EnabledProfiles, model.TransportProfileWSTLSWeb) {
 		return fmt.Errorf("%s profile requires a TLS web front end and is not renderable yet", model.TransportProfileWSTLSWeb)
+	}
+	if includesProfile(spec.EnabledProfiles, model.TransportProfileTLSSelfSNIWeb) {
+		if includesProfile(spec.EnabledProfiles, model.TransportProfileRealityTCPVision) {
+			return fmt.Errorf("%s conflicts with %s because both require 443/tcp; disable one profile before deploy", model.TransportProfileTLSSelfSNIWeb, model.TransportProfileRealityTCPVision)
+		}
+		if spec.Role == model.ServerRoleProxy {
+			return fmt.Errorf("%s is only supported on vpn servers", model.TransportProfileTLSSelfSNIWeb)
+		}
+		if strings.TrimSpace(spec.Domain) == "" {
+			return fmt.Errorf("%s requires server domain for TLS SNI", model.TransportProfileTLSSelfSNIWeb)
+		}
+		if strings.TrimSpace(spec.TLSSelfSNICertFile) == "" || strings.TrimSpace(spec.TLSSelfSNIKeyFile) == "" {
+			return fmt.Errorf("%s requires TLS certificate and key files", model.TransportProfileTLSSelfSNIWeb)
+		}
+		if strings.TrimSpace(spec.TLSSelfSNIFallbackDest) == "" {
+			return fmt.Errorf("%s requires fallback destination", model.TransportProfileTLSSelfSNIWeb)
+		}
 	}
 	if spec.Role != "" && spec.Role != model.ServerRoleVPN && spec.Role != model.ServerRoleProxy {
 		return fmt.Errorf("role must be %q or %q", model.ServerRoleVPN, model.ServerRoleProxy)
@@ -562,6 +629,16 @@ func includesProfile(profiles []string, want string) bool {
 	want = model.NormalizeTransportProfile(want)
 	for _, profile := range profiles {
 		if model.NormalizeTransportProfile(profile) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func profilesNeedReality(profiles []string) bool {
+	for _, profile := range normalizeEnabledProfiles(profiles) {
+		meta, ok := model.LookupTransportProfile(profile)
+		if ok && meta.Kind == "reality" {
 			return true
 		}
 	}
@@ -623,6 +700,17 @@ func BuildVLESSLink(in LinkInput) string {
 			in.Address,
 			in.Port,
 			url.QueryEscape("/"),
+			urlEscapeLabel(label),
+		)
+	case model.TransportProfileTLSSelfSNIWeb:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?security=tls&encryption=none&fp=chrome&type=tcp&flow=%s&sni=%s&alpn=%s&headerType=none#%s",
+			in.UUID,
+			in.Address,
+			in.Port,
+			in.Flow,
+			in.ServerName,
+			url.QueryEscape("http/1.1"),
 			urlEscapeLabel(label),
 		)
 	}

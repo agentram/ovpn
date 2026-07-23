@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+domain="{{ ovpn_camouflage_domain | default(ovpn_domain | default(inventory_hostname)) }}"
+cert_dir="{{ ovpn_camouflage_cert_dir | default(ovpn_deploy_root ~ '/certs') }}"
+live_dir="/etc/letsencrypt/live/$domain"
+
+if [ ! -f "$live_dir/fullchain.pem" ] || [ ! -f "$live_dir/privkey.pem" ]; then
+  echo "missing certificate for $domain in $live_dir" >&2
+  exit 1
+fi
+
+install -d -m 0755 "$cert_dir"
+install -m 0644 "$live_dir/fullchain.pem" "$cert_dir/fullchain.pem"
+install -m 0640 -o root -g 65532 "$live_dir/privkey.pem" "$cert_dir/privkey.pem"
+
+if command -v docker >/dev/null 2>&1 &&
+   docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep -qx ovpn-xray &&
+   [ -f "{{ ovpn_deploy_root }}/docker-compose.yml" ]; then
+  cd "{{ ovpn_deploy_root }}"
+  docker compose --env-file .env -f docker-compose.yml up -d --force-recreate xray
+fi

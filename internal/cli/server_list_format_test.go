@@ -11,25 +11,25 @@ func TestRenderServerListTableIncludesHeaders(t *testing.T) {
 	out := renderServerListTable([]model.Server{
 		{
 			ID:          2,
-			Name:        "germany-1",
+			Name:        "vpn-a",
 			Role:        model.ServerRoleVPN,
-			Host:        "92.51.37.146",
-			Domain:      "germany-1.masterandmargarita.webtm.ru",
+			Host:        "203.0.113.10",
+			Domain:      "vpn-a.example.net",
 			XrayVersion: "26.3.27",
 			Enabled:     true,
 		},
 		{
 			ID:          5,
-			Name:        "italy-1",
+			Name:        "vpn-b",
 			Role:        model.ServerRoleVPN,
-			Host:        "188.213.171.179",
-			Domain:      "olproject.com.ru",
+			Host:        "203.0.113.11",
+			Domain:      "vpn-b.example.net",
 			XrayVersion: "26.3.27",
 			Enabled:     true,
 		},
 	})
 
-	for _, want := range []string{"ID", "NAME", "ROLE", "HOST", "DOMAIN", "XRAY", "STATE", "italy-1", "olproject.com.ru", "enabled"} {
+	for _, want := range []string{"ID", "NAME", "ROLE", "HOST", "DOMAIN", "XRAY", "STATE", "vpn-b", "vpn-b.example.net", "enabled"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("expected %q in server table:\n%s", want, out)
 		}

@@ -32,6 +32,7 @@ type Input struct {
 	XrayImage                    string
 	AgentImage                   string
 	TelegramBotImage             string
+	WebImage                     string
 	HAProxyImage                 string
 	AgentLogLevel                string
 	AgentToken                   string
@@ -43,6 +44,8 @@ type Input struct {
 	ConnectionDiagnostics        string
 	XrayAccessLogPath            string
 	XrayAccessLogMaxBytes        string
+	TLSSelfSNICertDir            string
+	TLSSelfSNISiteDir            string
 	PrometheusImage              string
 	AlertmanagerImage            string
 	GrafanaImage                 string
@@ -77,6 +80,7 @@ func (in *Input) applyDefaults() {
 		in.AgentImage = defaults.DefaultAgentImage
 	}
 	in.TelegramBotImage = defaultString(in.TelegramBotImage, defaults.DefaultTelegramBotImage)
+	in.WebImage = defaultString(in.WebImage, defaults.DefaultWebImage)
 	in.HAProxyImage = defaultString(in.HAProxyImage, defaults.DefaultHAProxyImage)
 	in.AgentLogLevel = defaultString(in.AgentLogLevel, "info")
 	in.AgentHostPort = defaultString(in.AgentHostPort, "19000")
@@ -86,6 +90,8 @@ func (in *Input) applyDefaults() {
 	in.ConnectionDiagnostics = defaultString(in.ConnectionDiagnostics, "basic")
 	in.XrayAccessLogPath = defaultString(in.XrayAccessLogPath, "/var/log/ovpn/xray-access.log")
 	in.XrayAccessLogMaxBytes = defaultString(in.XrayAccessLogMaxBytes, "31457280")
+	in.TLSSelfSNICertDir = defaultString(in.TLSSelfSNICertDir, "/opt/ovpn/certs")
+	in.TLSSelfSNISiteDir = defaultString(in.TLSSelfSNISiteDir, "/opt/ovpn/camouflage-site")
 	in.PrometheusImage = defaultString(in.PrometheusImage, defaults.DefaultPrometheusImage)
 	in.AlertmanagerImage = defaultString(in.AlertmanagerImage, defaults.DefaultAlertmanagerImage)
 	in.GrafanaImage = defaultString(in.GrafanaImage, defaults.DefaultGrafanaImage)
@@ -134,6 +140,80 @@ func injectXrayProfilePorts(composeTpl []byte, profiles []string) []byte {
 	return []byte(strings.Replace(text, needle, needle+strings.Join(extra, "\n")+"\n", 1))
 }
 
+func usesTLSSelfSNIProfile(profiles []string) bool {
+	for _, profile := range profiles {
+		if model.NormalizeTransportProfile(profile) == model.TransportProfileTLSSelfSNIWeb {
+			return true
+		}
+	}
+	return false
+}
+
+func injectTLSSelfSNIWeb(composeTpl []byte, profiles []string) []byte {
+	if !usesTLSSelfSNIProfile(profiles) {
+		return composeTpl
+	}
+	text := string(composeTpl)
+	volumeMarker := "      # OVPN_XRAY_TLS_SELFSNI_VOLUMES\n"
+	if strings.Contains(text, volumeMarker) {
+		volumes := strings.Join([]string{
+			"      - ${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}:/etc/xray/certs:ro",
+			volumeMarker[:len(volumeMarker)-1],
+		}, "\n") + "\n"
+		text = strings.Replace(text, volumeMarker, volumes, 1)
+	}
+	dependsMarker := "    # OVPN_XRAY_TLS_SELFSNI_DEPENDS_ON\n"
+	if strings.Contains(text, dependsMarker) {
+		depends := strings.Join([]string{
+			"    depends_on:",
+			"      - ovpn-web",
+			dependsMarker[:len(dependsMarker)-1],
+		}, "\n") + "\n"
+		text = strings.Replace(text, dependsMarker, depends, 1)
+	}
+	serviceMarker := "  # OVPN_CAMOUFLAGE_WEB_SERVICE\n"
+	if strings.Contains(text, serviceMarker) {
+		webService := `  ovpn-web:
+    image: ${OVPN_WEB_IMAGE}
+    container_name: ovpn-web
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - ${OVPN_CAMOUFLAGE_SITE_DIR:-/opt/ovpn/camouflage-site}:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+    networks:
+      - ovpn-net
+
+`
+		text = strings.Replace(text, serviceMarker, webService+serviceMarker, 1)
+	}
+	return []byte(text)
+}
+
+func camouflageNginxConfig() string {
+	return `server {
+  listen 8080;
+  server_name _;
+
+  access_log off;
+  error_log /var/log/nginx/error.log warn;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
+`
+}
+
 type Bundle struct {
 	Dir       string
 	ConfigRaw []byte
@@ -144,26 +224,29 @@ func RenderBundle(in Input) (*Bundle, error) {
 	in.applyDefaults()
 
 	spec := xraycfg.Spec{
-		Role:                  in.Server.NormalizedRole(),
-		ProxyPreset:           in.Server.NormalizedProxyPreset(),
-		Domain:                in.Server.Domain,
-		RealityPrivateKey:     in.Server.RealityPrivateKey,
-		RealityPublicKey:      in.Server.RealityPublicKey,
-		RealityServerName:     in.Server.RealityServerName,
-		RealityTarget:         in.Server.RealityTarget,
-		ServiceUsers:          append([]xraycfg.ServiceUser(nil), in.ServiceUsers...),
-		ProxyRelay:            in.ProxyRelay,
-		SecurityProfile:       in.SecurityProfile,
-		ThreatDNSServers:      append([]string(nil), in.ThreatDNSServers...),
-		LimitFallbackUpload:   in.RealityLimitFallbackUpload,
-		LimitFallbackDownload: in.RealityLimitFallbackDownload,
-		ShortIDs:              util.ParseCSV(in.Server.RealityShortIDs),
-		EnabledProfiles:       in.Server.NormalizedEnabledProfiles(),
-		APIListen:             "0.0.0.0",
-		APIPort:               10085,
-		LogLevel:              in.XrayLogLevel,
-		AccessLogPath:         accessLogPathForDiagnostics(in.ConnectionDiagnostics, in.XrayAccessLogPath),
-		Users:                 in.Users,
+		Role:                   in.Server.NormalizedRole(),
+		ProxyPreset:            in.Server.NormalizedProxyPreset(),
+		Domain:                 in.Server.Domain,
+		RealityPrivateKey:      in.Server.RealityPrivateKey,
+		RealityPublicKey:       in.Server.RealityPublicKey,
+		RealityServerName:      in.Server.RealityServerName,
+		RealityTarget:          in.Server.RealityTarget,
+		ServiceUsers:           append([]xraycfg.ServiceUser(nil), in.ServiceUsers...),
+		ProxyRelay:             in.ProxyRelay,
+		SecurityProfile:        in.SecurityProfile,
+		ThreatDNSServers:       append([]string(nil), in.ThreatDNSServers...),
+		LimitFallbackUpload:    in.RealityLimitFallbackUpload,
+		LimitFallbackDownload:  in.RealityLimitFallbackDownload,
+		ShortIDs:               util.ParseCSV(in.Server.RealityShortIDs),
+		EnabledProfiles:        in.Server.NormalizedEnabledProfiles(),
+		APIListen:              "0.0.0.0",
+		APIPort:                10085,
+		LogLevel:               in.XrayLogLevel,
+		AccessLogPath:          accessLogPathForDiagnostics(in.ConnectionDiagnostics, in.XrayAccessLogPath),
+		TLSSelfSNICertFile:     xraycfg.DefaultTLSSelfSNICertFile,
+		TLSSelfSNIKeyFile:      xraycfg.DefaultTLSSelfSNIKeyFile,
+		TLSSelfSNIFallbackDest: xraycfg.DefaultTLSSelfSNIFallbackDest,
+		Users:                  in.Users,
 	}
 	configRaw := in.RenderedOverride
 	if len(configRaw) == 0 {
@@ -181,6 +264,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		"xray",
 		"agent",
 		"logs",
+		"web",
 		"haproxy",
 		"geodata",
 		"monitoring/prometheus/rules",
@@ -211,8 +295,14 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	composeTpl = injectXrayProfilePorts(composeTpl, in.Server.NormalizedEnabledProfiles())
+	composeTpl = injectTLSSelfSNIWeb(composeTpl, in.Server.NormalizedEnabledProfiles())
 	if err := os.WriteFile(filepath.Join(tmpDir, "docker-compose.yml"), composeTpl, 0o644); err != nil {
 		return nil, err
+	}
+	if usesTLSSelfSNIProfile(in.Server.NormalizedEnabledProfiles()) {
+		if err := os.WriteFile(filepath.Join(tmpDir, "web", "nginx.conf"), []byte(camouflageNginxConfig()), 0o644); err != nil {
+			return nil, err
+		}
 	}
 	monitoringComposeTpl, err := AssetFS.ReadFile("templates/docker-compose.monitoring.yml.tmpl")
 	if err != nil {
@@ -222,10 +312,11 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	envContent := fmt.Sprintf(
-		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_TOKEN=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nOVPN_CONNECTION_DIAGNOSTICS=%s\nOVPN_XRAY_ACCESS_LOG=%s\nOVPN_XRAY_ACCESS_LOG_MAX_BYTES=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
+		"XRAY_IMAGE=%s\nOVPN_AGENT_IMAGE=%s\nOVPN_TELEGRAM_BOT_IMAGE=%s\nOVPN_WEB_IMAGE=%s\nHAPROXY_IMAGE=%s\nOVPN_AGENT_LOG_LEVEL=%s\nOVPN_AGENT_TOKEN=%s\nOVPN_AGENT_HOST_PORT=%s\nOVPN_TELEGRAM_BOT_HOST_PORT=%s\nOVPN_AGENT_CERT_FILE=%s\nOVPN_CERT_FULLCHAIN_PATH=%s\nOVPN_CONNECTION_DIAGNOSTICS=%s\nOVPN_XRAY_ACCESS_LOG=%s\nOVPN_XRAY_ACCESS_LOG_MAX_BYTES=%s\nOVPN_TLS_SELFSNI_CERT_DIR=%s\nOVPN_CAMOUFLAGE_SITE_DIR=%s\nPROMETHEUS_IMAGE=%s\nALERTMANAGER_IMAGE=%s\nGRAFANA_IMAGE=%s\nNODE_EXPORTER_IMAGE=%s\nCADVISOR_IMAGE=%s\nGRAFANA_ADMIN_USER=%s\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=%s\nOVPN_TELEGRAM_NOTIFY_CHAT_IDS=%s\nOVPN_TELEGRAM_OWNER_USER_ID=%s\nOVPN_TELEGRAM_CLIENTS_PDF_PATH=%s\nOVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=%s\nOVPN_TELEGRAM_API_FALLBACK_IPS=%s\nOVPN_TELEGRAM_HAPROXY_URL=%s\n",
 		in.XrayImage,
 		in.AgentImage,
 		in.TelegramBotImage,
+		in.WebImage,
 		in.HAProxyImage,
 		in.AgentLogLevel,
 		in.AgentToken,
@@ -236,6 +327,8 @@ func RenderBundle(in Input) (*Bundle, error) {
 		in.ConnectionDiagnostics,
 		in.XrayAccessLogPath,
 		in.XrayAccessLogMaxBytes,
+		in.TLSSelfSNICertDir,
+		in.TLSSelfSNISiteDir,
 		in.PrometheusImage,
 		in.AlertmanagerImage,
 		in.GrafanaImage,

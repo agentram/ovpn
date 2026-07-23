@@ -1,0 +1,70 @@
+---
+- name: Resolve camouflage domain
+  ansible.builtin.set_fact:
+    security_camouflage_domain: "{{ ovpn_camouflage_domain | default(ovpn_domain | default(inventory_hostname)) }}"
+
+- name: Validate camouflage settings
+  ansible.builtin.assert:
+    that:
+      - security_camouflage_domain | length > 0
+      - ovpn_deploy_root | default('') | length > 0
+    fail_msg: "Set ovpn_camouflage_domain or ovpn_domain and ovpn_deploy_root before enabling camouflage."
+
+- name: Install certbot for self-SNI certificates
+  ansible.builtin.apt:
+    name: certbot
+    state: present
+    update_cache: true
+
+- name: Ensure self-SNI certificate directory exists
+  ansible.builtin.file:
+    path: "{{ ovpn_camouflage_cert_dir | default(ovpn_deploy_root ~ '/certs') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Ensure camouflage site directory exists
+  ansible.builtin.file:
+    path: "{{ ovpn_camouflage_site_dir | default(ovpn_deploy_root ~ '/camouflage-site') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install camouflage fallback site
+  ansible.builtin.template:
+    src: camouflage-index.html.j2
+    dest: "{{ ovpn_camouflage_site_dir | default(ovpn_deploy_root ~ '/camouflage-site') }}/index.html"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Check existing Let's Encrypt certificate
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ security_camouflage_domain }}/fullchain.pem"
+  register: security_camouflage_cert
+
+- name: Issue self-SNI certificate with HTTP-01
+  ansible.builtin.command:
+    cmd: >-
+      certbot certonly --standalone --preferred-challenges http
+      -d {{ security_camouflage_domain }}
+      --non-interactive --agree-tos
+      {{ ('--email ' ~ ovpn_camouflage_cert_email) if (ovpn_camouflage_cert_email | default('') | length > 0) else '--register-unsafely-without-email' }}
+  when:
+    - not ansible_check_mode
+    - not security_camouflage_cert.stat.exists
+
+- name: Install self-SNI certificate deploy hook
+  ansible.builtin.template:
+    src: ovpn-camouflage-cert-deploy.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/ovpn-camouflage-cert.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Sync self-SNI certificate into ovpn runtime directory
+  ansible.builtin.command: /etc/letsencrypt/renewal-hooks/deploy/ovpn-camouflage-cert.sh
+  changed_when: false
+  when: not ansible_check_mode

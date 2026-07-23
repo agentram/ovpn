@@ -167,6 +167,22 @@ func TestBuildVLESSLinkProfiles(t *testing.T) {
 	if strings.Contains(plainXHTTP, "pbk=") || strings.Contains(plainXHTTP, "sni=") || strings.Contains(plainXHTTP, "sid=") {
 		t.Fatalf("plain xhttp link should not include REALITY params: %s", plainXHTTP)
 	}
+
+	tlsSelfSNI := BuildVLESSLink(LinkInput{
+		Address:    "example.com",
+		UUID:       "11111111-1111-1111-1111-111111111111",
+		ServerName: "example.com",
+		Profile:    model.TransportProfileTLSSelfSNIWeb,
+		Label:      "ovpn tls",
+	})
+	for _, want := range []string{":443?", "security=tls", "type=tcp", "flow=xtls-rprx-vision", "sni=example.com", "alpn=http%2F1.1", "fp=chrome", "headerType=none", "#ovpn%20tls"} {
+		if !strings.Contains(tlsSelfSNI, want) {
+			t.Fatalf("tls self-sni link missing %q: %s", want, tlsSelfSNI)
+		}
+	}
+	if strings.Contains(tlsSelfSNI, "pbk=") || strings.Contains(tlsSelfSNI, "sid=") {
+		t.Fatalf("tls self-sni link should not include REALITY params: %s", tlsSelfSNI)
+	}
 }
 
 func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
@@ -216,6 +232,104 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 	plainXHTTPSettings, _ := plainStream["xhttpSettings"].(map[string]any)
 	if got := plainXHTTPSettings["path"]; got != "/" {
 		t.Fatalf("plain xhttp path = %v", got)
+	}
+}
+
+func TestRenderServerJSONIncludesTLSSelfSNIWebFallback(t *testing.T) {
+	t.Parallel()
+
+	raw, err := RenderServerJSON(Spec{
+		Domain:                 "example.com",
+		SecurityProfile:        SecurityProfileMinimal,
+		ThreatDNSServers:       []string{"9.9.9.9"},
+		EnabledProfiles:        []string{model.TransportProfileTLSSelfSNIWeb},
+		TLSSelfSNICertFile:     "/certs/fullchain.pem",
+		TLSSelfSNIKeyFile:      "/certs/privkey.pem",
+		TLSSelfSNIFallbackDest: "ovpn-web:8080",
+		Users:                  []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "u@example.com", Enabled: true}},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal rendered config: %v", err)
+	}
+	inbounds, _ := cfg["inbounds"].([]any)
+	var inbound map[string]any
+	for _, rawInbound := range inbounds {
+		candidate, _ := rawInbound.(map[string]any)
+		if candidate["tag"] == "vless-tcp-tls-selfsni-web" {
+			inbound = candidate
+			break
+		}
+	}
+	if inbound == nil {
+		t.Fatalf("expected tls self-sni inbound in %v", inbounds)
+	}
+	if got := inbound["port"]; got != float64(443) {
+		t.Fatalf("tls self-sni port = %v, want 443", got)
+	}
+	stream, _ := inbound["streamSettings"].(map[string]any)
+	if got := stream["security"]; got != "tls" {
+		t.Fatalf("tls self-sni security = %v", got)
+	}
+	tlsSettings, _ := stream["tlsSettings"].(map[string]any)
+	certs, _ := tlsSettings["certificates"].([]any)
+	if len(certs) != 1 {
+		t.Fatalf("expected one certificate entry, got %v", certs)
+	}
+	cert, _ := certs[0].(map[string]any)
+	if cert["certificateFile"] != "/certs/fullchain.pem" || cert["keyFile"] != "/certs/privkey.pem" {
+		t.Fatalf("unexpected cert config: %v", cert)
+	}
+	settings, _ := inbound["settings"].(map[string]any)
+	fallbacks, _ := settings["fallbacks"].([]any)
+	if len(fallbacks) != 1 {
+		t.Fatalf("expected one fallback, got %v", fallbacks)
+	}
+	fallback, _ := fallbacks[0].(map[string]any)
+	if got := fallback["dest"]; got != "ovpn-web:8080" {
+		t.Fatalf("fallback dest = %v, want ovpn-web:8080", got)
+	}
+	clients, _ := settings["clients"].([]any)
+	client, _ := clients[0].(map[string]any)
+	if got := client["flow"]; got != "xtls-rprx-vision" {
+		t.Fatalf("tls self-sni client flow = %v", got)
+	}
+}
+
+func TestValidateSpecRejectsTLSSelfSNIRealityPortConflict(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateSpec(Spec{
+		Domain:                 "example.com",
+		RealityPrivateKey:      "priv",
+		RealityServerName:      "www.microsoft.com",
+		RealityTarget:          "www.microsoft.com:443",
+		ShortIDs:               []string{"abcd"},
+		ThreatDNSServers:       []string{"9.9.9.9"},
+		EnabledProfiles:        []string{model.TransportProfileRealityTCPVision, model.TransportProfileTLSSelfSNIWeb},
+		TLSSelfSNICertFile:     "/certs/fullchain.pem",
+		TLSSelfSNIKeyFile:      "/certs/privkey.pem",
+		TLSSelfSNIFallbackDest: "ovpn-web:8080",
+	})
+	if err == nil || !strings.Contains(err.Error(), "conflicts") {
+		t.Fatalf("expected tls self-sni 443 conflict, got %v", err)
+	}
+}
+
+func TestValidateSpecRejectsTLSSelfSNIMissingCertificate(t *testing.T) {
+	t.Parallel()
+
+	err := ValidateSpec(Spec{
+		Domain:                 "example.com",
+		ThreatDNSServers:       []string{"9.9.9.9"},
+		EnabledProfiles:        []string{model.TransportProfileTLSSelfSNIWeb},
+		TLSSelfSNIFallbackDest: "ovpn-web:8080",
+	})
+	if err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("expected tls certificate validation error, got %v", err)
 	}
 }
 

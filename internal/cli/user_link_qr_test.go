@@ -168,6 +168,41 @@ func TestPlainXHTTPProfileLinkDoesNotRequireRealityShortID(t *testing.T) {
 	}
 }
 
+func TestTLSSelfSNIProfileLinkUsesServerDomain(t *testing.T) {
+	link, err := buildUserProfileLink(model.Server{
+		Name:            "main",
+		Host:            "203.0.113.10",
+		Domain:          "example.org",
+		PrimaryProfile:  model.TransportProfileTLSSelfSNIWeb,
+		EnabledProfiles: model.TransportProfileTLSSelfSNIWeb,
+	}, model.User{
+		Username: "alice",
+		UUID:     "11111111-1111-1111-1111-111111111111",
+	}, model.TransportProfileTLSSelfSNIWeb)
+	if err != nil {
+		t.Fatalf("TLS self-SNI link should not need REALITY material: %v", err)
+	}
+	for _, want := range []string{
+		"vless://11111111-1111-1111-1111-111111111111@example.org:443",
+		"security=tls",
+		"type=tcp",
+		"flow=xtls-rprx-vision",
+		"sni=example.org",
+		"alpn=http%2F1.1",
+		"fp=chrome",
+		"headerType=none",
+	} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("TLS self-SNI link missing %q: %s", want, link)
+		}
+	}
+	for _, forbidden := range []string{"security=reality", "pbk=", "sid="} {
+		if strings.Contains(link, forbidden) {
+			t.Fatalf("TLS self-SNI link should not contain %s: %s", forbidden, link)
+		}
+	}
+}
+
 func TestUserLinkRejectsUnknownExplicitTransportProfile(t *testing.T) {
 	app := newTestAppWithLinkedUser(t)
 	cmd := app.newUserLinkCmd()

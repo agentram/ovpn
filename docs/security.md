@@ -8,16 +8,18 @@ Recommended host model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
 - Optional XHTTP fallback profile on `13179/tcp`
+- Optional self-SNI HTTPS camouflage profile on `443/tcp`, with a real certificate and an internal static fallback site
 - SSH control plane on `22/tcp`
 - Ansible for host baseline and hardening
 - `ovpn` for runtime lifecycle
-- No external reverse-proxy or certificate-management layer is required in the recommended flow
+- No external reverse-proxy or certificate-management layer is required in the recommended REALITY flow
 
 ## Threat-surface baseline
 
 Public surface should stay minimal:
 
 - Xray transport port (`443/tcp`)
+- Optional HTTP challenge port (`80/tcp`) when self-SNI certificate issuance is enabled
 - Optional XHTTP fallback port (`13179/tcp`) when that profile is enabled
 - SSH (`22/tcp`)
 
@@ -77,6 +79,42 @@ Optional fallback rate-limit env settings:
 - `OVPN_REALITY_LIMIT_FALLBACK_DOWNLOAD_BURST_BYTES_PER_SEC`
 
 Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentionally.
+
+## Optional self-SNI HTTPS fallback
+
+The `vless-tcp-tls-selfsni-web` profile is an explicit operator choice for hosts where a normal HTTPS response on the VPN domain is useful.
+It differs from REALITY:
+
+- REALITY uses an external `reality_target` for failed-auth behavior.
+- self-SNI uses a real certificate for the server domain and Xray's VLESS TCP/TLS fallback.
+- Xray remains the only public listener on `443/tcp`.
+- The fallback web service is an internal Docker sidecar (`ovpn-web`) exposed only inside the Compose network.
+
+When `ovpn_camouflage_enabled: true`, the Ansible security role includes the separate `camouflage.yml` task file and prepares:
+
+- `/opt/ovpn/certs` for the runtime certificate/key copy
+- `/opt/ovpn/camouflage-site` for a boring static site
+- certbot issuance/renewal for the configured domain
+- a renewal deploy hook that refreshes the runtime cert files and recreates the Xray container
+- `80/tcp` firewall access for HTTP-01 certificate validation
+
+If `ovpn_manage_firewall: false`, Ansible does not manage host firewall rules.
+In that case, open `80/tcp` through your separate firewall process before certificate issuance.
+
+Keep the fallback site ordinary. Do not put VPN branding, operator notes, hidden diagnostics, tokens, or user-specific content on it.
+The goal is a normal HTTPS response for accidental traffic and simple probes, not a public control surface.
+
+The profile conflicts with `vless-reality-tcp-vision` because both use `443/tcp`.
+Ansible only prepares certificates, firewall access, and the fallback site; it does not enable the Xray profile by itself. Use `server profile switch`, then deploy and verify:
+
+```bash
+./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn deploy <server>
+./ovpn doctor <server>
+curl -vk https://<domain>/
+```
+
+Users need new links only when they switch to this profile.
 
 ## SSH and host hardening defaults
 

@@ -9,7 +9,7 @@ import (
 
 func TestRenderServerProfileTableUsesReadableColumns(t *testing.T) {
 	srv := model.Server{
-		Name:            "germany-1",
+		Name:            "vpn-a",
 		PrimaryProfile:  model.TransportProfilePlainXHTTP,
 		EnabledProfiles: model.TransportProfilePlainXHTTP + "," + model.TransportProfileRealityXHTTP,
 	}

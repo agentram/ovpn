@@ -177,6 +177,8 @@ func TestDoctorXrayConfigMountsAccessLogDir(t *testing.T) {
 		"sudo chown 65532:65532 /opt/ovpn/logs",
 		"sudo chmod 770 /opt/ovpn/logs",
 		"-v /opt/ovpn/logs:/var/log/ovpn",
+		"tls_selfsni_cert_dir=${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}",
+		":/etc/xray/certs:ro",
 	} {
 		if !strings.Contains(gotCmd, want) {
 			t.Fatalf("xray config check command missing %q: %s", want, gotCmd)

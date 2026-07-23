@@ -367,6 +367,133 @@ func TestRenderBundleConnectionDiagnosticsModeControlsAccessLog(t *testing.T) {
 	}
 }
 
+func TestRenderBundleIncludesTLSSelfSNIWebSidecar(t *testing.T) {
+	t.Parallel()
+
+	bundle, err := RenderBundle(Input{
+		Server: model.Server{
+			Name:            "vpn-a",
+			XrayVersion:     "26.3.27",
+			Domain:          "vpn-a.example.net",
+			PrimaryProfile:  model.TransportProfileTLSSelfSNIWeb,
+			EnabledProfiles: model.TransportProfileTLSSelfSNIWeb,
+		},
+		Users: []model.User{{
+			Username: "alice",
+			Email:    "alice@global",
+			UUID:     "11111111-1111-1111-1111-111111111111",
+			Enabled:  true,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("render TLS self-SNI bundle: %v", err)
+	}
+	defer CleanupBundle(bundle)
+
+	cfg := string(bundle.ConfigRaw)
+	for _, want := range []string{
+		`"tag": "vless-tcp-tls-selfsni-web"`,
+		`"security": "tls"`,
+		`"certificateFile": "/etc/xray/certs/fullchain.pem"`,
+		`"keyFile": "/etc/xray/certs/privkey.pem"`,
+		`"fallbacks"`,
+		`"dest": "ovpn-web:8080"`,
+	} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("expected TLS self-SNI config to contain %q, got:\n%s", want, cfg)
+		}
+	}
+	if strings.Contains(cfg, "realitySettings") {
+		t.Fatalf("TLS self-SNI-only config should not render REALITY settings:\n%s", cfg)
+	}
+
+	composeRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	compose := string(composeRaw)
+	for _, want := range []string{
+		"ovpn-web:",
+		"image: ${OVPN_WEB_IMAGE}",
+		"depends_on:\n      - ovpn-web",
+		"${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}:/etc/xray/certs:ro",
+		"${OVPN_CAMOUFLAGE_SITE_DIR:-/opt/ovpn/camouflage-site}:/usr/share/nginx/html:ro",
+		"./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro",
+	} {
+		if !strings.Contains(compose, want) {
+			t.Fatalf("expected TLS self-SNI compose to contain %q, got:\n%s", want, compose)
+		}
+	}
+	for _, forbidden := range []string{`"8443:8443/tcp"`, `"13179:13179/tcp"`} {
+		if strings.Contains(compose, forbidden) {
+			t.Fatalf("TLS self-SNI bundle should not expose unrelated profile port %s, got:\n%s", forbidden, compose)
+		}
+	}
+
+	nginxRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "web", "nginx.conf"))
+	if err != nil {
+		t.Fatalf("read camouflage nginx config: %v", err)
+	}
+	if !strings.Contains(string(nginxRaw), "listen 8080;") {
+		t.Fatalf("camouflage nginx config should listen internally on 8080, got:\n%s", string(nginxRaw))
+	}
+
+	envRaw, err := os.ReadFile(filepath.Join(bundle.Dir, ".env"))
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	env := string(envRaw)
+	for _, want := range []string{
+		"OVPN_WEB_IMAGE=nginx:1.29-alpine",
+		"OVPN_TLS_SELFSNI_CERT_DIR=/opt/ovpn/certs",
+		"OVPN_CAMOUFLAGE_SITE_DIR=/opt/ovpn/camouflage-site",
+	} {
+		if !strings.Contains(env, want) {
+			t.Fatalf("expected TLS self-SNI env to contain %q, got:\n%s", want, env)
+		}
+	}
+}
+
+func TestRenderBundleDefaultOmitsTLSSelfSNIWebSidecar(t *testing.T) {
+	t.Parallel()
+
+	bundle, err := RenderBundle(Input{
+		Server: model.Server{
+			Name:              "vpn-a",
+			XrayVersion:       "26.3.27",
+			Domain:            "vpn-a.example.net",
+			RealityPrivateKey: "priv",
+			RealityServerName: "www.microsoft.com",
+			RealityTarget:     "www.microsoft.com:443",
+			RealityShortIDs:   "abcd",
+		},
+	})
+	if err != nil {
+		t.Fatalf("render default bundle: %v", err)
+	}
+	defer CleanupBundle(bundle)
+
+	composeRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	compose := string(composeRaw)
+	for _, forbidden := range []string{
+		"ovpn-web:",
+		"depends_on:\n      - ovpn-web",
+		"${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}:/etc/xray/certs:ro",
+		"${OVPN_CAMOUFLAGE_SITE_DIR:-/opt/ovpn/camouflage-site}:/usr/share/nginx/html:ro",
+	} {
+		if strings.Contains(compose, forbidden) {
+			t.Fatalf("default bundle should not render TLS self-SNI sidecar data %q, got:\n%s", forbidden, compose)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(bundle.Dir, "web", "nginx.conf")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("default bundle should not write camouflage nginx config, stat err=%v", err)
+	}
+
+}
+
 func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 	t.Parallel()
 
@@ -746,6 +873,14 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[2], "-v /opt/ovpn/.incoming/logs:/var/log/ovpn") ||
 		!strings.Contains(r.execCmds[2], "sudo chown 65532:65532 /opt/ovpn/.incoming/logs") {
 		t.Fatalf("third command should mount a writable access log directory for xray validation, got %q", r.execCmds[2])
+	}
+	for _, want := range []string{
+		"OVPN_TLS_SELFSNI_CERT_DIR",
+		":/etc/xray/certs:ro",
+	} {
+		if !strings.Contains(r.execCmds[2], want) {
+			t.Fatalf("third command should mount TLS self-SNI cert dir when present; missing %q in %q", want, r.execCmds[2])
+		}
 	}
 	if strings.Contains(r.execCmds[2], "$XRAY_IMAGE xray run -test") {
 		t.Fatalf("xray test command should not include duplicate leading 'xray': %q", r.execCmds[2])

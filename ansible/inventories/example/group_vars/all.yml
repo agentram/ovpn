@@ -32,6 +32,19 @@ ovpn_firewall_extra_tcp_ports:
 ovpn_firewall_extra_udp_ports: []
 ovpn_firewall_remove_tcp_ports: []
 
+# Optional self-SNI HTTPS camouflage prerequisites. This is off by default and
+# only prepares certificates/firewall/site files; the Xray profile is enabled
+# separately with `ovpn server profile switch`.
+ovpn_camouflage_enabled: false
+ovpn_camouflage_domain: "{{ ovpn_domain | default(inventory_hostname) }}"
+ovpn_camouflage_cert_email: ""
+ovpn_camouflage_cert_dir: "{{ ovpn_deploy_root }}/certs"
+ovpn_camouflage_site_dir: "{{ ovpn_deploy_root }}/camouflage-site"
+ovpn_camouflage_site_title: "Project notes"
+ovpn_camouflage_site_heading: "Project notes"
+ovpn_camouflage_site_text: "A small public page for shared notes, documents, and status updates."
+ovpn_camouflage_site_accent: "#4f6f52"
+
 # Optional cleanup for explicitly declared apt source files and packages.
 ovpn_remove_apt_source_files: []
 ovpn_purge_packages: []

@@ -155,6 +155,7 @@ Generate the client credential:
 ./ovpn user link --server <server> --username alice --profile vless-reality-xhttp
 ./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --out ~/Desktop/alice-xhttp.png
 ./ovpn user link --server <server> --username alice --profile vless-xhttp-plain
+./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
 ./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
 ```
 
@@ -217,6 +218,28 @@ Enable an extra deployable profile and redeploy:
 ./ovpn server profile enable <server> vless-xhttp-plain
 ./ovpn deploy <server>
 ./ovpn doctor <server>
+```
+
+The `vless-tcp-tls-selfsni-web` profile uses `443/tcp`, so it conflicts with `vless-reality-tcp-vision`.
+Prepare its certificate/fallback site through Ansible first, then switch the server profile instead of enabling both:
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/security.yml --limit <server-hostname>
+cd ..
+
+./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn deploy <server>
+./ovpn doctor <server>
+curl -vk https://<domain>/
+```
+
+The required Ansible variables are:
+
+```yaml
+ovpn_camouflage_enabled: true
+ovpn_camouflage_domain: vpn-a.example.net
+ovpn_camouflage_cert_email: ops@example.net
 ```
 
 Change the primary profile used by `user link` when `--profile` is omitted:

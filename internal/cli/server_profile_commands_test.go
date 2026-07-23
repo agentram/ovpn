@@ -118,3 +118,103 @@ func TestServerProfileSwitchAllowsFallbackProfile(t *testing.T) {
 		t.Fatalf("expected primary fallback profile to be enabled, enabled=%v", updated.NormalizedEnabledProfiles())
 	}
 }
+
+func TestServerProfileEnableRejectsTLSSelfSNIRealityConflict(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	cmd := app.newServerProfileEnableCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfileTLSSelfSNIWeb})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil {
+		t.Fatalf("expected 443/tcp profile conflict")
+	}
+	for _, want := range []string{
+		"profile " + model.TransportProfileTLSSelfSNIWeb + " conflicts with an enabled 443/tcp profile on main",
+		"ovpn server profile switch main " + model.TransportProfileTLSSelfSNIWeb,
+		"then redeploy",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected error to contain %q, got %v", want, err)
+		}
+	}
+	if stdout != "" {
+		t.Fatalf("conflict should not print stdout, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestServerProfileSwitchReplacesConflicting443Profile(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	cmd := app.newServerProfileSwitchCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfileTLSSelfSNIWeb})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("profile switch self-sni: %v", err)
+	}
+	if !strings.Contains(stdout, "primary profile for main: "+model.TransportProfileTLSSelfSNIWeb) {
+		t.Fatalf("unexpected stdout: %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	updated, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("reload server: %v", err)
+	}
+	if got := updated.NormalizedPrimaryProfile(); got != model.TransportProfileTLSSelfSNIWeb {
+		t.Fatalf("expected self-sni primary, got %s", got)
+	}
+	if !updated.IsTransportProfileEnabled(model.TransportProfileTLSSelfSNIWeb) {
+		t.Fatalf("expected self-sni profile to be enabled, enabled=%v", updated.NormalizedEnabledProfiles())
+	}
+	if updated.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
+		t.Fatalf("expected reality tcp profile to be removed from enabled profiles, enabled=%v", updated.NormalizedEnabledProfiles())
+	}
+}
+
+func TestServerProfileSwitchToTLSSelfSNIPreservesNonConflictingProfiles(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.PrimaryProfile = model.TransportProfileRealityTCPVision
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.PrimaryProfile, strings.Join([]string{
+		model.TransportProfileRealityTCPVision,
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+	}, ","))
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	cmd := app.newServerProfileSwitchCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfileTLSSelfSNIWeb})
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("profile switch self-sni: %v", err)
+	}
+	if !strings.Contains(stdout, "primary profile for main: "+model.TransportProfileTLSSelfSNIWeb) {
+		t.Fatalf("unexpected stdout: %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	updated, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("reload server: %v", err)
+	}
+	for _, wantEnabled := range []string{
+		model.TransportProfileTLSSelfSNIWeb,
+		model.TransportProfileRealityXHTTP,
+		model.TransportProfilePlainXHTTP,
+	} {
+		if !updated.IsTransportProfileEnabled(wantEnabled) {
+			t.Fatalf("expected %s to stay enabled, enabled=%v", wantEnabled, updated.NormalizedEnabledProfiles())
+		}
+	}
+	if updated.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
+		t.Fatalf("expected only conflicting 443/tcp reality profile to be removed, enabled=%v", updated.NormalizedEnabledProfiles())
+	}
+}

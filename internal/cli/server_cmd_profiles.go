@@ -60,6 +60,9 @@ func (a *App) newServerProfileEnableCmd() *cobra.Command {
 			if profile == model.TransportProfileWSTLSWeb {
 				return plannedTransportProfileError(profile, srv.Name)
 			}
+			if profileConflictsOn443(srv.NormalizedEnabledProfiles(), profile) {
+				return fmt.Errorf("profile %s conflicts with an enabled 443/tcp profile on %s; use `ovpn server profile switch %s %s` to make it primary and replace the conflicting profile, then redeploy", profile, srv.Name, srv.Name, profile)
+			}
 			profiles := append(srv.NormalizedEnabledProfiles(), profile)
 			srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join(profiles, ","))
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
@@ -133,7 +136,7 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 				return plannedTransportProfileError(profile, srv.Name)
 			}
 			srv.PrimaryProfile = profile
-			srv.EnabledProfiles = model.EnabledProfilesCSV(profile, srv.EnabledProfiles)
+			srv.EnabledProfiles = model.EnabledProfilesCSV(profile, strings.Join(removeConflicting443Profiles(srv.NormalizedEnabledProfiles(), profile), ","))
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}
@@ -150,4 +153,33 @@ func unsupportedTransportProfileError(raw string) error {
 
 func plannedTransportProfileError(profile string, serverName string) error {
 	return fmt.Errorf("%s is planned but not deployable yet; choose an enabled deployable profile from `ovpn server profile list %s`", profile, serverName)
+}
+
+func profileConflictsOn443(enabled []string, profile string) bool {
+	for _, item := range enabled {
+		if isMutuallyExclusive443Profile(item) && isMutuallyExclusive443Profile(profile) && item != profile {
+			return true
+		}
+	}
+	return false
+}
+
+func removeConflicting443Profiles(enabled []string, profile string) []string {
+	out := make([]string, 0, len(enabled))
+	for _, item := range enabled {
+		if isMutuallyExclusive443Profile(item) && isMutuallyExclusive443Profile(profile) && item != profile {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func isMutuallyExclusive443Profile(profile string) bool {
+	switch model.NormalizeTransportProfile(profile) {
+	case model.TransportProfileRealityTCPVision, model.TransportProfileTLSSelfSNIWeb:
+		return true
+	default:
+		return false
+	}
 }

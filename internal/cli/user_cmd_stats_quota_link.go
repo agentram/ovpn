@@ -425,6 +425,10 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 			return "", fmt.Errorf("server %s has no REALITY short-id configured for profile %s; check `ovpn server profile list %s` and try a non-REALITY profile such as %s if it is enabled", srv.Name, profile, srv.Name, model.TransportProfilePlainXHTTP)
 		}
 	}
+	serverName := srv.RealityServerName
+	if meta.Kind == "tls-selfsni-web" {
+		serverName = address
+	}
 	label := "ovpn-" + u.Username
 	if requestedProfile || profile != model.TransportProfileRealityTCPVision {
 		label += "-" + profile
@@ -433,7 +437,7 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 		Address:    address,
 		Port:       meta.Port,
 		UUID:       u.UUID,
-		ServerName: srv.RealityServerName,
+		ServerName: serverName,
 		Password:   srv.RealityPublicKey,
 		ShortID:    shortID,
 		Profile:    profile,

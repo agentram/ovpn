@@ -15,6 +15,8 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 		"vless-reality": TransportProfileRealityTCPVision,
 		"xhttp":         TransportProfileRealityXHTTP,
 		"plain-xhttp":   TransportProfilePlainXHTTP,
+		"self-sni":      TransportProfileTLSSelfSNIWeb,
+		"vless-tls":     TransportProfileTLSSelfSNIWeb,
 		"ws":            TransportProfileWSTLSWeb,
 		"unknown":       "",
 	}

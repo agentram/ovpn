@@ -28,6 +28,14 @@ var transportProfiles = []TransportProfile{
 		Description: "VLESS over XHTTP without stream security on a high port; operator-controlled fallback for degraded REALITY paths.",
 	},
 	{
+		Name:        TransportProfileTLSSelfSNIWeb,
+		Kind:        "tls-selfsni-web",
+		Status:      "camouflage",
+		Port:        443,
+		InboundTag:  "vless-tcp-tls-selfsni-web",
+		Description: "VLESS over TCP/TLS with xtls-rprx-vision and HTTPS fallback to a normal internal web service.",
+	},
+	{
 		Name:        TransportProfileWSTLSWeb,
 		Kind:        "tls-web",
 		Status:      "planned",
@@ -74,6 +82,8 @@ func NormalizeTransportProfile(name string) string {
 		return TransportProfileRealityXHTTP
 	case "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
 		return TransportProfilePlainXHTTP
+	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
+		return TransportProfileTLSSelfSNIWeb
 	case "ws", "websocket", "ws-tls", "web", TransportProfileWSTLSWeb:
 		return TransportProfileWSTLSWeb
 	default:
