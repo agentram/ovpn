@@ -132,7 +132,7 @@ func TestUserLinkCanSelectTransportProfile(t *testing.T) {
 		t.Fatalf("user link --profile xhttp: %v", err)
 	}
 	link := strings.TrimSpace(stdout)
-	for _, want := range []string{":8443?", "type=xhttp", "path=%2Fovpn-xhttp", "#ovpn-alice-vless-reality-xhttp"} {
+	for _, want := range []string{":8443?", "fp=firefox", "type=xhttp", "path=%2Fovpn-xhttp", "spx=%2Fassets%2Fc08477004c8a.js", "#ovpn-alice-vless-reality-xhttp"} {
 		if !strings.Contains(link, want) {
 			t.Fatalf("profile link missing %q: %s", want, link)
 		}
@@ -189,7 +189,7 @@ func TestTLSSelfSNIProfileLinkUsesServerDomain(t *testing.T) {
 		"flow=xtls-rprx-vision",
 		"sni=example.org",
 		"alpn=http%2F1.1",
-		"fp=chrome",
+		"fp=firefox",
 		"headerType=none",
 	} {
 		if !strings.Contains(link, want) {
@@ -200,6 +200,88 @@ func TestTLSSelfSNIProfileLinkUsesServerDomain(t *testing.T) {
 		if strings.Contains(link, forbidden) {
 			t.Fatalf("TLS self-SNI link should not contain %s: %s", forbidden, link)
 		}
+	}
+}
+
+func TestUserLinkCanOverrideFingerprintAndSpiderX(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{
+		"--server", "main",
+		"--username", "alice",
+		"--fingerprint", "qq",
+		"--spider-x", "/news/app.js",
+		"--qr=false",
+	})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("user link with fingerprint/spiderX overrides: %v", err)
+	}
+	link := strings.TrimSpace(stdout)
+	for _, want := range []string{"fp=qq", "spx=%2Fnews%2Fapp.js"} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("override link missing %q: %s", want, link)
+		}
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+}
+
+func TestUserLinkRejectsBadFingerprintAndSpiderX(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--fingerprint", "netscape", "--qr=false"})
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "unsupported --fingerprint") || !strings.Contains(err.Error(), "firefox") {
+		t.Fatalf("expected unsupported fingerprint error, err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("bad fingerprint should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	cmd = app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--spider-x", "missing-slash", "--qr=false"})
+	stdout, stderr, err = captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "--spider-x must start with /") {
+		t.Fatalf("expected bad spider-x error, err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("bad spider-x should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestUserLinkRejectsFingerprintAndSpiderXForPlainXHTTP(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfilePlainXHTTP)
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	cmd := app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfilePlainXHTTP, "--fingerprint", "firefox", "--qr=false"})
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "--fingerprint is only supported") {
+		t.Fatalf("expected unsupported fingerprint for plain profile, err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("bad profile option should not print secrets, stdout=%q stderr=%q", stdout, stderr)
+	}
+
+	cmd = app.newUserLinkCmd()
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfilePlainXHTTP, "--spider-x", "/ok", "--qr=false"})
+	stdout, stderr, err = captureStdoutStderr(t, cmd.Execute)
+	if err == nil || !strings.Contains(err.Error(), "--spider-x is only supported") {
+		t.Fatalf("expected unsupported spider-x for plain profile, err=%v stdout=%q stderr=%q", err, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("bad profile option should not print secrets, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -283,6 +365,50 @@ func TestUserExportAllProfilesWritesLinksAndQRs(t *testing.T) {
 		}
 		if !strings.Contains(string(raw), "#ovpn-alice-"+profile) {
 			t.Fatalf("exported link for %s missing profile label: %s", profile, string(raw))
+		}
+		assertPNGQRCodeFile(t, base+".png")
+	}
+}
+
+func TestUserExportWritesFingerprintVariants(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfileRealityXHTTP)
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+	out := t.TempDir()
+	cmd := app.newUserExportCmd()
+	cmd.SetArgs([]string{
+		"--server", "main",
+		"--username", "alice",
+		"--profile", model.TransportProfileRealityXHTTP,
+		"--fingerprints", "firefox,qq,chrome",
+		"--out", out,
+	})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err != nil {
+		t.Fatalf("user export --fingerprints: %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if strings.Count(stdout, "exported ") != 3 {
+		t.Fatalf("expected three exported variants, got:\n%s", stdout)
+	}
+	for _, fp := range []string{"firefox", "qq", "chrome"} {
+		base := filepath.Join(out, "main-alice-"+model.TransportProfileRealityXHTTP+"-fp-"+fp)
+		raw, err := os.ReadFile(base + ".txt")
+		if err != nil {
+			t.Fatalf("read exported %s link: %v", fp, err)
+		}
+		link := string(raw)
+		if !strings.Contains(link, "fp="+fp) || !strings.Contains(link, "spx=%2Fassets%2Fc08477004c8a.js") {
+			t.Fatalf("exported %s link missing hardened params: %s", fp, link)
 		}
 		assertPNGQRCodeFile(t, base+".png")
 	}
@@ -451,4 +577,4 @@ func captureStdoutStderr(t *testing.T, fn func() error) (string, string, error) 
 	return stdout, stderr, runErr
 }
 
-const testAliceVLESSLink = "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=reality&encryption=none&pbk=pub&fp=chrome&type=tcp&flow=xtls-rprx-vision&sni=www.microsoft.com&sid=abcd1234#ovpn-alice"
+const testAliceVLESSLink = "vless://11111111-1111-1111-1111-111111111111@example.com:443?security=reality&encryption=none&pbk=pub&fp=firefox&type=tcp&flow=xtls-rprx-vision&sni=www.microsoft.com&sid=abcd1234&spx=%2Fassets%2F08ac542059c2.js#ovpn-alice"

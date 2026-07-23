@@ -229,6 +229,7 @@ Use this flow for a first small server. Replace placeholders with your own value
 ```
 
 `user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
+New REALITY/TLS links default to `fp=firefox`; use `--fingerprint` or `--spider-x` only when you need an explicit client-link variant.
 See [`docs/transports.md`](docs/transports.md) before enabling fallback profiles or switching the default generated link profile.
 
 `server init` performs the first bootstrap/deploy for the VPN runtime. Use `deploy` later when you change runtime settings:

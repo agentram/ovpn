@@ -120,6 +120,7 @@ func TestBuildVLESSLink(t *testing.T) {
 		Password:   "pubkey",
 		ShortID:    "abcd",
 		Label:      "ovpn user",
+		SpiderX:    "/assets/user.js",
 	})
 	if !strings.HasPrefix(link, "vless://") {
 		t.Fatalf("bad prefix: %s", link)
@@ -129,6 +130,9 @@ func TestBuildVLESSLink(t *testing.T) {
 	}
 	if !strings.Contains(link, "#ovpn%20user") {
 		t.Fatalf("label not escaped: %s", link)
+	}
+	if !strings.Contains(link, "fp=firefox") || !strings.Contains(link, "spx=%2Fassets%2Fuser.js") {
+		t.Fatalf("missing hardened defaults: %s", link)
 	}
 }
 
@@ -143,8 +147,9 @@ func TestBuildVLESSLinkProfiles(t *testing.T) {
 		ShortID:    "abcd",
 		Profile:    model.TransportProfileRealityXHTTP,
 		Label:      "ovpn xhttp",
+		SpiderX:    "/xhttp-spider",
 	})
-	for _, want := range []string{":8443?", "type=xhttp", "path=%2Fovpn-xhttp", "mode=auto", "#ovpn%20xhttp"} {
+	for _, want := range []string{":8443?", "fp=firefox", "type=xhttp", "path=%2Fovpn-xhttp", "mode=auto", "spx=%2Fxhttp-spider", "#ovpn%20xhttp"} {
 		if !strings.Contains(xhttp, want) {
 			t.Fatalf("xhttp link missing %q: %s", want, xhttp)
 		}
@@ -175,13 +180,32 @@ func TestBuildVLESSLinkProfiles(t *testing.T) {
 		Profile:    model.TransportProfileTLSSelfSNIWeb,
 		Label:      "ovpn tls",
 	})
-	for _, want := range []string{":443?", "security=tls", "type=tcp", "flow=xtls-rprx-vision", "sni=example.com", "alpn=http%2F1.1", "fp=chrome", "headerType=none", "#ovpn%20tls"} {
+	for _, want := range []string{":443?", "security=tls", "type=tcp", "flow=xtls-rprx-vision", "sni=example.com", "alpn=http%2F1.1", "fp=firefox", "headerType=none", "#ovpn%20tls"} {
 		if !strings.Contains(tlsSelfSNI, want) {
 			t.Fatalf("tls self-sni link missing %q: %s", want, tlsSelfSNI)
 		}
 	}
 	if strings.Contains(tlsSelfSNI, "pbk=") || strings.Contains(tlsSelfSNI, "sid=") {
 		t.Fatalf("tls self-sni link should not include REALITY params: %s", tlsSelfSNI)
+	}
+}
+
+func TestBuildVLESSLinkHonorsExplicitFingerprint(t *testing.T) {
+	t.Parallel()
+
+	link := BuildVLESSLink(LinkInput{
+		Address:     "example.com",
+		UUID:        "11111111-1111-1111-1111-111111111111",
+		ServerName:  "www.microsoft.com",
+		Password:    "pubkey",
+		ShortID:     "abcd",
+		Fingerprint: "chrome",
+		SpiderX:     "/compat",
+	})
+	for _, want := range []string{"fp=chrome", "spx=%2Fcompat"} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("explicit link missing %q: %s", want, link)
+		}
 	}
 }
 

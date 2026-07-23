@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -203,11 +205,13 @@ func quotaBytesFromFlags(monthlyBytes int64, monthlyGB int64, monthlyBytesSet bo
 // newUserLinkCmd builds the `user link` command that prints a user's VLESS link and QR code.
 func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
-		server   string
-		username string
-		profile  string
-		qr       bool
-		qrFile   string
+		server      string
+		username    string
+		profile     string
+		fingerprint string
+		spiderX     string
+		qr          bool
+		qrFile      string
 	}
 	cmd := &cobra.Command{
 		Use:   "link",
@@ -232,7 +236,10 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			vless, err := buildUserProfileLink(*srv, *u, link.profile)
+			vless, err := buildUserProfileLink(*srv, *u, link.profile, userLinkOptions{
+				fingerprint: link.fingerprint,
+				spiderX:     link.spiderX,
+			})
 			if err != nil {
 				return err
 			}
@@ -256,6 +263,8 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	cmd.Flags().StringVar(&link.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&link.username, "username", "", "Username")
 	cmd.Flags().StringVar(&link.profile, "profile", "", "Transport profile (default: server primary profile)")
+	cmd.Flags().StringVar(&link.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
+	cmd.Flags().StringVar(&link.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
 	cmd.Flags().BoolVar(&link.qr, "qr", true, "Print a terminal QR code after the link; use --qr=false for link-only output")
 	cmd.Flags().StringVar(&link.qrFile, "qr-file", "", "Save a PNG QR code to this path")
 	_ = cmd.MarkFlagRequired("server")
@@ -265,10 +274,12 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 
 func (a *App) newUserQRCmd() *cobra.Command {
 	var qr struct {
-		server   string
-		username string
-		profile  string
-		out      string
+		server      string
+		username    string
+		profile     string
+		fingerprint string
+		spiderX     string
+		out         string
 	}
 	cmd := &cobra.Command{
 		Use:   "qr",
@@ -295,7 +306,10 @@ func (a *App) newUserQRCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			vless, err := buildUserProfileLink(*srv, *u, qr.profile)
+			vless, err := buildUserProfileLink(*srv, *u, qr.profile, userLinkOptions{
+				fingerprint: qr.fingerprint,
+				spiderX:     qr.spiderX,
+			})
 			if err != nil {
 				return err
 			}
@@ -309,6 +323,8 @@ func (a *App) newUserQRCmd() *cobra.Command {
 	cmd.Flags().StringVar(&qr.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&qr.username, "username", "", "Username")
 	cmd.Flags().StringVar(&qr.profile, "profile", "", "Transport profile (default: server primary profile)")
+	cmd.Flags().StringVar(&qr.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
+	cmd.Flags().StringVar(&qr.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
 	cmd.Flags().StringVar(&qr.out, "out", "", "Output PNG path")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
@@ -318,11 +334,14 @@ func (a *App) newUserQRCmd() *cobra.Command {
 
 func (a *App) newUserExportCmd() *cobra.Command {
 	var export struct {
-		server      string
-		username    string
-		out         string
-		allProfiles bool
-		profile     string
+		server       string
+		username     string
+		out          string
+		allProfiles  bool
+		profile      string
+		fingerprint  string
+		fingerprints string
+		spiderX      string
 	}
 	cmd := &cobra.Command{
 		Use:   "export",
@@ -356,6 +375,9 @@ func (a *App) newUserExportCmd() *cobra.Command {
 			if !info.IsDir() {
 				return fmt.Errorf("output path is not a directory: %s", out)
 			}
+			if strings.TrimSpace(export.fingerprint) != "" && strings.TrimSpace(export.fingerprints) != "" {
+				return fmt.Errorf("use only one of --fingerprint or --fingerprints")
+			}
 			profiles := []string{export.profile}
 			if export.allProfiles {
 				profiles = srv.NormalizedEnabledProfiles()
@@ -363,21 +385,43 @@ func (a *App) newUserExportCmd() *cobra.Command {
 			if !export.allProfiles && strings.TrimSpace(export.profile) == "" {
 				profiles = []string{srv.NormalizedPrimaryProfile()}
 			}
+			fingerprints, multiFingerprintExport, err := exportFingerprints(export.fingerprint, export.fingerprints)
+			if err != nil {
+				return err
+			}
 			for _, profile := range profiles {
-				vless, err := buildUserProfileLink(*srv, *u, profile)
+				normalizedProfile, err := normalizeRequestedProfileForExport(*srv, profile)
 				if err != nil {
 					return err
 				}
-				base := fmt.Sprintf("%s-%s-%s", srv.Name, u.Username, model.NormalizeTransportProfile(profile))
-				linkPath := filepath.Join(out, base+".txt")
-				if err := os.WriteFile(linkPath, []byte(vless+"\n"), 0o600); err != nil {
-					return err
+				profileFingerprints := fingerprints
+				includeFingerprintInName := multiFingerprintExport || strings.TrimSpace(export.fingerprint) != ""
+				if !profileUsesClientFingerprint(normalizedProfile) {
+					profileFingerprints = []string{""}
+					includeFingerprintInName = false
 				}
-				qrPath := filepath.Join(out, base+".png")
-				if err := writeQRCodePNG(vless, qrPath); err != nil {
-					return fmt.Errorf("write QR file: %w", err)
+				for _, fp := range profileFingerprints {
+					vless, err := buildUserProfileLink(*srv, *u, normalizedProfile, userLinkOptions{
+						fingerprint: fp,
+						spiderX:     export.spiderX,
+					})
+					if err != nil {
+						return err
+					}
+					base := fmt.Sprintf("%s-%s-%s", srv.Name, u.Username, normalizedProfile)
+					if includeFingerprintInName {
+						base += "-fp-" + xraycfg.NormalizeClientFingerprint(fp)
+					}
+					linkPath := filepath.Join(out, base+".txt")
+					if err := os.WriteFile(linkPath, []byte(vless+"\n"), 0o600); err != nil {
+						return err
+					}
+					qrPath := filepath.Join(out, base+".png")
+					if err := writeQRCodePNG(vless, qrPath); err != nil {
+						return fmt.Errorf("write QR file: %w", err)
+					}
+					fmt.Printf("exported %s\n", filepath.Clean(qrPath))
 				}
-				fmt.Printf("exported %s\n", filepath.Clean(qrPath))
 			}
 			return nil
 		},
@@ -387,13 +431,25 @@ func (a *App) newUserExportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&export.out, "out", "", "Output directory")
 	cmd.Flags().BoolVar(&export.allProfiles, "all-profiles", false, "Export every enabled server profile")
 	cmd.Flags().StringVar(&export.profile, "profile", "", "Export one profile (default: server primary profile)")
+	cmd.Flags().StringVar(&export.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
+	cmd.Flags().StringVar(&export.fingerprints, "fingerprints", "", "Comma-separated fingerprint variants to export for REALITY/TLS profiles")
+	cmd.Flags().StringVar(&export.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
 	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }
 
-func buildUserProfileLink(srv model.Server, u model.User, profile string) (string, error) {
+type userLinkOptions struct {
+	fingerprint string
+	spiderX     string
+}
+
+func buildUserProfileLink(srv model.Server, u model.User, profile string, opts ...userLinkOptions) (string, error) {
+	options := userLinkOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
 	rawProfile := strings.TrimSpace(profile)
 	requestedProfile := rawProfile != ""
 	if requestedProfile {
@@ -414,16 +470,36 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 	if !srv.IsTransportProfileEnabled(profile) {
 		return "", fmt.Errorf("profile %s is not enabled on server %s; enable and deploy it first with `ovpn server profile enable %s %s` and `ovpn deploy %s`, or choose an enabled profile from `ovpn server profile list %s`", profile, srv.Name, srv.Name, profile, srv.Name, srv.Name)
 	}
+	fingerprint := ""
+	if profileUsesClientFingerprint(profile) {
+		fingerprint = xraycfg.NormalizeClientFingerprint(options.fingerprint)
+		if fingerprint == "" {
+			return "", fmt.Errorf("unsupported --fingerprint %q; supported values: %s", strings.TrimSpace(options.fingerprint), xraycfg.SupportedClientFingerprintsText())
+		}
+	} else if strings.TrimSpace(options.fingerprint) != "" {
+		return "", fmt.Errorf("--fingerprint is only supported for REALITY/TLS profiles; profile %s does not use it", profile)
+	}
 	address := srv.Domain
 	if address == "" {
 		address = srv.Host
 	}
 	var shortID string
+	var spiderX string
 	if meta.Kind == "reality" {
 		shortID = firstShortID(srv.RealityShortIDs)
 		if shortID == "" {
 			return "", fmt.Errorf("server %s has no REALITY short-id configured for profile %s; check `ovpn server profile list %s` and try a non-REALITY profile such as %s if it is enabled", srv.Name, profile, srv.Name, model.TransportProfilePlainXHTTP)
 		}
+		var err error
+		spiderX, err = normalizeSpiderX(options.spiderX)
+		if err != nil {
+			return "", err
+		}
+		if spiderX == "" {
+			spiderX = defaultSpiderX(srv, u, profile)
+		}
+	} else if strings.TrimSpace(options.spiderX) != "" {
+		return "", fmt.Errorf("--spider-x is only supported for REALITY profiles; profile %s does not use it", profile)
 	}
 	serverName := srv.RealityServerName
 	if meta.Kind == "tls-selfsni-web" {
@@ -434,13 +510,94 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string) (strin
 		label += "-" + profile
 	}
 	return xraycfg.BuildVLESSLink(xraycfg.LinkInput{
-		Address:    address,
-		Port:       meta.Port,
-		UUID:       u.UUID,
-		ServerName: serverName,
-		Password:   srv.RealityPublicKey,
-		ShortID:    shortID,
-		Profile:    profile,
-		Label:      label,
+		Address:     address,
+		Port:        meta.Port,
+		UUID:        u.UUID,
+		ServerName:  serverName,
+		Password:    srv.RealityPublicKey,
+		ShortID:     shortID,
+		Profile:     profile,
+		Label:       label,
+		Fingerprint: fingerprint,
+		SpiderX:     spiderX,
 	}), nil
+}
+
+func exportFingerprints(single string, list string) ([]string, bool, error) {
+	if strings.TrimSpace(list) == "" {
+		fp := xraycfg.NormalizeClientFingerprint(single)
+		if fp == "" {
+			return nil, false, fmt.Errorf("unsupported --fingerprint %q; supported values: %s", strings.TrimSpace(single), xraycfg.SupportedClientFingerprintsText())
+		}
+		return []string{fp}, false, nil
+	}
+	parts := strings.Split(list, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, raw := range parts {
+		fp := xraycfg.NormalizeClientFingerprint(raw)
+		if fp == "" {
+			return nil, false, fmt.Errorf("unsupported --fingerprints value %q; supported values: %s", strings.TrimSpace(raw), xraycfg.SupportedClientFingerprintsText())
+		}
+		if !seen[fp] {
+			out = append(out, fp)
+			seen[fp] = true
+		}
+	}
+	if len(out) == 0 {
+		return nil, false, fmt.Errorf("--fingerprints must include at least one fingerprint")
+	}
+	return out, true, nil
+}
+
+func normalizeRequestedProfileForExport(srv model.Server, profile string) (string, error) {
+	if strings.TrimSpace(profile) == "" {
+		return srv.NormalizedPrimaryProfile(), nil
+	}
+	normalized := model.NormalizeTransportProfile(profile)
+	if normalized == "" {
+		return "", unsupportedTransportProfileError(profile)
+	}
+	return normalized, nil
+}
+
+func profileUsesClientFingerprint(profile string) bool {
+	meta, ok := model.LookupTransportProfile(model.NormalizeTransportProfile(profile))
+	if !ok {
+		return false
+	}
+	return meta.Kind == "reality" || meta.Kind == "tls-selfsni-web"
+}
+
+func normalizeSpiderX(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", nil
+	}
+	if !strings.HasPrefix(v, "/") {
+		return "", fmt.Errorf("--spider-x must start with /")
+	}
+	if strings.ContainsAny(v, " \t\r\n") {
+		return "", fmt.Errorf("--spider-x must not contain spaces")
+	}
+	for _, r := range v {
+		if r > 127 {
+			return "", fmt.Errorf("--spider-x must be URL-safe ASCII")
+		}
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		switch r {
+		case '/', '.', '_', '-', '~':
+			continue
+		default:
+			return "", fmt.Errorf("--spider-x must be URL-safe ASCII path characters")
+		}
+	}
+	return v, nil
+}
+
+func defaultSpiderX(srv model.Server, u model.User, profile string) string {
+	sum := sha256.Sum256([]byte(srv.Name + "\x00" + u.Username + "\x00" + model.NormalizeTransportProfile(profile)))
+	return "/assets/" + hex.EncodeToString(sum[:])[:12] + ".js"
 }

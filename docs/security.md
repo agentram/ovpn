@@ -38,11 +38,14 @@ Follow official Xray guidance:
 - Use a realistic, stable `reality_target`.
 - Treat fallback as anti-active-probing/shared-port behavior.
 - Understand failed auth traffic is forwarded to `target`.
+- Treat `fp` and `spiderX` as client-link hardening knobs; they do not require server-side target rotation.
 
 Operational rules:
 
 - Do not use wildcard-style server names.
 - Avoid placeholder `reality_target` values.
+- Keep `reality_server_name` aligned with a certificate name served by `reality_target`.
+- Rotate `reality_target` / `serverNames` only as an operator change: update config, deploy, then issue new REALITY links.
 - Keep `OVPN_SECURITY_PROFILE=minimal` unless you need emergency rollback.
 - Minimal profile adds protocol/domain blocking and threat DNS resolvers.
 - Keep fallback rate limits disabled by default.

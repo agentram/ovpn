@@ -72,12 +72,27 @@ const (
 	SecurityProfileMinimal = "minimal"
 	SecurityProfileOff     = "off"
 
+	DefaultClientFingerprint = "firefox"
+
 	DefaultTLSSelfSNICertFile     = "/etc/xray/certs/fullchain.pem"
 	DefaultTLSSelfSNIKeyFile      = "/etc/xray/certs/privkey.pem"
 	DefaultTLSSelfSNIFallbackDest = "ovpn-web:8080"
 )
 
 var defaultThreatDNSServers = []string{"9.9.9.9", "149.112.112.112"}
+
+var supportedClientFingerprints = []string{
+	"firefox",
+	"chrome",
+	"safari",
+	"ios",
+	"android",
+	"edge",
+	"360",
+	"qq",
+	"random",
+	"randomized",
+}
 
 // RenderServerJSON renders a complete Xray server config (inbounds, routing, outbounds) as JSON from spec.
 func RenderServerJSON(spec Spec) ([]byte, error) {
@@ -646,15 +661,34 @@ func profilesNeedReality(profiles []string) bool {
 }
 
 type LinkInput struct {
-	Address    string
-	Port       int
-	UUID       string
-	ServerName string
-	Password   string
-	ShortID    string
-	Flow       string
-	Label      string
-	Profile    string
+	Address     string
+	Port        int
+	UUID        string
+	ServerName  string
+	Password    string
+	ShortID     string
+	Flow        string
+	Label       string
+	Profile     string
+	Fingerprint string
+	SpiderX     string
+}
+
+func NormalizeClientFingerprint(raw string) string {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	if v == "" {
+		return DefaultClientFingerprint
+	}
+	for _, fp := range supportedClientFingerprints {
+		if v == fp {
+			return v
+		}
+	}
+	return ""
+}
+
+func SupportedClientFingerprintsText() string {
+	return strings.Join(supportedClientFingerprints, ", ")
 }
 
 // BuildVLESSLink renders a client VLESS connection URL from in.
@@ -680,17 +714,28 @@ func BuildVLESSLink(in LinkInput) string {
 	if strings.TrimSpace(label) == "" {
 		label = "ovpn"
 	}
+	fingerprint := NormalizeClientFingerprint(in.Fingerprint)
+	if fingerprint == "" {
+		fingerprint = DefaultClientFingerprint
+	}
+	spiderX := strings.TrimSpace(in.SpiderX)
 	switch profile {
 	case model.TransportProfileRealityXHTTP:
+		spx := ""
+		if spiderX != "" {
+			spx = "&spx=" + url.QueryEscape(spiderX)
+		}
 		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=chrome&type=xhttp&path=%s&mode=auto&sni=%s&sid=%s#%s",
+			"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=%s&type=xhttp&path=%s&mode=auto&sni=%s&sid=%s%s#%s",
 			in.UUID,
 			in.Address,
 			in.Port,
 			in.Password,
+			fingerprint,
 			url.QueryEscape("/ovpn-xhttp"),
 			in.ServerName,
 			in.ShortID,
+			spx,
 			urlEscapeLabel(label),
 		)
 	case model.TransportProfilePlainXHTTP:
@@ -704,10 +749,11 @@ func BuildVLESSLink(in LinkInput) string {
 		)
 	case model.TransportProfileTLSSelfSNIWeb:
 		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=tls&encryption=none&fp=chrome&type=tcp&flow=%s&sni=%s&alpn=%s&headerType=none#%s",
+			"vless://%s@%s:%d?security=tls&encryption=none&fp=%s&type=tcp&flow=%s&sni=%s&alpn=%s&headerType=none#%s",
 			in.UUID,
 			in.Address,
 			in.Port,
+			fingerprint,
 			in.Flow,
 			in.ServerName,
 			url.QueryEscape("http/1.1"),
@@ -715,15 +761,21 @@ func BuildVLESSLink(in LinkInput) string {
 		)
 	}
 	// Keep pbk query key for broad client compatibility.
+	spx := ""
+	if spiderX != "" {
+		spx = "&spx=" + url.QueryEscape(spiderX)
+	}
 	return fmt.Sprintf(
-		"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=chrome&type=tcp&flow=%s&sni=%s&sid=%s#%s",
+		"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=%s&type=tcp&flow=%s&sni=%s&sid=%s%s#%s",
 		in.UUID,
 		in.Address,
 		in.Port,
 		in.Password,
+		fingerprint,
 		in.Flow,
 		in.ServerName,
 		in.ShortID,
+		spx,
 		urlEscapeLabel(label),
 	)
 }

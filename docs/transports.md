@@ -67,6 +67,17 @@ Generate a profile-specific link:
 ./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
 ```
 
+REALITY and TLS links default to `fp=firefox`. Existing profiles already imported by users do not change.
+Operators can still generate explicit variants:
+
+```bash
+./ovpn user link --server <server> --username alice --profile vless-reality-xhttp --fingerprint chrome
+./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --fingerprint qq --spider-x /assets/alice.js --out ~/Downloads/alice-qq.png
+./ovpn user export --server <server> --username alice --profile vless-reality-xhttp --fingerprints firefox,qq,chrome --out ~/Downloads
+```
+
+`--spider-x` is only for REALITY profiles. If omitted, ovpn generates a stable per-user path, so re-running link export does not create a different client profile each time.
+
 Export all enabled profiles for a user:
 
 ```bash
@@ -95,6 +106,17 @@ After users have migrated, disable a non-primary profile and redeploy:
 The CLI refuses to disable the current primary profile; switch primary first, deploy, verify, then disable the old profile.
 
 Link and QR commands fail early when a requested profile is unknown, planned, or disabled. That is intentional: they should not print a secret that cannot work on the selected server.
+
+## REALITY Target And SNI
+
+`reality_target` and `reality_server_name` are server-side settings. Do not rotate them casually:
+
+- `reality_server_name` must be covered by the TLS certificate presented by `reality_target`.
+- The target should be stable, reachable from the VPN host, and behave like a normal high-traffic HTTPS service.
+- Region-specific or “domestic” targets can make one network better and another worse; test them deliberately.
+- Changing target/SNI requires updating server config, running `ovpn deploy`, and issuing fresh REALITY links.
+
+Client-side `--fingerprint` and `--spider-x` variants are safer levers because they change only newly generated links.
 
 ## Client Compatibility
 

@@ -153,14 +153,20 @@ Generate the client credential:
 ./ovpn user link --server <server> --username alice --qr=false
 ./ovpn user link --server <server> --username alice --qr-file ~/Desktop/alice.png
 ./ovpn user link --server <server> --username alice --profile vless-reality-xhttp
+./ovpn user link --server <server> --username alice --profile vless-reality-xhttp --fingerprint chrome
 ./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --out ~/Desktop/alice-xhttp.png
+./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --fingerprint qq --spider-x /assets/alice.js --out ~/Desktop/alice-xhttp-qq.png
 ./ovpn user link --server <server> --username alice --profile vless-xhttp-plain
 ./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
 ./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
+./ovpn user export --server <server> --username alice --profile vless-reality-xhttp --fingerprints firefox,qq,chrome --out ~/Downloads
 ```
 
 The `vless://` link and QR code are secrets.
 Anyone who has them can use that profile until you disable or remove the user.
+
+New REALITY/TLS links use `fp=firefox` by default. Existing imported client profiles are not changed.
+Use `--fingerprint` when you need a specific supported client fingerprint. Use `--spider-x` only for REALITY profiles; if omitted, ovpn generates a stable per-user path.
 
 Transport profiles are server-side opt-in. See [`docs/transports.md`](transports.md) for the profile list, client compatibility notes, and rollout workflow.
 
