@@ -167,6 +167,7 @@ See [`docs/transports.md`](docs/transports.md) for profile rollout, including th
 ## Optional camouflage
 
 `vless-tcp-tls-selfsni-web` is off by default. It uses a real certificate for the VPN domain, keeps Xray as the public `443/tcp` listener, and sends ordinary HTTPS traffic to an internal static site.
+Keep `ovpn_camouflage_cert_email` set in production so certificate expiry and renewal failures can reach an operator.
 
 ```bash
 # 1. Enable the Ansible prerequisites in inventory:

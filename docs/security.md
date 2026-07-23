@@ -98,6 +98,10 @@ When `ovpn_camouflage_enabled: true`, the Ansible security role includes the sep
 - a renewal deploy hook that refreshes the runtime cert files and recreates the Xray container
 - `80/tcp` firewall access for HTTP-01 certificate validation
 
+Set `ovpn_camouflage_cert_email` in production inventory when possible. Without it, certbot can register the certificate without an email address, but Let's Encrypt cannot send expiry or renewal-failure notices.
+
+The `80/tcp` rule stays open while camouflage is enabled because unattended `certbot renew --standalone` needs the HTTP-01 challenge port later, not only during first issuance. Nothing in ovpn listens on `80/tcp` between renewals.
+
 If `ovpn_manage_firewall: false`, Ansible does not manage host firewall rules.
 In that case, open `80/tcp` through your separate firewall process before certificate issuance.
 

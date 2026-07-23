@@ -196,24 +196,6 @@ func injectTLSSelfSNIWeb(composeTpl []byte, profiles []string) []byte {
 	return []byte(text)
 }
 
-func camouflageNginxConfig() string {
-	return `server {
-  listen 8080;
-  server_name _;
-
-  access_log off;
-  error_log /var/log/nginx/error.log warn;
-
-  root /usr/share/nginx/html;
-  index index.html;
-
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-}
-`
-}
-
 type Bundle struct {
 	Dir       string
 	ConfigRaw []byte
@@ -300,7 +282,11 @@ func RenderBundle(in Input) (*Bundle, error) {
 		return nil, err
 	}
 	if usesTLSSelfSNIProfile(in.Server.NormalizedEnabledProfiles()) {
-		if err := os.WriteFile(filepath.Join(tmpDir, "web", "nginx.conf"), []byte(camouflageNginxConfig()), 0o644); err != nil {
+		nginxCfg, err := AssetFS.ReadFile("templates/web/nginx.conf")
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, "web", "nginx.conf"), nginxCfg, 0o644); err != nil {
 			return nil, err
 		}
 	}

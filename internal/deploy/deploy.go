@@ -34,6 +34,7 @@ var (
 	uploadExtractTimeout         = 30 * time.Second
 	deployBackupTimeout          = 30 * time.Second
 	deployComposeValidateTimeout = 30 * time.Second
+	deployTLSSelfSNITimeout      = 30 * time.Second
 	deployXrayValidateTimeout    = 60 * time.Second
 	deployApplyTimeout           = 30 * time.Second
 	deployUpTimeout              = 5 * time.Minute
@@ -159,6 +160,12 @@ func buildDeployComposeValidateCommand(dir string) string {
 	return fmt.Sprintf("set -e; cd %s; sudo docker compose --env-file .env -f docker-compose.yml config -q", dir)
 }
 
+// buildDeployTLSSelfSNIPreflightCommand fails before applying a bundle whose Xray config depends on
+// external self-SNI certificate files that have not been prepared by the Ansible security role.
+func buildDeployTLSSelfSNIPreflightCommand(dir string) string {
+	return fmt.Sprintf("set -e; cd %[1]s; if grep -q '/etc/xray/certs/fullchain.pem' xray/config.json; then . ./.env; cert_dir=${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}; if ! sudo test -r \"$cert_dir/fullchain.pem\" || ! sudo test -r \"$cert_dir/privkey.pem\"; then echo \"missing TLS self-SNI certificate files in $cert_dir; run the Ansible security playbook with ovpn_camouflage_enabled=true before deploying vless-tcp-tls-selfsni-web\" >&2; exit 1; fi; fi", dir)
+}
+
 // buildDeployXrayTestCommand renders the `xray -test` validation of a staged config inside the target image.
 func buildDeployXrayTestCommand(dir string) string {
 	// Validate config in the target image before compose up to catch incompatible syntax early.
@@ -266,6 +273,12 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	defer cancelValidate()
 	if _, err := runner.Exec(validateCtx, cfg, withRemoteTimeout(deployComposeValidateTimeout, validateCmd)); err != nil {
 		return fmt.Errorf("validate compose config on %s: %w", cfg.Host, err)
+	}
+	tlsSelfSNICmd := buildDeployTLSSelfSNIPreflightCommand(RemoteStageDir)
+	tlsSelfSNICtx, cancelTLSSelfSNI := ssh.TimeoutCtx(ctx, deployTLSSelfSNITimeout)
+	defer cancelTLSSelfSNI()
+	if _, err := runner.Exec(tlsSelfSNICtx, cfg, withRemoteTimeout(deployTLSSelfSNITimeout, tlsSelfSNICmd)); err != nil {
+		return fmt.Errorf("validate TLS self-SNI prerequisites on %s: %w", cfg.Host, err)
 	}
 	xrayTestCmd := buildDeployXrayTestCommand(RemoteStageDir)
 	xrayCtx, cancelXray := ssh.TimeoutCtx(ctx, deployXrayValidateTimeout)

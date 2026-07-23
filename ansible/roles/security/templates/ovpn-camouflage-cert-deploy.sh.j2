@@ -10,8 +10,10 @@ if [ ! -f "$live_dir/fullchain.pem" ] || [ ! -f "$live_dir/privkey.pem" ]; then
   exit 1
 fi
 
-install -d -m 0755 "$cert_dir"
+install -d -m 0750 "$cert_dir"
 install -m 0644 "$live_dir/fullchain.pem" "$cert_dir/fullchain.pem"
+# The pinned Xray image used by ovpn can read root:65532 runtime files. If you switch
+# to a rootless custom image, keep its runtime gid aligned with this group.
 install -m 0640 -o root -g 65532 "$live_dir/privkey.pem" "$cert_dir/privkey.pem"
 
 if command -v docker >/dev/null 2>&1 &&
