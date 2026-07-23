@@ -504,14 +504,14 @@ func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 		model.TransportProfilePlainXHTTP,
 		model.TransportProfileWSTLSWeb,
 	}))
-	if !strings.Contains(got, `- "8443:8443/tcp"`) {
-		t.Fatalf("expected xhttp port mapping, got:\n%s", got)
+	if strings.Contains(got, "8443") {
+		t.Fatalf("decommissioned reality xhttp profile must not expose a port, got:\n%s", got)
 	}
 	if !strings.Contains(got, `- "13179:13179/tcp"`) {
 		t.Fatalf("expected plain xhttp port mapping, got:\n%s", got)
 	}
 	if strings.Contains(got, "8445") {
-		t.Fatalf("planned ws/tls profile must not expose a port, got:\n%s", got)
+		t.Fatalf("decommissioned ws/tls profile must not expose a port, got:\n%s", got)
 	}
 	if !strings.Contains(got, "# OVPN_XRAY_PROFILE_PORTS") {
 		t.Fatalf("profile port marker should stay in the rendered compose for future insertions, got:\n%s", got)

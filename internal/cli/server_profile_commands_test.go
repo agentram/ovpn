@@ -181,7 +181,6 @@ func TestServerProfileSwitchToTLSSelfSNIPreservesNonConflictingProfiles(t *testi
 	srv.PrimaryProfile = model.TransportProfileRealityTCPVision
 	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.PrimaryProfile, strings.Join([]string{
 		model.TransportProfileRealityTCPVision,
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
 	}, ","))
 	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
@@ -207,7 +206,6 @@ func TestServerProfileSwitchToTLSSelfSNIPreservesNonConflictingProfiles(t *testi
 	}
 	for _, wantEnabled := range []string{
 		model.TransportProfileTLSSelfSNIWeb,
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
 	} {
 		if !updated.IsTransportProfileEnabled(wantEnabled) {
@@ -216,5 +214,53 @@ func TestServerProfileSwitchToTLSSelfSNIPreservesNonConflictingProfiles(t *testi
 	}
 	if updated.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
 		t.Fatalf("expected only conflicting 443/tcp reality profile to be removed, enabled=%v", updated.NormalizedEnabledProfiles())
+	}
+}
+
+func TestServerProfileEnableRejectsDecommissionedProfile(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	cmd := app.newServerProfileEnableCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfileRealityXHTTP})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil {
+		t.Fatalf("expected decommissioned profile error")
+	}
+	for _, want := range []string{
+		model.TransportProfileRealityXHTTP,
+		"decomm",
+		"not deployable",
+		"ovpn server profile list main",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected error to contain %q, got %v", want, err)
+		}
+	}
+	if stdout != "" {
+		t.Fatalf("decommissioned profile error should not print stdout, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestServerProfileSwitchRejectsDecommissionedProfile(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	cmd := app.newServerProfileSwitchCmd()
+	cmd.SetArgs([]string{"main", model.TransportProfileWSTLSWeb})
+
+	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
+	if err == nil {
+		t.Fatalf("expected decommissioned profile error")
+	}
+	for _, want := range []string{
+		model.TransportProfileWSTLSWeb,
+		"decomm",
+		"not deployable",
+		"ovpn server profile list main",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected error to contain %q, got %v", want, err)
+		}
+	}
+	if stdout != "" {
+		t.Fatalf("decommissioned profile error should not print stdout, stdout=%q stderr=%q", stdout, stderr)
 	}
 }

@@ -13,7 +13,8 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 		"default":       TransportProfileRealityTCPVision,
 		"tcp":           TransportProfileRealityTCPVision,
 		"vless-reality": TransportProfileRealityTCPVision,
-		"xhttp":         TransportProfileRealityXHTTP,
+		"xhttp":         TransportProfilePlainXHTTP,
+		"reality-xhttp": TransportProfileRealityXHTTP,
 		"plain-xhttp":   TransportProfilePlainXHTTP,
 		"self-sni":      TransportProfileTLSSelfSNIWeb,
 		"vless-tls":     TransportProfileTLSSelfSNIWeb,
@@ -30,7 +31,7 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 func TestNormalizeEnabledProfilesKeepsPrimaryAndKnownOrder(t *testing.T) {
 	t.Parallel()
 
-	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "xhttp,tcp,plain-xhttp,xhttp")
+	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "reality-xhttp,tcp,plain-xhttp,xhttp")
 	want := []string{
 		TransportProfileRealityTCPVision,
 		TransportProfileRealityXHTTP,

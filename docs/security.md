@@ -61,9 +61,11 @@ Minimal profile runtime controls include:
 - `protocol: ["bittorrent"] -> outboundTag: "block"`
 - `domain: ["geosite:category-public-tracker"] -> outboundTag: "block"`
 - Xray `dns.servers` with threat resolvers
+- IPv6-literal destinations (`::/0`) -> `outboundTag: "block"` so IPv4-only VPS hosts fail fast instead of timing out on client-preferred IPv6 targets
 
 Rendered routing uses `domainStrategy=AsIs`, so IP-literal destinations remain visible to routing and diagnostics.
-The default freedom outbound prefers IPv4 for domain resolution, but IPv6-literal destinations are not blackholed by default because mobile clients may try IPv6 before falling back to IPv4.
+The default freedom outbound prefers IPv4 for domain resolution, and IPv6-literal destinations are blocked by default in the minimal profile.
+This is intentional for small IPv4-only VPS hosts where mobile clients may otherwise connect successfully but hang on IPv6 targets that the host cannot route.
 
 If Xray image validation fails because geosite resources are missing:
 

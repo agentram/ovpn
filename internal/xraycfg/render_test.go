@@ -58,7 +58,7 @@ func TestRenderServerJSONIncludesRequiredSections(t *testing.T) {
 	if got := routing["domainStrategy"]; got != "AsIs" {
 		t.Fatalf("routing domainStrategy = %v, want AsIs", got)
 	}
-	assertNoIPv6BlockRule(t, rules)
+	assertIPv6BlockRule(t, rules)
 	outbounds, ok := obj["outbounds"].([]any)
 	if !ok {
 		t.Fatalf("outbounds missing")
@@ -209,6 +209,25 @@ func TestBuildVLESSLinkHonorsExplicitFingerprint(t *testing.T) {
 	}
 }
 
+func TestBuildVLESSLinkOmitsEmptySpiderX(t *testing.T) {
+	t.Parallel()
+
+	link := BuildVLESSLink(LinkInput{
+		Address:     "example.com",
+		UUID:        "11111111-1111-1111-1111-111111111111",
+		ServerName:  "www.microsoft.com",
+		Password:    "pubkey",
+		ShortID:     "abcd",
+		Fingerprint: "chrome",
+	})
+	if !strings.Contains(link, "fp=chrome") {
+		t.Fatalf("link should include explicit fingerprint: %s", link)
+	}
+	if strings.Contains(link, "spx=") {
+		t.Fatalf("link should omit empty spiderX: %s", link)
+	}
+}
+
 func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 	t.Parallel()
 
@@ -219,7 +238,6 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 		ShortIDs:          []string{"abcd1234"},
 		EnabledProfiles: []string{
 			model.TransportProfileRealityTCPVision,
-			model.TransportProfileRealityXHTTP,
 			model.TransportProfilePlainXHTTP,
 		},
 		Users: []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "u@example.com", Enabled: true}},
@@ -238,16 +256,11 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 		tag, _ := inbound["tag"].(string)
 		tags[tag] = inbound
 	}
-	if tags["vless-reality"] == nil || tags["vless-reality-xhttp"] == nil || tags["vless-xhttp-plain"] == nil {
-		t.Fatalf("expected tcp, reality xhttp, and plain xhttp inbounds, got tags %#v", tags)
+	if tags["vless-reality"] == nil || tags["vless-xhttp-plain"] == nil {
+		t.Fatalf("expected tcp reality and plain xhttp inbounds, got tags %#v", tags)
 	}
-	xhttpStream, _ := tags["vless-reality-xhttp"]["streamSettings"].(map[string]any)
-	if got := xhttpStream["network"]; got != "xhttp" {
-		t.Fatalf("xhttp network = %v", got)
-	}
-	xhttpSettings, _ := xhttpStream["xhttpSettings"].(map[string]any)
-	if got := xhttpSettings["path"]; got != "/ovpn-xhttp" {
-		t.Fatalf("xhttp path = %v", got)
+	if tags["vless-reality-xhttp"] != nil {
+		t.Fatalf("decommissioned reality xhttp inbound should not render, got tags %#v", tags)
 	}
 	plainStream, _ := tags["vless-xhttp-plain"]["streamSettings"].(map[string]any)
 	if got := plainStream["security"]; got != "none" {
@@ -357,7 +370,7 @@ func TestValidateSpecRejectsTLSSelfSNIMissingCertificate(t *testing.T) {
 	}
 }
 
-func TestValidateSpecRejectsPlannedTransportProfile(t *testing.T) {
+func TestValidateSpecRejectsDecommissionedTransportProfile(t *testing.T) {
 	t.Parallel()
 
 	err := ValidateSpec(Spec{
@@ -366,10 +379,10 @@ func TestValidateSpecRejectsPlannedTransportProfile(t *testing.T) {
 		RealityTarget:     "www.microsoft.com:443",
 		ShortIDs:          []string{"abcd"},
 		ThreatDNSServers:  []string{"9.9.9.9"},
-		EnabledProfiles:   []string{model.TransportProfileWSTLSWeb},
+		EnabledProfiles:   []string{model.TransportProfileRealityXHTTP},
 	})
-	if err == nil || !strings.Contains(err.Error(), "not renderable yet") {
-		t.Fatalf("expected planned profile validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "decomm") || !strings.Contains(err.Error(), "not renderable") {
+		t.Fatalf("expected decommissioned profile validation error, got %v", err)
 	}
 }
 
@@ -452,6 +465,23 @@ func toStrings(in []any) []string {
 		}
 	}
 	return out
+}
+
+func assertIPv6BlockRule(t *testing.T, rules []any) {
+	t.Helper()
+	for _, rule := range rules {
+		r, ok := rule.(map[string]any)
+		if !ok || r["outboundTag"] != "block" {
+			continue
+		}
+		ips, _ := r["ip"].([]any)
+		for _, ip := range ips {
+			if ip == "::/0" {
+				return
+			}
+		}
+	}
+	t.Fatalf("expected IPv6 literal block rule in routing rules: %v", rules)
 }
 
 func assertNoIPv6BlockRule(t *testing.T, rules []any) {

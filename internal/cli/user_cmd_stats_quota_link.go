@@ -205,13 +205,15 @@ func quotaBytesFromFlags(monthlyBytes int64, monthlyGB int64, monthlyBytesSet bo
 // newUserLinkCmd builds the `user link` command that prints a user's VLESS link and QR code.
 func (a *App) newUserLinkCmd() *cobra.Command {
 	var link struct {
-		server      string
-		username    string
-		profile     string
-		fingerprint string
-		spiderX     string
-		qr          bool
-		qrFile      string
+		server        string
+		username      string
+		profile       string
+		fingerprint   string
+		spiderX       string
+		noSpiderX     bool
+		legacyReality bool
+		qr            bool
+		qrFile        string
 	}
 	cmd := &cobra.Command{
 		Use:   "link",
@@ -237,8 +239,10 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 				return err
 			}
 			vless, err := buildUserProfileLink(*srv, *u, link.profile, userLinkOptions{
-				fingerprint: link.fingerprint,
-				spiderX:     link.spiderX,
+				fingerprint:   link.fingerprint,
+				spiderX:       link.spiderX,
+				noSpiderX:     link.noSpiderX,
+				legacyReality: link.legacyReality,
 			})
 			if err != nil {
 				return err
@@ -265,6 +269,8 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 	cmd.Flags().StringVar(&link.profile, "profile", "", "Transport profile (default: server primary profile)")
 	cmd.Flags().StringVar(&link.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
 	cmd.Flags().StringVar(&link.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
+	cmd.Flags().BoolVar(&link.noSpiderX, "no-spider-x", false, "Do not include REALITY spiderX in generated links")
+	cmd.Flags().BoolVar(&link.legacyReality, "legacy-reality", false, "Generate legacy REALITY client params (fp=chrome, no spx)")
 	cmd.Flags().BoolVar(&link.qr, "qr", true, "Print a terminal QR code after the link; use --qr=false for link-only output")
 	cmd.Flags().StringVar(&link.qrFile, "qr-file", "", "Save a PNG QR code to this path")
 	_ = cmd.MarkFlagRequired("server")
@@ -274,12 +280,14 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 
 func (a *App) newUserQRCmd() *cobra.Command {
 	var qr struct {
-		server      string
-		username    string
-		profile     string
-		fingerprint string
-		spiderX     string
-		out         string
+		server        string
+		username      string
+		profile       string
+		fingerprint   string
+		spiderX       string
+		noSpiderX     bool
+		legacyReality bool
+		out           string
 	}
 	cmd := &cobra.Command{
 		Use:   "qr",
@@ -307,8 +315,10 @@ func (a *App) newUserQRCmd() *cobra.Command {
 				return err
 			}
 			vless, err := buildUserProfileLink(*srv, *u, qr.profile, userLinkOptions{
-				fingerprint: qr.fingerprint,
-				spiderX:     qr.spiderX,
+				fingerprint:   qr.fingerprint,
+				spiderX:       qr.spiderX,
+				noSpiderX:     qr.noSpiderX,
+				legacyReality: qr.legacyReality,
 			})
 			if err != nil {
 				return err
@@ -325,23 +335,27 @@ func (a *App) newUserQRCmd() *cobra.Command {
 	cmd.Flags().StringVar(&qr.profile, "profile", "", "Transport profile (default: server primary profile)")
 	cmd.Flags().StringVar(&qr.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
 	cmd.Flags().StringVar(&qr.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
+	cmd.Flags().BoolVar(&qr.noSpiderX, "no-spider-x", false, "Do not include REALITY spiderX in generated links")
+	cmd.Flags().BoolVar(&qr.legacyReality, "legacy-reality", false, "Generate legacy REALITY client params (fp=chrome, no spx)")
 	cmd.Flags().StringVar(&qr.out, "out", "", "Output PNG path")
+	cmd.Flags().StringVar(&qr.out, "qr-file", "", "Alias for --out")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
-	_ = cmd.MarkFlagRequired("out")
 	return cmd
 }
 
 func (a *App) newUserExportCmd() *cobra.Command {
 	var export struct {
-		server       string
-		username     string
-		out          string
-		allProfiles  bool
-		profile      string
-		fingerprint  string
-		fingerprints string
-		spiderX      string
+		server        string
+		username      string
+		out           string
+		allProfiles   bool
+		profile       string
+		fingerprint   string
+		fingerprints  string
+		spiderX       string
+		noSpiderX     bool
+		legacyReality bool
 	}
 	cmd := &cobra.Command{
 		Use:   "export",
@@ -378,9 +392,12 @@ func (a *App) newUserExportCmd() *cobra.Command {
 			if strings.TrimSpace(export.fingerprint) != "" && strings.TrimSpace(export.fingerprints) != "" {
 				return fmt.Errorf("use only one of --fingerprint or --fingerprints")
 			}
+			if export.legacyReality && strings.TrimSpace(export.fingerprints) != "" {
+				return fmt.Errorf("use only one of --legacy-reality or --fingerprints")
+			}
 			profiles := []string{export.profile}
 			if export.allProfiles {
-				profiles = srv.NormalizedEnabledProfiles()
+				profiles = deployableEnabledProfiles(*srv)
 			}
 			if !export.allProfiles && strings.TrimSpace(export.profile) == "" {
 				profiles = []string{srv.NormalizedPrimaryProfile()}
@@ -388,6 +405,10 @@ func (a *App) newUserExportCmd() *cobra.Command {
 			fingerprints, multiFingerprintExport, err := exportFingerprints(export.fingerprint, export.fingerprints)
 			if err != nil {
 				return err
+			}
+			if export.legacyReality {
+				fingerprints = []string{""}
+				multiFingerprintExport = false
 			}
 			for _, profile := range profiles {
 				normalizedProfile, err := normalizeRequestedProfileForExport(*srv, profile)
@@ -402,8 +423,10 @@ func (a *App) newUserExportCmd() *cobra.Command {
 				}
 				for _, fp := range profileFingerprints {
 					vless, err := buildUserProfileLink(*srv, *u, normalizedProfile, userLinkOptions{
-						fingerprint: fp,
-						spiderX:     export.spiderX,
+						fingerprint:   fp,
+						spiderX:       export.spiderX,
+						noSpiderX:     export.noSpiderX,
+						legacyReality: export.legacyReality,
 					})
 					if err != nil {
 						return err
@@ -434,6 +457,8 @@ func (a *App) newUserExportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&export.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")
 	cmd.Flags().StringVar(&export.fingerprints, "fingerprints", "", "Comma-separated fingerprint variants to export for REALITY/TLS profiles")
 	cmd.Flags().StringVar(&export.spiderX, "spider-x", "", "REALITY spiderX path override (default: stable per-user path)")
+	cmd.Flags().BoolVar(&export.noSpiderX, "no-spider-x", false, "Do not include REALITY spiderX in generated links")
+	cmd.Flags().BoolVar(&export.legacyReality, "legacy-reality", false, "Generate legacy REALITY client params (fp=chrome, no spx)")
 	_ = cmd.MarkFlagRequired("server")
 	_ = cmd.MarkFlagRequired("username")
 	_ = cmd.MarkFlagRequired("out")
@@ -441,8 +466,10 @@ func (a *App) newUserExportCmd() *cobra.Command {
 }
 
 type userLinkOptions struct {
-	fingerprint string
-	spiderX     string
+	fingerprint   string
+	spiderX       string
+	noSpiderX     bool
+	legacyReality bool
 }
 
 func buildUserProfileLink(srv model.Server, u model.User, profile string, opts ...userLinkOptions) (string, error) {
@@ -464,11 +491,21 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 	if !ok {
 		return "", unsupportedTransportProfileError(profile)
 	}
-	if meta.Status == "planned" {
-		return "", plannedTransportProfileError(profile, srv.Name)
+	if !meta.Deployable() {
+		return "", nonDeployableTransportProfileError(meta, srv.Name)
 	}
 	if !srv.IsTransportProfileEnabled(profile) {
 		return "", fmt.Errorf("profile %s is not enabled on server %s; enable and deploy it first with `ovpn server profile enable %s %s` and `ovpn deploy %s`, or choose an enabled profile from `ovpn server profile list %s`", profile, srv.Name, srv.Name, profile, srv.Name, srv.Name)
+	}
+	if options.legacyReality {
+		if meta.Kind != "reality" {
+			return "", fmt.Errorf("--legacy-reality is only supported for REALITY profiles; profile %s does not use it", profile)
+		}
+		if strings.TrimSpace(options.fingerprint) != "" || strings.TrimSpace(options.spiderX) != "" || options.noSpiderX {
+			return "", fmt.Errorf("--legacy-reality already sets --fingerprint chrome and omits spiderX; do not combine it with --fingerprint, --spider-x, or --no-spider-x")
+		}
+		options.fingerprint = "chrome"
+		options.noSpiderX = true
 	}
 	fingerprint := ""
 	if profileUsesClientFingerprint(profile) {
@@ -490,16 +527,21 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 		if shortID == "" {
 			return "", fmt.Errorf("server %s has no REALITY short-id configured for profile %s; check `ovpn server profile list %s` and try a non-REALITY profile such as %s if it is enabled", srv.Name, profile, srv.Name, model.TransportProfilePlainXHTTP)
 		}
+		if options.noSpiderX && strings.TrimSpace(options.spiderX) != "" {
+			return "", fmt.Errorf("use only one of --spider-x or --no-spider-x")
+		}
 		var err error
 		spiderX, err = normalizeSpiderX(options.spiderX)
 		if err != nil {
 			return "", err
 		}
-		if spiderX == "" {
+		if spiderX == "" && !options.noSpiderX {
 			spiderX = defaultSpiderX(srv, u, profile)
 		}
 	} else if strings.TrimSpace(options.spiderX) != "" {
 		return "", fmt.Errorf("--spider-x is only supported for REALITY profiles; profile %s does not use it", profile)
+	} else if options.noSpiderX {
+		return "", fmt.Errorf("--no-spider-x is only supported for REALITY profiles; profile %s does not use it", profile)
 	}
 	serverName := srv.RealityServerName
 	if meta.Kind == "tls-selfsni-web" {
@@ -559,6 +601,18 @@ func normalizeRequestedProfileForExport(srv model.Server, profile string) (strin
 		return "", unsupportedTransportProfileError(profile)
 	}
 	return normalized, nil
+}
+
+func deployableEnabledProfiles(srv model.Server) []string {
+	profiles := srv.NormalizedEnabledProfiles()
+	out := make([]string, 0, len(profiles))
+	for _, profile := range profiles {
+		meta, ok := model.LookupTransportProfile(profile)
+		if ok && meta.Deployable() {
+			out = append(out, profile)
+		}
+	}
+	return out
 }
 
 func profileUsesClientFingerprint(profile string) bool {

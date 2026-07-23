@@ -8,17 +8,25 @@ vless-reality-tcp-vision = VLESS / TCP / REALITY / xtls-rprx-vision on 443/tcp
 
 That profile is widely supported by current clients and existing links keep working. It is still one traffic shape, though, and in degraded networks it has not been the most reliable option.
 
-Transport profiles make that explicit: keep the deprecated compatibility profile live, enable one fallback profile, test it with a small set of users, and switch the server primary profile only if the tradeoff is acceptable. In current field tests, plain XHTTP has been the most reliable fallback shape on some degraded paths, but it is not transport-encrypted by itself.
+Transport profiles make that explicit: keep the default compatibility profile live, enable one fallback profile, test it with a small set of users, and switch the server primary profile only if the tradeoff is acceptable. In current field tests, self-SNI TLS and plain XHTTP have been the most reliable fallback shapes on some degraded paths. Plain XHTTP is not transport-encrypted by itself.
 
 ## Profiles
 
 | Profile | Status | Port | Use case |
 | --- | --- | ---: | --- |
-| `vless-reality-tcp-vision` | deprecated | `443/tcp` | Original VLESS + REALITY profile. Best compatibility, less reliable on affected paths. |
-| `vless-reality-xhttp` | experimental | `8443/tcp` | XHTTP + REALITY for clients that support XHTTP. Useful as a different traffic shape. |
+| `vless-reality-tcp-vision` | default | `443/tcp` | Original VLESS + REALITY profile. Best compatibility baseline and kept for existing links. |
+| `vless-reality-xhttp` | decomm | `8443/tcp` | Decommissioned after field tests; retained only so older local state can be identified and disabled. |
 | `vless-xhttp-plain` | fallback | `13179/tcp` | Plain XHTTP shape for affected networks; no transport security unless fronted by TLS separately. |
 | `vless-tcp-tls-selfsni-web` | camouflage | `443/tcp` | TCP/TLS profile with a real certificate and fallback to an internal static web service. Conflicts with `vless-reality-tcp-vision` because both own `443/tcp`. |
-| `vless-ws-tls-web` | planned | n/a | WebSocket/TLS behind a real HTTPS site. Not deployable yet because it needs certificate and web-front handling. |
+| `vless-ws-tls-web` | decomm | n/a | Decommissioned web-front idea; use `vless-tcp-tls-selfsni-web` for HTTPS fallback camouflage. |
+
+Decommissioned profiles are listed only for cleanup of older local state. They cannot be enabled, deployed, or used for newly generated links. If an older server still shows one as enabled, disable it before the next deploy:
+
+```bash
+./ovpn server profile disable <server> vless-reality-xhttp
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
 
 The fallback profiles are not magic. They give you controlled A/B testing and faster rotation when a network path degrades.
 The `vless-xhttp-plain` profile deliberately has `security=none`, `path=/`, and no REALITY parameters because it matches simple XHTTP profiles seen working in the field. That means Xray does not add REALITY/TLS transport security on this profile. HTTPS destinations inside the tunnel are still protected by HTTPS, but the VLESS/XHTTP transport itself is not protected like the REALITY profiles. Use it only when that tradeoff is acceptable, and keep monitoring whether it remains reliable for your users.
@@ -36,7 +44,6 @@ List profiles:
 Enable an extra profile:
 
 ```bash
-./ovpn server profile enable <server> vless-reality-xhttp
 ./ovpn server profile enable <server> vless-xhttp-plain
 ./ovpn deploy <server>
 ./ovpn doctor <server>
@@ -61,8 +68,7 @@ curl -vk https://<domain>/
 Generate a profile-specific link:
 
 ```bash
-./ovpn user link --server <server> --username alice --profile vless-reality-xhttp
-./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --out ~/Downloads/alice-xhttp.png
+./ovpn user link --server <server> --username alice --profile vless-reality-tcp-vision
 ./ovpn user qr --server <server> --username alice --profile vless-xhttp-plain --out ~/Downloads/alice-plain-xhttp.png
 ./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
 ```
@@ -71,20 +77,24 @@ REALITY and TLS links default to `fp=firefox`. Existing profiles already importe
 Operators can still generate explicit variants:
 
 ```bash
-./ovpn user link --server <server> --username alice --profile vless-reality-xhttp --fingerprint chrome
-./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --fingerprint qq --spider-x /assets/alice.js --out ~/Downloads/alice-qq.png
-./ovpn user export --server <server> --username alice --profile vless-reality-xhttp --fingerprints firefox,qq,chrome --out ~/Downloads
+./ovpn user link --server <server> --username alice --profile vless-reality-tcp-vision --fingerprint chrome
+./ovpn user qr --server <server> --username alice --profile vless-reality-tcp-vision --fingerprint qq --spider-x /assets/alice.js --out ~/Downloads/alice-qq.png
+./ovpn user export --server <server> --username alice --profile vless-reality-tcp-vision --fingerprints firefox,qq,chrome --out ~/Downloads
 ```
 
 `--spider-x` is only for REALITY profiles. If omitted, ovpn generates a stable per-user path, so re-running link export does not create a different client profile each time.
 If you want the client spider to start from the target site's root or from a known real path, pass it explicitly, for example `--spider-x /`.
+For compatibility checks with older imported REALITY profiles, use `--legacy-reality`; it generates the previous client shape with `fp=chrome` and no `spx`:
+
+```bash
+./ovpn user qr --server <server> --username alice --profile vless-reality-tcp-vision --legacy-reality --out ~/Downloads/alice-reality-legacy.png
+```
 
 Profile-specific client fields:
 
 | profile | `--fingerprint` | `--spider-x` | SNI source |
 | --- | --- | --- | --- |
 | `vless-reality-tcp-vision` | yes | yes | `reality_server_name` |
-| `vless-reality-xhttp` | yes | yes | `reality_server_name` |
 | `vless-tcp-tls-selfsni-web` | yes | no | server domain |
 | `vless-xhttp-plain` | no | no | none |
 
@@ -118,7 +128,7 @@ After users have migrated, disable a non-primary profile and redeploy:
 `disable` updates local desired state only. Old links for that profile keep working until the next successful deploy removes the Xray inbound.
 The CLI refuses to disable the current primary profile; switch primary first, deploy, verify, then disable the old profile.
 
-Link and QR commands fail early when a requested profile is unknown, planned, or disabled. That is intentional: they should not print a secret that cannot work on the selected server.
+Link and QR commands fail early when a requested profile is unknown, decommissioned, or disabled. That is intentional: they should not print a secret that cannot work on the selected server.
 
 ## REALITY Target And SNI
 

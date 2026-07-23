@@ -2,27 +2,34 @@ package model
 
 import "strings"
 
+const (
+	TransportProfileStatusDefault        = "default"
+	TransportProfileStatusFallback       = "fallback"
+	TransportProfileStatusCamouflage     = "camouflage"
+	TransportProfileStatusDecommissioned = "decomm"
+)
+
 var transportProfiles = []TransportProfile{
 	{
 		Name:        TransportProfileRealityTCPVision,
 		Kind:        "reality",
-		Status:      "deprecated",
+		Status:      TransportProfileStatusDefault,
 		Port:        443,
 		InboundTag:  "vless-reality",
-		Description: "VLESS over TCP with REALITY and xtls-rprx-vision flow; kept for existing links and client compatibility.",
+		Description: "Default VLESS over TCP with REALITY and xtls-rprx-vision flow; kept for compatibility and as the baseline REALITY profile.",
 	},
 	{
 		Name:        TransportProfileRealityXHTTP,
 		Kind:        "reality",
-		Status:      "experimental",
+		Status:      TransportProfileStatusDecommissioned,
 		Port:        8443,
 		InboundTag:  "vless-reality-xhttp",
-		Description: "VLESS over XHTTP with REALITY for clients that support XHTTP.",
+		Description: "Decommissioned REALITY/XHTTP profile; retained only so older local state can be identified and cleaned up.",
 	},
 	{
 		Name:        TransportProfilePlainXHTTP,
 		Kind:        "plain-xhttp",
-		Status:      "fallback",
+		Status:      TransportProfileStatusFallback,
 		Port:        13179,
 		InboundTag:  "vless-xhttp-plain",
 		Description: "VLESS over XHTTP without stream security on a high port; operator-controlled fallback for degraded REALITY paths.",
@@ -30,7 +37,7 @@ var transportProfiles = []TransportProfile{
 	{
 		Name:        TransportProfileTLSSelfSNIWeb,
 		Kind:        "tls-selfsni-web",
-		Status:      "camouflage",
+		Status:      TransportProfileStatusCamouflage,
 		Port:        443,
 		InboundTag:  "vless-tcp-tls-selfsni-web",
 		Description: "VLESS over TCP/TLS with xtls-rprx-vision and HTTPS fallback to a normal internal web service.",
@@ -38,10 +45,10 @@ var transportProfiles = []TransportProfile{
 	{
 		Name:        TransportProfileWSTLSWeb,
 		Kind:        "tls-web",
-		Status:      "planned",
+		Status:      TransportProfileStatusDecommissioned,
 		Port:        8445,
 		InboundTag:  "vless-ws-tls-web",
-		Description: "VLESS over WebSocket/TLS behind a normal HTTPS web endpoint; requires certificates and a web front end.",
+		Description: "Decommissioned WebSocket/TLS web-front idea; use vless-tcp-tls-selfsni-web for HTTPS fallback camouflage.",
 	},
 }
 
@@ -72,15 +79,20 @@ func LookupTransportProfile(name string) (TransportProfile, bool) {
 	return TransportProfile{}, false
 }
 
+// Deployable reports whether the profile may be enabled, rendered, and used for new links.
+func (p TransportProfile) Deployable() bool {
+	return p.Status != TransportProfileStatusDecommissioned
+}
+
 // NormalizeTransportProfile canonicalizes a profile name.
 func NormalizeTransportProfile(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 	switch name {
 	case "", "default", "tcp", "reality", "vision", "vless-reality", TransportProfileRealityTCPVision:
 		return TransportProfileRealityTCPVision
-	case "xhttp", "reality-xhttp", TransportProfileRealityXHTTP:
+	case "reality-xhttp", TransportProfileRealityXHTTP:
 		return TransportProfileRealityXHTTP
-	case "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
+	case "xhttp", "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
 		return TransportProfilePlainXHTTP
 	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
 		return TransportProfileTLSSelfSNIWeb

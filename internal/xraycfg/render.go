@@ -225,6 +225,11 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 		cfg.Routing.(map[string]any)["rules"] = append(rules,
 			map[string]any{
 				"type":        "field",
+				"ip":          []string{"::/0"},
+				"outboundTag": "block",
+			},
+			map[string]any{
+				"type":        "field",
 				"protocol":    []string{"bittorrent"},
 				"outboundTag": "block",
 			},
@@ -577,12 +582,14 @@ func ValidateSpec(spec Spec) error {
 		}
 	}
 	for _, raw := range spec.EnabledProfiles {
-		if model.NormalizeTransportProfile(raw) == "" {
+		name := model.NormalizeTransportProfile(raw)
+		if name == "" {
 			return fmt.Errorf("unsupported transport profile %q", raw)
 		}
-	}
-	if includesProfile(spec.EnabledProfiles, model.TransportProfileWSTLSWeb) {
-		return fmt.Errorf("%s profile requires a TLS web front end and is not renderable yet", model.TransportProfileWSTLSWeb)
+		meta, _ := model.LookupTransportProfile(name)
+		if !meta.Deployable() {
+			return fmt.Errorf("%s profile is %s and is not renderable; disable it before deploy", meta.Name, meta.Status)
+		}
 	}
 	if includesProfile(spec.EnabledProfiles, model.TransportProfileTLSSelfSNIWeb) {
 		if includesProfile(spec.EnabledProfiles, model.TransportProfileRealityTCPVision) {

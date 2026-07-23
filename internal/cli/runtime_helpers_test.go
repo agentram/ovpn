@@ -63,7 +63,6 @@ func TestApplyRuntimeUserUsesAllEnabledTransportInbounds(t *testing.T) {
 		t.Fatalf("get server: %v", err)
 	}
 	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join([]string{
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
 	}, ","))
 	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
@@ -94,10 +93,8 @@ func TestApplyRuntimeUserUsesAllEnabledTransportInbounds(t *testing.T) {
 	got := strings.Join(calls, "\n")
 	for _, want := range []string{
 		"POST http://127.0.0.1:19000/runtime/user/add vless-reality",
-		"POST http://127.0.0.1:19000/runtime/user/add vless-reality-xhttp",
 		"POST http://127.0.0.1:19000/runtime/user/add vless-xhttp-plain",
 		"POST http://127.0.0.1:19000/runtime/user/remove vless-reality",
-		"POST http://127.0.0.1:19000/runtime/user/remove vless-reality-xhttp",
 		"POST http://127.0.0.1:19000/runtime/user/remove vless-xhttp-plain",
 	} {
 		if !strings.Contains(got, want) {
