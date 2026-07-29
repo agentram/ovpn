@@ -51,6 +51,13 @@ Enable an extra profile:
 
 Self-SNI owns `443/tcp`, so switch to it instead of enabling it next to TCP/REALITY. The Ansible step only prepares the certificate and fallback site; the profile change happens in local ovpn state and is applied by deploy:
 
+```yaml
+# host_vars/<server-hostname>.yml
+ovpn_camouflage_enabled: true
+ovpn_camouflage_domain: vpn-a.example.net
+ovpn_camouflage_cert_email: ops@example.net
+```
+
 ```bash
 # First prepare certs and the fallback site through Ansible.
 cd ansible

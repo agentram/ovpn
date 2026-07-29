@@ -21,7 +21,7 @@
     path: "{{ ovpn_camouflage_cert_dir | default(ovpn_deploy_root ~ '/certs') }}"
     state: directory
     owner: root
-    group: root
+    group: "65532"
     mode: "0750"
 
 - name: Ensure camouflage site directory exists

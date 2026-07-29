@@ -40,6 +40,40 @@ func TestRootComposeMirrorsEmbeddedTemplates(t *testing.T) {
 	}
 }
 
+func TestAnsibleCamouflageCertsReadableByXrayRuntimeGroup(t *testing.T) {
+	t.Parallel()
+
+	taskRaw, err := os.ReadFile("../../ansible/roles/security/tasks/camouflage.yml")
+	if err != nil {
+		t.Fatalf("read camouflage tasks: %v", err)
+	}
+	task := string(taskRaw)
+	for _, want := range []string{
+		"name: Ensure self-SNI certificate directory exists",
+		"group: \"65532\"",
+		"mode: \"0750\"",
+	} {
+		if !strings.Contains(task, want) {
+			t.Fatalf("camouflage cert directory task missing %q:\n%s", want, task)
+		}
+	}
+
+	hookRaw, err := os.ReadFile("../../ansible/roles/security/templates/ovpn-camouflage-cert-deploy.sh.j2")
+	if err != nil {
+		t.Fatalf("read camouflage cert deploy hook: %v", err)
+	}
+	hook := string(hookRaw)
+	for _, want := range []string{
+		`install -d -m 0750 -o root -g 65532 "$cert_dir"`,
+		`install -m 0644 -o root -g 65532 "$live_dir/fullchain.pem" "$cert_dir/fullchain.pem"`,
+		`install -m 0640 -o root -g 65532 "$live_dir/privkey.pem" "$cert_dir/privkey.pem"`,
+	} {
+		if !strings.Contains(hook, want) {
+			t.Fatalf("camouflage cert hook missing %q:\n%s", want, hook)
+		}
+	}
+}
+
 type fakeRunner struct {
 	execCmds []string
 	copyOps  [][2]string
