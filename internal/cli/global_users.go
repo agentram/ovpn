@@ -63,7 +63,8 @@ func (a *App) canonicalUsersFromServers(servers []model.Server) (map[string]mode
 	return canonical, nil
 }
 
-// ensureRealityParity verifies that cluster-critical REALITY parameters are equal on all registered servers.
+// ensureRealityParity verifies that cluster-critical REALITY identity parameters are equal on all registered servers.
+// The external target and SNI are intentionally per-server so operators can test or rotate them independently.
 func (a *App) ensureRealityParity() error {
 	for _, role := range []string{model.ServerRoleVPN, model.ServerRoleProxy} {
 		servers, err := a.listEnabledServersByRole(role)
@@ -108,12 +109,6 @@ func realityParityDiff(base model.Server, srv model.Server, includeProxyServiceU
 	}
 	if strings.TrimSpace(srv.RealityShortIDs) != strings.TrimSpace(base.RealityShortIDs) {
 		diff = append(diff, "reality_short_ids")
-	}
-	if strings.TrimSpace(srv.RealityServerName) != strings.TrimSpace(base.RealityServerName) {
-		diff = append(diff, "reality_server_name")
-	}
-	if strings.TrimSpace(srv.RealityTarget) != strings.TrimSpace(base.RealityTarget) {
-		diff = append(diff, "reality_target")
 	}
 	if includeProxyServiceUUID && strings.TrimSpace(srv.ProxyServiceUUID) != strings.TrimSpace(base.ProxyServiceUUID) {
 		diff = append(diff, "proxy_service_uuid")

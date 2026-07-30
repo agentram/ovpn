@@ -3,12 +3,15 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"ovpn/internal/defaults"
 	"ovpn/internal/deploy"
 	"ovpn/internal/model"
 	"ovpn/internal/util"
@@ -157,9 +160,9 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	addCmd.Flags().StringVar(&add.identityFile, "ssh-identity", filepath.Join(util.HomeDir(), ".ssh", "id_rsa"), "SSH private key path")
 	addCmd.Flags().StringVar(&add.knownHosts, "ssh-known-hosts", filepath.Join(util.HomeDir(), ".ssh", "known_hosts"), "SSH known_hosts path")
 	addCmd.Flags().BoolVar(&add.strict, "ssh-strict-host-key", true, "Enable strict SSH host key checking")
-	addCmd.Flags().StringVar(&add.xrayVersion, "xray-version", "26.3.27", "Pinned Xray version")
-	addCmd.Flags().StringVar(&add.realitySNI, "reality-server-name", "www.microsoft.com", "REALITY serverName")
-	addCmd.Flags().StringVar(&add.realityTGT, "reality-target", "www.microsoft.com:443", "REALITY target")
+	addCmd.Flags().StringVar(&add.xrayVersion, "xray-version", defaults.DefaultXrayVersion, "Pinned Xray version")
+	addCmd.Flags().StringVar(&add.realitySNI, "reality-server-name", "www.trip.com", "REALITY serverName")
+	addCmd.Flags().StringVar(&add.realityTGT, "reality-target", "www.trip.com:443", "REALITY target")
 	addCmd.Flags().StringVar(&add.privateKey, "reality-private-key", "", "REALITY private key")
 	addCmd.Flags().StringVar(&add.publicKey, "reality-public-key", "", "REALITY public key")
 	addCmd.Flags().StringVar(&add.shortID, "reality-short-id", "", "REALITY short ID (hex)")
@@ -167,6 +170,90 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	_ = addCmd.MarkFlagRequired("host")
 	_ = addCmd.MarkFlagRequired("domain")
 	return addCmd
+}
+
+// newServerSetRealityTargetCmd updates the REALITY target and SNI in local state.
+// The runtime is changed only by a subsequent deploy, so operators can inspect the diff first.
+func (a *App) newServerSetRealityTargetCmd() *cobra.Command {
+	var serverName string
+	cmd := &cobra.Command{
+		Use:   "set-reality-target <server> <target>",
+		Short: "Set REALITY target and SNI in local state",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, targetHost, err := normalizeRealityTarget(args[1])
+			if err != nil {
+				return err
+			}
+			sni := strings.TrimSpace(serverName)
+			if sni == "" {
+				sni = targetHost
+			}
+			if err := validateRealityServerName(sni); err != nil {
+				return err
+			}
+			srv, err := a.store.GetServerByName(a.ctx, strings.TrimSpace(args[0]))
+			if err != nil {
+				return err
+			}
+			previousTarget := srv.RealityTarget
+			previousSNI := srv.RealityServerName
+			srv.RealityTarget = target
+			srv.RealityServerName = sni
+			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
+				return err
+			}
+			a.log().Info("reality target updated", "server", srv.Name, "previous_target", previousTarget, "target", target, "previous_server_name", previousSNI, "server_name", sni)
+			fmt.Printf("server %s REALITY target: %s -> %s\n", srv.Name, previousTarget, target)
+			fmt.Printf("server %s REALITY serverName: %s -> %s\n", srv.Name, previousSNI, sni)
+			fmt.Println("redeploy the server, then generate new REALITY links; existing links use the previous target/SNI")
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&serverName, "server-name", "", "REALITY SNI/serverName (defaults to target host)")
+	return cmd
+}
+
+func normalizeRealityTarget(raw string) (string, string, error) {
+	target := strings.TrimSpace(raw)
+	if target == "" {
+		return "", "", errors.New("REALITY target is required; use a hostname or host:443")
+	}
+	if strings.Contains(target, "://") || strings.ContainsAny(target, " \t\r\n") {
+		return "", "", fmt.Errorf("invalid REALITY target %q; use a hostname or host:443, without a URL scheme or spaces", raw)
+	}
+	host := target
+	port := 443
+	if strings.HasPrefix(target, "[") || strings.Count(target, ":") > 0 {
+		parsedHost, parsedPort, err := net.SplitHostPort(target)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid REALITY target %q; use a hostname or host:443", raw)
+		}
+		host = parsedHost
+		port, err = strconv.Atoi(parsedPort)
+		if err != nil || port < 1 || port > 65535 {
+			return "", "", fmt.Errorf("invalid REALITY target port in %q; expected 1-65535", raw)
+		}
+	}
+	host = strings.TrimSpace(host)
+	if err := validateRealityServerName(host); err != nil {
+		return "", "", fmt.Errorf("invalid REALITY target host: %w", err)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port)), host, nil
+}
+
+func validateRealityServerName(raw string) error {
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		return errors.New("REALITY serverName is required")
+	}
+	if strings.ContainsAny(name, " \t\r\n") || strings.Contains(name, "*") || strings.Contains(name, "/") {
+		return fmt.Errorf("invalid REALITY serverName %q; use a concrete hostname without wildcards, spaces, or paths", raw)
+	}
+	if net.ParseIP(name) != nil {
+		return fmt.Errorf("invalid REALITY serverName %q; use the TLS hostname, not an IP address", raw)
+	}
+	return nil
 }
 
 // newServerInitCmd builds the `server init` command that bootstraps Docker and deploys the stack.

@@ -9,10 +9,8 @@ const (
 
 const (
 	TransportProfileRealityTCPVision = "vless-reality-tcp-vision"
-	TransportProfileRealityXHTTP     = "vless-reality-xhttp"
 	TransportProfilePlainXHTTP       = "vless-xhttp-plain"
 	TransportProfileTLSSelfSNIWeb    = "vless-tcp-tls-selfsni-web"
-	TransportProfileWSTLSWeb         = "vless-ws-tls-web"
 )
 
 type SSHConfig struct {

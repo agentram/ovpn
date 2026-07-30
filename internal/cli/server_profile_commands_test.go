@@ -16,7 +16,6 @@ func TestServerProfileDisableRemovesNonPrimaryProfile(t *testing.T) {
 	srv.PrimaryProfile = model.TransportProfilePlainXHTTP
 	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.PrimaryProfile, strings.Join([]string{
 		model.TransportProfileRealityTCPVision,
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
 	}, ","))
 	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
@@ -24,7 +23,7 @@ func TestServerProfileDisableRemovesNonPrimaryProfile(t *testing.T) {
 	}
 
 	cmd := app.newServerProfileDisableCmd()
-	cmd.SetArgs([]string{"main", model.TransportProfileRealityXHTTP})
+	cmd.SetArgs([]string{"main", model.TransportProfileRealityTCPVision})
 	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
 	if err != nil {
 		t.Fatalf("profile disable: %v", err)
@@ -33,7 +32,7 @@ func TestServerProfileDisableRemovesNonPrimaryProfile(t *testing.T) {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
 	for _, want := range []string{
-		"disabled profile " + model.TransportProfileRealityXHTTP + " on main",
+		"disabled profile " + model.TransportProfileRealityTCPVision + " on main",
 		"redeploy the server",
 	} {
 		if !strings.Contains(stdout, want) {
@@ -44,8 +43,8 @@ func TestServerProfileDisableRemovesNonPrimaryProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload server: %v", err)
 	}
-	if updated.IsTransportProfileEnabled(model.TransportProfileRealityXHTTP) {
-		t.Fatalf("expected %s to be disabled, enabled=%v", model.TransportProfileRealityXHTTP, updated.NormalizedEnabledProfiles())
+	if updated.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
+		t.Fatalf("expected %s to be disabled, enabled=%v", model.TransportProfileRealityTCPVision, updated.NormalizedEnabledProfiles())
 	}
 	if !updated.IsTransportProfileEnabled(model.TransportProfilePlainXHTTP) {
 		t.Fatalf("expected primary profile to remain enabled, enabled=%v", updated.NormalizedEnabledProfiles())
@@ -214,53 +213,5 @@ func TestServerProfileSwitchToTLSSelfSNIPreservesNonConflictingProfiles(t *testi
 	}
 	if updated.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
 		t.Fatalf("expected only conflicting 443/tcp reality profile to be removed, enabled=%v", updated.NormalizedEnabledProfiles())
-	}
-}
-
-func TestServerProfileEnableRejectsDecommissionedProfile(t *testing.T) {
-	app := newTestAppWithServer(t, false)
-	cmd := app.newServerProfileEnableCmd()
-	cmd.SetArgs([]string{"main", model.TransportProfileRealityXHTTP})
-
-	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
-	if err == nil {
-		t.Fatalf("expected decommissioned profile error")
-	}
-	for _, want := range []string{
-		model.TransportProfileRealityXHTTP,
-		"decomm",
-		"not deployable",
-		"ovpn server profile list main",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Fatalf("expected error to contain %q, got %v", want, err)
-		}
-	}
-	if stdout != "" {
-		t.Fatalf("decommissioned profile error should not print stdout, stdout=%q stderr=%q", stdout, stderr)
-	}
-}
-
-func TestServerProfileSwitchRejectsDecommissionedProfile(t *testing.T) {
-	app := newTestAppWithServer(t, false)
-	cmd := app.newServerProfileSwitchCmd()
-	cmd.SetArgs([]string{"main", model.TransportProfileWSTLSWeb})
-
-	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
-	if err == nil {
-		t.Fatalf("expected decommissioned profile error")
-	}
-	for _, want := range []string{
-		model.TransportProfileWSTLSWeb,
-		"decomm",
-		"not deployable",
-		"ovpn server profile list main",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Fatalf("expected error to contain %q, got %v", want, err)
-		}
-	}
-	if stdout != "" {
-		t.Fatalf("decommissioned profile error should not print stdout, stdout=%q stderr=%q", stdout, stderr)
 	}
 }

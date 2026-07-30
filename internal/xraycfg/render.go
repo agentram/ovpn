@@ -331,16 +331,6 @@ func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plain
 				"security":        "reality",
 				"realitySettings": realitySettings,
 			}))
-		case model.TransportProfileRealityXHTTP:
-			out = append(out, vlessInbound("vless-reality-xhttp", 8443, plainUsers, map[string]any{
-				"network":         "xhttp",
-				"security":        "reality",
-				"realitySettings": realitySettings,
-				"xhttpSettings": map[string]any{
-					"path": "/ovpn-xhttp",
-					"mode": "auto",
-				},
-			}))
 		case model.TransportProfilePlainXHTTP:
 			out = append(out, vlessInbound("vless-xhttp-plain", 13179, plainUsers, map[string]any{
 				"network":  "xhttp",
@@ -586,10 +576,6 @@ func ValidateSpec(spec Spec) error {
 		if name == "" {
 			return fmt.Errorf("unsupported transport profile %q", raw)
 		}
-		meta, _ := model.LookupTransportProfile(name)
-		if !meta.Deployable() {
-			return fmt.Errorf("%s profile is %s and is not renderable; disable it before deploy", meta.Name, meta.Status)
-		}
 	}
 	if includesProfile(spec.EnabledProfiles, model.TransportProfileTLSSelfSNIWeb) {
 		if includesProfile(spec.EnabledProfiles, model.TransportProfileRealityTCPVision) {
@@ -706,8 +692,6 @@ func BuildVLESSLink(in LinkInput) string {
 	}
 	if in.Port == 0 {
 		switch profile {
-		case model.TransportProfileRealityXHTTP:
-			in.Port = 8443
 		case model.TransportProfilePlainXHTTP:
 			in.Port = 13179
 		default:
@@ -727,24 +711,6 @@ func BuildVLESSLink(in LinkInput) string {
 	}
 	spiderX := strings.TrimSpace(in.SpiderX)
 	switch profile {
-	case model.TransportProfileRealityXHTTP:
-		spx := ""
-		if spiderX != "" {
-			spx = "&spx=" + url.QueryEscape(spiderX)
-		}
-		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=%s&type=xhttp&path=%s&mode=auto&sni=%s&sid=%s%s#%s",
-			in.UUID,
-			in.Address,
-			in.Port,
-			in.Password,
-			fingerprint,
-			url.QueryEscape("/ovpn-xhttp"),
-			in.ServerName,
-			in.ShortID,
-			spx,
-			urlEscapeLabel(label),
-		)
 	case model.TransportProfilePlainXHTTP:
 		return fmt.Sprintf(
 			"vless://%s@%s:%d?security=none&encryption=none&type=xhttp&path=%s&mode=auto#%s",

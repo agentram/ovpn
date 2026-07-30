@@ -14,11 +14,9 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 		"tcp":           TransportProfileRealityTCPVision,
 		"vless-reality": TransportProfileRealityTCPVision,
 		"xhttp":         TransportProfilePlainXHTTP,
-		"reality-xhttp": TransportProfileRealityXHTTP,
 		"plain-xhttp":   TransportProfilePlainXHTTP,
 		"self-sni":      TransportProfileTLSSelfSNIWeb,
 		"vless-tls":     TransportProfileTLSSelfSNIWeb,
-		"ws":            TransportProfileWSTLSWeb,
 		"unknown":       "",
 	}
 	for raw, want := range cases {
@@ -28,17 +26,32 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 	}
 }
 
-func TestNormalizeEnabledProfilesKeepsPrimaryAndKnownOrder(t *testing.T) {
+func TestNormalizeEnabledProfilesDropsRemovedNamesAndKeepsKnownOrder(t *testing.T) {
 	t.Parallel()
 
-	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "reality-xhttp,tcp,plain-xhttp,xhttp")
+	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "vless-reality-xhttp,tcp,plain-xhttp,xhttp")
 	want := []string{
 		TransportProfileRealityTCPVision,
-		TransportProfileRealityXHTTP,
 		TransportProfilePlainXHTTP,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("NormalizeEnabledProfiles = %#v, want %#v", got, want)
+	}
+}
+
+func TestRemovedTransportProfilesAreNotSupported(t *testing.T) {
+	t.Parallel()
+
+	for _, removed := range []string{
+		"vless-reality-xhttp",
+		"vless-ws-tls-web",
+	} {
+		if got := NormalizeTransportProfile(removed); got != "" {
+			t.Fatalf("removed profile %q normalized to %q", removed, got)
+		}
+		if _, ok := LookupTransportProfile(removed); ok {
+			t.Fatalf("removed profile %q is still supported", removed)
+		}
 	}
 }
 

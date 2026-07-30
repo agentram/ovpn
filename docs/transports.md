@@ -15,18 +15,10 @@ Transport profiles make that explicit: keep the default compatibility profile li
 | Profile | Status | Port | Use case |
 | --- | --- | ---: | --- |
 | `vless-reality-tcp-vision` | default | `443/tcp` | Original VLESS + REALITY profile. Best compatibility baseline and kept for existing links. |
-| `vless-reality-xhttp` | decomm | `8443/tcp` | Decommissioned after field tests; retained only so older local state can be identified and disabled. |
 | `vless-xhttp-plain` | fallback | `13179/tcp` | Plain XHTTP shape for affected networks; no transport security unless fronted by TLS separately. |
 | `vless-tcp-tls-selfsni-web` | camouflage | `443/tcp` | TCP/TLS profile with a real certificate and fallback to an internal static web service. Conflicts with `vless-reality-tcp-vision` because both own `443/tcp`. |
-| `vless-ws-tls-web` | decomm | n/a | Decommissioned web-front idea; use `vless-tcp-tls-selfsni-web` for HTTPS fallback camouflage. |
 
-Decommissioned profiles are listed only for cleanup of older local state. They cannot be enabled, deployed, or used for newly generated links. If an older server still shows one as enabled, disable it before the next deploy:
-
-```bash
-./ovpn server profile disable <server> vless-reality-xhttp
-./ovpn deploy <server>
-./ovpn doctor <server>
-```
+The former `vless-reality-xhttp` and `vless-ws-tls-web` profiles are removed from the supported profile set. When an old local database contains one of those names, `ovpn` drops it while normalizing the server record; it is not listed, rendered, or available for new links. No manual cleanup command is required.
 
 The fallback profiles are not magic. They give you controlled A/B testing and faster rotation when a network path degrades.
 The `vless-xhttp-plain` profile deliberately has `security=none`, `path=/`, and no REALITY parameters because it matches simple XHTTP profiles seen working in the field. That means Xray does not add REALITY/TLS transport security on this profile. HTTPS destinations inside the tunnel are still protected by HTTPS, but the VLESS/XHTTP transport itself is not protected like the REALITY profiles. Use it only when that tradeoff is acceptable, and keep monitoring whether it remains reliable for your users.
@@ -135,18 +127,67 @@ After users have migrated, disable a non-primary profile and redeploy:
 `disable` updates local desired state only. Old links for that profile keep working until the next successful deploy removes the Xray inbound.
 The CLI refuses to disable the current primary profile; switch primary first, deploy, verify, then disable the old profile.
 
-Link and QR commands fail early when a requested profile is unknown, decommissioned, or disabled. That is intentional: they should not print a secret that cannot work on the selected server.
+Link and QR commands fail early when a requested profile is unknown or disabled. That is intentional: they should not print a secret that cannot work on the selected server. The removed profile names are reported as unsupported.
 
 ## REALITY Target And SNI
 
-`reality_target` and `reality_server_name` are server-side settings. Do not rotate them casually:
+`reality_target` and `reality_server_name` are server-side settings stored per server. Do not rotate them casually:
 
 - `reality_server_name` must be covered by the TLS certificate presented by `reality_target`.
 - The target should be stable, reachable from the VPN host, and behave like a normal high-traffic HTTPS service.
 - Region-specific or “domestic” targets can make one network better and another worse; test them deliberately.
 - Changing target/SNI requires updating server config, running `ovpn deploy`, and issuing fresh REALITY links.
 
+They do not have to be identical across a multi-server setup. The REALITY key
+and short ID remain cluster identity parameters, while target/SNI can be changed
+on one test server without blocking its deployment:
+
+```bash
+ovpn server set-reality-target <server> www.trip.com
+ovpn deploy <server>
+```
+
+The command changes local desired state until `deploy` is run. Generate new
+links after deployment; existing links keep their previous target/SNI values.
+
 Client-side `--fingerprint` and `--spider-x` variants are safer levers because they change only newly generated links.
+
+## Xray Version And REALITY Failures
+
+An Xray image upgrade and a REALITY target change are different operations.
+Test a new image on an unused server first. Check `doctor`, the Xray startup
+log, and at least one client from each network that matters before changing
+the repository default. Keep the previous image tag available for rollback.
+
+The server and client versions also matter. A newer Xray release can warn or
+enforce a minimum client version, so an image upgrade must be checked against
+the client applications already used by people. An image-only upgrade should
+not require new links, but changing the target, SNI, keys, short ID, flow, or
+transport does.
+
+Use the target check from the server when investigating a REALITY failure:
+
+```bash
+xray tls ping <reality-target>:443
+```
+
+The target must be reachable from the VPN host and its certificate must cover
+the configured SNI. This check validates the server-side target; it does not
+prove that an ISP will pass the client handshake. Community reports describe
+middleboxes dropping fragmented or unusually large ClientHello packets, and
+regional filtering can produce the same symptom as a broken server. Treat
+those reports as hypotheses and compare server logs, client diagnostics, and a
+known-good network.
+
+`spiderX` is only the initial path used after a REALITY handshake. It cannot
+repair a handshake that fails before authentication, and changing it alone is
+not a reliable way to address operator filtering.
+
+The current repository default is intentionally kept on the stable upstream
+Xray pin. Prerelease images can be tested per server with
+`server set-xray-version`, but should not be rolled out globally without a
+compatibility review. See `docs/upgrades.md` for the backup, deploy,
+validation, and rollback sequence.
 
 ## Client Compatibility
 

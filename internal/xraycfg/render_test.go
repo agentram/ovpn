@@ -139,25 +139,6 @@ func TestBuildVLESSLink(t *testing.T) {
 func TestBuildVLESSLinkProfiles(t *testing.T) {
 	t.Parallel()
 
-	xhttp := BuildVLESSLink(LinkInput{
-		Address:    "example.com",
-		UUID:       "11111111-1111-1111-1111-111111111111",
-		ServerName: "www.microsoft.com",
-		Password:   "pubkey",
-		ShortID:    "abcd",
-		Profile:    model.TransportProfileRealityXHTTP,
-		Label:      "ovpn xhttp",
-		SpiderX:    "/xhttp-spider",
-	})
-	for _, want := range []string{":8443?", "fp=firefox", "type=xhttp", "path=%2Fovpn-xhttp", "mode=auto", "spx=%2Fxhttp-spider", "#ovpn%20xhttp"} {
-		if !strings.Contains(xhttp, want) {
-			t.Fatalf("xhttp link missing %q: %s", want, xhttp)
-		}
-	}
-	if strings.Contains(xhttp, "flow=xtls-rprx-vision") {
-		t.Fatalf("xhttp link should not include vision flow: %s", xhttp)
-	}
-
 	plainXHTTP := BuildVLESSLink(LinkInput{
 		Address: "example.com",
 		UUID:    "11111111-1111-1111-1111-111111111111",
@@ -260,7 +241,7 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 		t.Fatalf("expected tcp reality and plain xhttp inbounds, got tags %#v", tags)
 	}
 	if tags["vless-reality-xhttp"] != nil {
-		t.Fatalf("decommissioned reality xhttp inbound should not render, got tags %#v", tags)
+		t.Fatalf("removed reality xhttp inbound should not render, got tags %#v", tags)
 	}
 	plainStream, _ := tags["vless-xhttp-plain"]["streamSettings"].(map[string]any)
 	if got := plainStream["security"]; got != "none" {
@@ -370,7 +351,7 @@ func TestValidateSpecRejectsTLSSelfSNIMissingCertificate(t *testing.T) {
 	}
 }
 
-func TestValidateSpecRejectsDecommissionedTransportProfile(t *testing.T) {
+func TestValidateSpecIgnoresRemovedTransportProfile(t *testing.T) {
 	t.Parallel()
 
 	err := ValidateSpec(Spec{
@@ -379,10 +360,10 @@ func TestValidateSpecRejectsDecommissionedTransportProfile(t *testing.T) {
 		RealityTarget:     "www.microsoft.com:443",
 		ShortIDs:          []string{"abcd"},
 		ThreatDNSServers:  []string{"9.9.9.9"},
-		EnabledProfiles:   []string{model.TransportProfileRealityXHTTP},
+		EnabledProfiles:   []string{"vless-reality-xhttp"},
 	})
-	if err == nil || !strings.Contains(err.Error(), "decomm") || !strings.Contains(err.Error(), "not renderable") {
-		t.Fatalf("expected decommissioned profile validation error, got %v", err)
+	if err != nil {
+		t.Fatalf("removed profile should be ignored during normalization, got %v", err)
 	}
 }
 

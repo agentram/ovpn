@@ -9,9 +9,10 @@ import (
 
 func TestRenderServerProfileTableUsesReadableColumns(t *testing.T) {
 	srv := model.Server{
-		Name:            "vpn-a",
-		PrimaryProfile:  model.TransportProfilePlainXHTTP,
-		EnabledProfiles: model.TransportProfilePlainXHTTP + "," + model.TransportProfileRealityXHTTP,
+		Name:           "vpn-a",
+		PrimaryProfile: model.TransportProfilePlainXHTTP,
+		// Simulate old local state. Removed profiles must be normalized away before display.
+		EnabledProfiles: model.TransportProfilePlainXHTTP + ",vless-reality-xhttp",
 	}
 	enabled := map[string]bool{}
 	for _, profile := range srv.NormalizedEnabledProfiles() {

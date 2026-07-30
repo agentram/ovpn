@@ -223,7 +223,7 @@ Use this flow for a first small server. Replace placeholders with your own value
   --domain <domain> \
   --ssh-user root \
   --ssh-port 22 \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 
 ./ovpn server init <server>
 ./ovpn doctor <server>
@@ -298,7 +298,7 @@ See [`README.ansible.md`](README.ansible.md) for inventory and hardening details
   --domain <domain> \
   --ssh-user root \
   --ssh-port 22 \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 ```
 
 ### 4. Initialize and deploy runtime

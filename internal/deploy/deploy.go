@@ -285,7 +285,7 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	defer cancelXray()
 	if _, err := runner.Exec(xrayCtx, cfg, withRemoteTimeout(deployXrayValidateTimeout, xrayTestCmd)); err != nil {
 		if isLikelyXrayVersionTagError(err.Error()) {
-			return fmt.Errorf("validate xray config in container on %s: %w; hint: use xray version without 'v' prefix (example: 26.3.27)", cfg.Host, err)
+			return fmt.Errorf("validate xray config in container on %s: %w; hint: use xray version without 'v' prefix (example: 26.7.28)", cfg.Host, err)
 		}
 		if isLikelyXrayGeositeResourceError(err.Error()) {
 			return fmt.Errorf("validate xray config in container on %s: %w; hint: set OVPN_SECURITY_PROFILE=off and redeploy if this Xray image lacks geosite resources", cfg.Host, err)

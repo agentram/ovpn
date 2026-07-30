@@ -57,7 +57,7 @@ Register a normal VPN host:
   --ssh-user root \
   --ssh-port 22 \
   --ssh-identity ~/.ssh/id_rsa \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 ```
 
 Useful server flags:
@@ -219,7 +219,7 @@ List the profiles known to a server:
 ./ovpn server profile list <server>
 ```
 
-Enable an extra deployable profile and redeploy:
+Enable an extra profile and redeploy:
 
 ```bash
 ./ovpn server profile enable <server> vless-xhttp-plain
@@ -227,7 +227,7 @@ Enable an extra deployable profile and redeploy:
 ./ovpn doctor <server>
 ```
 
-Decommissioned profiles are shown by `server profile list` only for cleanup of older local state. They cannot be enabled, deployed, or used for new links.
+Profiles removed in a release are no longer shown or rendered. If older local state contains a removed profile name, normal state normalization drops it; no separate cleanup command is required. Links for removed profiles cannot be generated after the profile is removed from the server.
 
 The `vless-tcp-tls-selfsni-web` profile uses `443/tcp`, so it conflicts with `vless-reality-tcp-vision`.
 Prepare its certificate/fallback site through Ansible first, then switch the server profile instead of enabling both:

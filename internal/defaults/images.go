@@ -3,7 +3,7 @@ package defaults
 import "strings"
 
 const (
-	DefaultXrayVersion       = "26.3.27"
+	DefaultXrayVersion       = "26.7.28"
 	DefaultXrayImageRepo     = "ghcr.io/xtls/xray-core"
 	DefaultAgentImage        = "alpine:3.23.4"
 	DefaultTelegramBotImage  = "alpine:3.23.4"

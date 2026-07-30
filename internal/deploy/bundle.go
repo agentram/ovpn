@@ -123,7 +123,7 @@ func injectXrayProfilePorts(composeTpl []byte, profiles []string) []byte {
 	var extra []string
 	for _, profile := range profiles {
 		meta, ok := model.LookupTransportProfile(profile)
-		if !ok || meta.Port == 443 || meta.Port <= 0 || !meta.Deployable() {
+		if !ok || meta.Port == 443 || meta.Port <= 0 {
 			continue
 		}
 		extra = append(extra, fmt.Sprintf("      - \"%d:%d/tcp\"", meta.Port, meta.Port))

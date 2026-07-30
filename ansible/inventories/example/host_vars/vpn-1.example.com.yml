@@ -17,7 +17,7 @@ ovpn_manage_firewall: true
 ovpn_use_fail2ban: true
 ovpn_firewall_extra_tcp_ports: []
 
-ovpn_xray_version: "26.3.27"
+ovpn_xray_version: "26.7.28"
 
 # If using ansible-vault:
 # ovpn_reality_private_key: "{{ vault_ovpn_reality_private_key | default('') }}"

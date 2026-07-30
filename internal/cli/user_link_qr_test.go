@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -167,30 +166,30 @@ func TestUserLinkCanSelectTransportProfile(t *testing.T) {
 	}
 }
 
-func TestUserLinkRejectsDecommissionedTransportProfile(t *testing.T) {
+func TestUserLinkRejectsRemovedTransportProfile(t *testing.T) {
 	app := newTestAppWithLinkedUser(t)
 	srv, err := app.store.GetServerByName(app.ctx, "main")
 	if err != nil {
 		t.Fatalf("get server: %v", err)
 	}
-	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfileRealityXHTTP)
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), "vless-reality-xhttp")
 	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
 		t.Fatalf("update server: %v", err)
 	}
 
 	cmd := app.newUserLinkCmd()
-	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileRealityXHTTP, "--qr=false"})
+	cmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", "vless-reality-xhttp", "--qr=false"})
 	stdout, stderr, err := captureStdoutStderr(t, cmd.Execute)
 	if err == nil {
-		t.Fatalf("expected decommissioned profile error")
+		t.Fatalf("expected removed profile error")
 	}
-	for _, want := range []string{model.TransportProfileRealityXHTTP, "decomm", "not deployable"} {
+	for _, want := range []string{"vless-reality-xhttp", "unsupported transport profile"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("expected error to contain %q, got %v", want, err)
 		}
 	}
 	if stdout != "" {
-		t.Fatalf("expected no link output for decommissioned profile, stdout=%q stderr=%q", stdout, stderr)
+		t.Fatalf("expected no link output for removed profile, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -503,7 +502,6 @@ func TestUserExportAllProfilesWritesLinksAndQRs(t *testing.T) {
 		t.Fatalf("get server: %v", err)
 	}
 	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), strings.Join([]string{
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
 	}, ","))
 	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
@@ -536,11 +534,6 @@ func TestUserExportAllProfilesWritesLinksAndQRs(t *testing.T) {
 			t.Fatalf("exported link for %s missing profile label: %s", profile, string(raw))
 		}
 		assertPNGQRCodeFile(t, base+".png")
-	}
-	for _, suffix := range []string{".txt", ".png"} {
-		if _, err := os.Stat(filepath.Join(out, "main-alice-"+model.TransportProfileRealityXHTTP+suffix)); !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("decommissioned profile should not be exported, stat err=%v", err)
-		}
 	}
 }
 

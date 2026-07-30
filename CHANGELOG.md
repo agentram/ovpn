@@ -20,7 +20,8 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Refreshed Go dependencies, including Prometheus client, `golang.org/x/crypto`, gRPC, sqlite, and table rendering libraries.
 - Updated pinned GitHub Actions versions for checkout, Go setup, Python setup, cache metadata, and golangci-lint.
 - New generated REALITY/TLS client links now default to `fp=firefox` instead of `fp=chrome` and include a stable per-user REALITY `spx` path. Existing imported user profiles keep working until users import a newly generated link.
-- Marked `vless-reality-tcp-vision` as the default baseline profile, and decommissioned `vless-reality-xhttp` plus `vless-ws-tls-web` so they can be listed and disabled from older local state but cannot be used for new deploys or generated links.
+- Made `vless-reality-tcp-vision` the default REALITY profile and removed the unused `vless-reality-xhttp` and `vless-ws-tls-web` profiles from the supported/deployable profile set. Old local records are normalized without rendering those profiles again.
+- Updated the repository Xray default to `26.7.28`; REALITY target/SNI changes remain explicit per-server operations.
 - Minimal security routing blocks IPv6-literal destinations again (`::/0 -> block`) so IPv4-only VPS hosts do not accept unroutable client-preferred IPv6 targets and then stall traffic.
 
 ### Docs

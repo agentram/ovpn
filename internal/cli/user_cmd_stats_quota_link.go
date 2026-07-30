@@ -491,9 +491,6 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 	if !ok {
 		return "", unsupportedTransportProfileError(profile)
 	}
-	if !meta.Deployable() {
-		return "", nonDeployableTransportProfileError(meta, srv.Name)
-	}
 	if !srv.IsTransportProfileEnabled(profile) {
 		return "", fmt.Errorf("profile %s is not enabled on server %s; enable and deploy it first with `ovpn server profile enable %s %s` and `ovpn deploy %s`, or choose an enabled profile from `ovpn server profile list %s`", profile, srv.Name, srv.Name, profile, srv.Name, srv.Name)
 	}
@@ -607,8 +604,8 @@ func deployableEnabledProfiles(srv model.Server) []string {
 	profiles := srv.NormalizedEnabledProfiles()
 	out := make([]string, 0, len(profiles))
 	for _, profile := range profiles {
-		meta, ok := model.LookupTransportProfile(profile)
-		if ok && meta.Deployable() {
+		_, ok := model.LookupTransportProfile(profile)
+		if ok {
 			out = append(out, profile)
 		}
 	}

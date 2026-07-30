@@ -197,6 +197,7 @@ func TestServerAndConfigCommandsUseLocalStateAndDryRunSSH(t *testing.T) {
 	app := newTestAppWithServer(t, true)
 	runServerCommand(t, app, "list")
 	runServerCommand(t, app, "set-xray-version", "main", "v26.4.1")
+	runServerCommand(t, app, "set-reality-target", "main", "www.trip.com")
 	runServerCommand(t, app, "status", "main")
 	runServerCommand(t, app, "logs", "main", "--service", "xray", "--tail", "5")
 	runServerCommand(t, app, "monitor", "up", "main")
