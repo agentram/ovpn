@@ -52,6 +52,10 @@ changes local desired state only; `deploy` is what updates the remote image.
 The stack restarts during deployment, so expect a short interruption. Existing
 links do not need to be regenerated for an image-only upgrade.
 
+The short `xhttp` profile alias was removed in 1.8.0 because it could silently
+select the plaintext fallback after the REALITY-XHTTP profile was removed. Use
+the explicit name `vless-xhttp-plain` in scripts and profile commands.
+
 Ansible is not required for an image-only Xray upgrade. Run the Ansible
 maintenance playbook separately only when host packages, firewall rules, or
 other host policy also changed.

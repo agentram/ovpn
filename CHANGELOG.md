@@ -10,6 +10,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ### Security
 - Updated the CI Ansible pin to `ansible-core 2.20.7`, which includes the fix for the `ansible-galaxy` argument-injection advisory.
+- Removed the ambiguous `xhttp` profile alias; use `vless-xhttp-plain` explicitly.
 
 ### Added
 - Added opt-in `vless-tcp-tls-selfsni-web` transport profile: VLESS over TCP/TLS on `443/tcp` with Xray fallback to an internal static `ovpn-web` service for ordinary HTTPS responses.

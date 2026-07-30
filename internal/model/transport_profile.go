@@ -68,7 +68,7 @@ func NormalizeTransportProfile(name string) string {
 	switch name {
 	case "", "default", "tcp", "reality", "vision", "vless-reality", TransportProfileRealityTCPVision:
 		return TransportProfileRealityTCPVision
-	case "xhttp", "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
+	case "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
 		return TransportProfilePlainXHTTP
 	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
 		return TransportProfileTLSSelfSNIWeb
