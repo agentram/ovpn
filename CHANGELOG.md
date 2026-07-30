@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## Unreleased
+
+## 1.8.0
+
+### Security
+- Updated the CI Ansible pin to `ansible-core 2.20.7`, which includes the fix for the `ansible-galaxy` argument-injection advisory.
+- Removed the ambiguous `xhttp` profile alias; use `vless-xhttp-plain` explicitly.
+
+### Added
+- Added opt-in `vless-tcp-tls-selfsni-web` transport profile: VLESS over TCP/TLS on `443/tcp` with Xray fallback to an internal static `ovpn-web` service for ordinary HTTPS responses.
+- Added optional Ansible self-SNI prerequisites in a separate `camouflage.yml` task file for certificate issuance, renewal hook, fallback site directory, and conditional `80/tcp` firewall access.
+- Added profile-aware validation and link generation for self-SNI, including a clear `443/tcp` conflict with the TCP/REALITY profile.
+- Added `--fingerprint` and `--spider-x` overrides to `user link` and `user qr`, plus `--fingerprint` / `--fingerprints` export variants for operators who need explicit client-link hardening.
+- Added `--legacy-reality` and `--no-spider-x` link-generation options for compatibility checks with older REALITY client profiles.
+- Added a doctor warning when `reality_server_name` differs from the `reality_target` host, because target/SNI changes require deliberate server config updates, deploy, and fresh REALITY links.
+
+### Changed
+- Refreshed Go dependencies, including Prometheus client, `golang.org/x/crypto`, gRPC, sqlite, and table rendering libraries.
+- Updated pinned GitHub Actions versions for checkout, Go setup, Python setup, cache metadata, and golangci-lint.
+- New generated REALITY/TLS client links now default to `fp=firefox` instead of `fp=chrome` and include a stable per-user REALITY `spx` path. Existing imported user profiles keep working until users import a newly generated link.
+- Made `vless-reality-tcp-vision` the default REALITY profile and removed the unused `vless-reality-xhttp` and `vless-ws-tls-web` profiles from the supported/deployable profile set. Old local records are normalized without rendering those profiles again.
+- Updated the repository Xray default to `26.7.28`; REALITY target/SNI changes remain explicit per-server operations.
+- Minimal security routing blocks IPv6-literal destinations again (`::/0 -> block`) so IPv4-only VPS hosts do not accept unroutable client-preferred IPv6 targets and then stall traffic.
+
+### Docs
+- Documented the self-SNI rollout path, certificate prerequisites, fallback-site behavior, and when users need new links.
+
 ## 1.7.4
 
 ### Security

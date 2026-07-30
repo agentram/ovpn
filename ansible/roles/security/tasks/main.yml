@@ -6,7 +6,7 @@
 
 - name: Build effective public HTTP/HTTPS toggles
   ansible.builtin.set_fact:
-    security_firewall_effective_http: "{{ ovpn_firewall_allow_http | bool }}"
+    security_firewall_effective_http: "{{ (ovpn_firewall_allow_http | bool) or (ovpn_camouflage_enabled | default(false) | bool) }}"
     security_firewall_effective_https: "{{ ovpn_firewall_allow_https | bool }}"
 
 - name: Build effective public service port sets
@@ -325,6 +325,10 @@
       ansible.builtin.command: ufw --force enable
       register: security_ufw_enable
       changed_when: false
+
+- name: Configure self-SNI camouflage prerequisites (optional)
+  ansible.builtin.include_tasks: camouflage.yml
+  when: ovpn_camouflage_enabled | default(false) | bool
 
 - name: Configure SSH hardening drop-in
   when: ovpn_harden_ssh | bool

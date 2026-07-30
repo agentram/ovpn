@@ -80,6 +80,11 @@ func TestDoctorBranchesForRemoteFailuresAndWarnings(t *testing.T) {
 	if got := checkLocalConfig(warnSrv); got.Status != doctor.StatusWarn {
 		t.Fatalf("expected local warning, got %+v", got)
 	}
+	warnSrv.RealityTarget = "cdn.example.net:443"
+	warnSrv.RealityServerName = "www.microsoft.com"
+	if got := checkLocalConfig(warnSrv); got.Status != doctor.StatusWarn || !strings.Contains(strings.Join(got.Details, "\n"), "reality_server_name differs") {
+		t.Fatalf("expected target/serverName mismatch warning, got %+v", got)
+	}
 	warnSrv.SSHPort = 0
 	if got := checkLocalConfig(warnSrv); got.Status != doctor.StatusFail {
 		t.Fatalf("expected local validation failure, got %+v", got)
@@ -177,6 +182,8 @@ func TestDoctorXrayConfigMountsAccessLogDir(t *testing.T) {
 		"sudo chown 65532:65532 /opt/ovpn/logs",
 		"sudo chmod 770 /opt/ovpn/logs",
 		"-v /opt/ovpn/logs:/var/log/ovpn",
+		"tls_selfsni_cert_dir=${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}",
+		":/etc/xray/certs:ro",
 	} {
 		if !strings.Contains(gotCmd, want) {
 			t.Fatalf("xray config check command missing %q: %s", want, gotCmd)

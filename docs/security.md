@@ -8,16 +8,18 @@ Recommended host model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
 - Optional XHTTP fallback profile on `13179/tcp`
+- Optional self-SNI HTTPS camouflage profile on `443/tcp`, with a real certificate and an internal static fallback site
 - SSH control plane on `22/tcp`
 - Ansible for host baseline and hardening
 - `ovpn` for runtime lifecycle
-- No external reverse-proxy or certificate-management layer is required in the recommended flow
+- No external reverse-proxy or certificate-management layer is required in the recommended REALITY flow
 
 ## Threat-surface baseline
 
 Public surface should stay minimal:
 
 - Xray transport port (`443/tcp`)
+- Optional HTTP challenge port (`80/tcp`) when self-SNI certificate issuance is enabled
 - Optional XHTTP fallback port (`13179/tcp`) when that profile is enabled
 - SSH (`22/tcp`)
 
@@ -36,11 +38,14 @@ Follow official Xray guidance:
 - Use a realistic, stable `reality_target`.
 - Treat fallback as anti-active-probing/shared-port behavior.
 - Understand failed auth traffic is forwarded to `target`.
+- Treat `fp` and `spiderX` as client-link hardening knobs; they do not require server-side target rotation.
 
 Operational rules:
 
 - Do not use wildcard-style server names.
 - Avoid placeholder `reality_target` values.
+- Keep `reality_server_name` aligned with a certificate name served by `reality_target`.
+- Rotate `reality_target` / `serverNames` only as an operator change: update config, deploy, then issue new REALITY links.
 - Keep `OVPN_SECURITY_PROFILE=minimal` unless you need emergency rollback.
 - Minimal profile adds protocol/domain blocking and threat DNS resolvers.
 - Keep fallback rate limits disabled by default.
@@ -56,9 +61,11 @@ Minimal profile runtime controls include:
 - `protocol: ["bittorrent"] -> outboundTag: "block"`
 - `domain: ["geosite:category-public-tracker"] -> outboundTag: "block"`
 - Xray `dns.servers` with threat resolvers
+- IPv6-literal destinations (`::/0`) -> `outboundTag: "block"` so IPv4-only VPS hosts fail fast instead of timing out on client-preferred IPv6 targets
 
 Rendered routing uses `domainStrategy=AsIs`, so IP-literal destinations remain visible to routing and diagnostics.
-The default freedom outbound prefers IPv4 for domain resolution, but IPv6-literal destinations are not blackholed by default because mobile clients may try IPv6 before falling back to IPv4.
+The default freedom outbound prefers IPv4 for domain resolution, and IPv6-literal destinations are blocked by default in the minimal profile.
+This is intentional for small IPv4-only VPS hosts where mobile clients may otherwise connect successfully but hang on IPv6 targets that the host cannot route.
 
 If Xray image validation fails because geosite resources are missing:
 
@@ -77,6 +84,54 @@ Optional fallback rate-limit env settings:
 - `OVPN_REALITY_LIMIT_FALLBACK_DOWNLOAD_BURST_BYTES_PER_SEC`
 
 Note: Xray docs warn fallback rate limits may be fingerprintable. Use intentionally.
+
+## Optional self-SNI HTTPS fallback
+
+The `vless-tcp-tls-selfsni-web` profile is an explicit operator choice for hosts where a normal HTTPS response on the VPN domain is useful.
+It differs from REALITY:
+
+- REALITY uses an external `reality_target` for failed-auth behavior.
+- self-SNI uses a real certificate for the server domain and Xray's VLESS TCP/TLS fallback.
+- Xray remains the only public listener on `443/tcp`.
+- The fallback web service is an internal Docker sidecar (`ovpn-web`) exposed only inside the Compose network.
+
+When `ovpn_camouflage_enabled: true`, the Ansible security role includes the separate `camouflage.yml` task file and prepares:
+
+- `/opt/ovpn/certs` for the runtime certificate/key copy
+- `/opt/ovpn/camouflage-site` for a boring static site
+- certbot issuance/renewal for the configured domain
+- a renewal deploy hook that refreshes the runtime cert files and recreates the Xray container
+- `80/tcp` firewall access for HTTP-01 certificate validation
+
+Set these values in `host_vars/<server-hostname>.yml` before switching a server to `vless-tcp-tls-selfsni-web`:
+
+```yaml
+ovpn_camouflage_enabled: true
+ovpn_camouflage_domain: vpn-a.example.net
+ovpn_camouflage_cert_email: ops@example.net
+```
+
+Set `ovpn_camouflage_cert_email` in production inventory when possible. Without it, certbot can register the certificate without an email address, but Let's Encrypt cannot send expiry or renewal-failure notices.
+
+The `80/tcp` rule stays open while camouflage is enabled because unattended `certbot renew --standalone` needs the HTTP-01 challenge port later, not only during first issuance. Nothing in ovpn listens on `80/tcp` between renewals.
+
+If `ovpn_manage_firewall: false`, Ansible does not manage host firewall rules.
+In that case, open `80/tcp` through your separate firewall process before certificate issuance.
+
+Keep the fallback site ordinary. Do not put VPN branding, operator notes, hidden diagnostics, tokens, or user-specific content on it.
+The goal is a normal HTTPS response for accidental traffic and simple probes, not a public control surface.
+
+The profile conflicts with `vless-reality-tcp-vision` because both use `443/tcp`.
+Ansible only prepares certificates, firewall access, and the fallback site; it does not enable the Xray profile by itself. Use `server profile switch`, then deploy and verify:
+
+```bash
+./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn deploy <server>
+./ovpn doctor <server>
+curl -vk https://<domain>/
+```
+
+Users need new links only when they switch to this profile.
 
 ## SSH and host hardening defaults
 

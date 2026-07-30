@@ -59,7 +59,7 @@ func TestQuotaSetAllowsTrailingGBUnit(t *testing.T) {
 	t.Parallel()
 
 	cmd := (&App{}).newUserQuotaSetCmd()
-	if err := cmd.ParseFlags([]string{"--username", "arr-1", "--monthly-gb", "400"}); err != nil {
+	if err := cmd.ParseFlags([]string{"--username", "alice", "--monthly-gb", "400"}); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
 	if err := cmd.Args(cmd, []string{"GB"}); err != nil {
@@ -74,9 +74,9 @@ func TestQuotaSetRejectsUnexpectedTrailingUnit(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "unknown unit", args: []string{"--username", "arr-1", "--monthly-gb", "400", "MB"}},
-		{name: "gb without monthly-gb", args: []string{"--username", "arr-1", "--monthly-bytes", "400", "GB"}},
-		{name: "extra words", args: []string{"--username", "arr-1", "--monthly-gb", "400", "GB", "extra"}},
+		{name: "unknown unit", args: []string{"--username", "alice", "--monthly-gb", "400", "MB"}},
+		{name: "gb without monthly-gb", args: []string{"--username", "alice", "--monthly-bytes", "400", "GB"}},
+		{name: "extra words", args: []string{"--username", "alice", "--monthly-gb", "400", "GB", "extra"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

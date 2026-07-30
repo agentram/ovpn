@@ -12,6 +12,8 @@ services:
     volumes:
       - ./xray/config.json:/etc/xray/config.json:ro
       - ./logs:/var/log/ovpn
+      # OVPN_XRAY_TLS_SELFSNI_VOLUMES
+    # OVPN_XRAY_TLS_SELFSNI_DEPENDS_ON
     logging:
       driver: json-file
       options:
@@ -19,6 +21,8 @@ services:
         max-file: "5"
     networks:
       - ovpn-net
+
+  # OVPN_CAMOUFLAGE_WEB_SERVICE
 
   ovpn-agent:
     image: ${OVPN_AGENT_IMAGE}

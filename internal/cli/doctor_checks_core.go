@@ -347,6 +347,7 @@ func (a *App) checkXrayConfig(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
 		fmt.Sprintf("sudo chmod 770 %s/logs", deploy.RemoteDir),
 		fmt.Sprintf("extra_mounts=''; if [ -f %s/geodata/geosite.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
 		fmt.Sprintf("if [ -f %s/geodata/geoip.dat ]; then extra_mounts=\"$extra_mounts -v %s/geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro\"; fi", deploy.RemoteDir, deploy.RemoteDir),
+		"tls_selfsni_cert_dir=${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}; if [ -d \"$tls_selfsni_cert_dir\" ]; then extra_mounts=\"$extra_mounts -v $tls_selfsni_cert_dir:/etc/xray/certs:ro\"; fi",
 		fmt.Sprintf("eval sudo -n docker run --rm -v %s/xray/config.json:/etc/xray/config.json:ro -v %s/logs:/var/log/ovpn $extra_mounts $XRAY_IMAGE run -test -config /etc/xray/config.json", deploy.RemoteDir, deploy.RemoteDir),
 	}, "; ")
 	res, err := a.execRemote(runner, cfg, 40*time.Second, cmd)

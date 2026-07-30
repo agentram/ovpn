@@ -229,6 +229,9 @@ func checkLocalConfig(srv model.Server) doctor.Check {
 	if strings.EqualFold(strings.TrimSpace(targetHost), strings.TrimSpace(srv.Host)) || strings.EqualFold(strings.TrimSpace(targetHost), strings.TrimSpace(srv.Domain)) {
 		warns = append(warns, "reality_target points to this VPN host/domain; choose an external realistic target")
 	}
+	if targetHost != "" && strings.TrimSpace(srv.RealityServerName) != "" && !strings.EqualFold(strings.TrimSpace(targetHost), strings.TrimSpace(srv.RealityServerName)) {
+		warns = append(warns, "reality_server_name differs from reality_target host; make sure the target certificate covers the configured serverName")
+	}
 	if len(warns) > 0 {
 		check.Status = doctor.StatusWarn
 		check.Message = "local server record is usable but has warnings"

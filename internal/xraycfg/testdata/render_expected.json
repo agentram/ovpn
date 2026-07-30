@@ -40,6 +40,13 @@
         "type": "field"
       },
       {
+        "ip": [
+          "::/0"
+        ],
+        "outboundTag": "block",
+        "type": "field"
+      },
+      {
         "outboundTag": "block",
         "protocol": [
           "bittorrent"

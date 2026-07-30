@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ ovpn_camouflage_site_title | default('Project notes') }}</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --accent: {{ ovpn_camouflage_site_accent | default('#4f6f52') }};
+    }
+    body { margin: 0; min-height: 100vh; background: #f6f5f1; color: #24251f; }
+    header, main { width: min(920px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 28px 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    nav { display: flex; gap: 16px; font-size: 14px; color: #60645a; }
+    main { padding: 56px 0 72px; }
+    h1 { font-size: clamp(30px, 5vw, 54px); line-height: 1.08; margin: 0 0 18px; font-weight: 650; }
+    p { font-size: 18px; line-height: 1.65; margin: 0; color: #56594f; max-width: 620px; }
+    .mark { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); }
+    .grid { margin-top: 42px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 18px; }
+    .item { border-top: 1px solid #d9d7cd; padding-top: 16px; }
+    .item h2 { font-size: 15px; margin: 0 0 8px; font-weight: 650; }
+    .item p { font-size: 14px; line-height: 1.5; color: #666a60; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #12130f; color: #ecebe4; }
+      nav, p { color: #aaa99d; }
+      .item { border-top-color: #34362e; }
+      .item p { color: #aaa99d; }
+    }
+  </style>
+</head>
+<body>
+  {% set cards = ovpn_camouflage_site_cards | default([
+    {'title': 'Status', 'text': 'Current public page is available.'},
+    {'title': 'Documents', 'text': 'Shared materials and references are collected here.'},
+    {'title': 'Contact', 'text': 'Use the usual contact channel for questions.'}
+  ]) %}
+  <header>
+    <div class="mark" aria-hidden="true"></div>
+    <nav>
+      <span>Home</span>
+      <span>Notes</span>
+      <span>Contact</span>
+    </nav>
+  </header>
+  <main>
+    <h1>{{ ovpn_camouflage_site_heading | default('Project notes') }}</h1>
+    <p>{{ ovpn_camouflage_site_text | default('A small public page for shared notes, documents, and status updates.') }}</p>
+    <section class="grid" aria-label="Page sections">
+      {% for card in cards %}
+      <article class="item">
+        <h2>{{ card.title }}</h2>
+        <p>{{ card.text }}</p>
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>

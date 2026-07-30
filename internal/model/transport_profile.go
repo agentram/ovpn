@@ -2,38 +2,36 @@ package model
 
 import "strings"
 
+const (
+	TransportProfileStatusDefault    = "default"
+	TransportProfileStatusFallback   = "fallback"
+	TransportProfileStatusCamouflage = "camouflage"
+)
+
 var transportProfiles = []TransportProfile{
 	{
 		Name:        TransportProfileRealityTCPVision,
 		Kind:        "reality",
-		Status:      "deprecated",
+		Status:      TransportProfileStatusDefault,
 		Port:        443,
 		InboundTag:  "vless-reality",
-		Description: "VLESS over TCP with REALITY and xtls-rprx-vision flow; kept for existing links and client compatibility.",
-	},
-	{
-		Name:        TransportProfileRealityXHTTP,
-		Kind:        "reality",
-		Status:      "experimental",
-		Port:        8443,
-		InboundTag:  "vless-reality-xhttp",
-		Description: "VLESS over XHTTP with REALITY for clients that support XHTTP.",
+		Description: "Default VLESS over TCP with REALITY and xtls-rprx-vision flow; kept for compatibility and as the baseline REALITY profile.",
 	},
 	{
 		Name:        TransportProfilePlainXHTTP,
 		Kind:        "plain-xhttp",
-		Status:      "fallback",
+		Status:      TransportProfileStatusFallback,
 		Port:        13179,
 		InboundTag:  "vless-xhttp-plain",
 		Description: "VLESS over XHTTP without stream security on a high port; operator-controlled fallback for degraded REALITY paths.",
 	},
 	{
-		Name:        TransportProfileWSTLSWeb,
-		Kind:        "tls-web",
-		Status:      "planned",
-		Port:        8445,
-		InboundTag:  "vless-ws-tls-web",
-		Description: "VLESS over WebSocket/TLS behind a normal HTTPS web endpoint; requires certificates and a web front end.",
+		Name:        TransportProfileTLSSelfSNIWeb,
+		Kind:        "tls-selfsni-web",
+		Status:      TransportProfileStatusCamouflage,
+		Port:        443,
+		InboundTag:  "vless-tcp-tls-selfsni-web",
+		Description: "VLESS over TCP/TLS with xtls-rprx-vision and HTTPS fallback to a normal internal web service.",
 	},
 }
 
@@ -70,18 +68,18 @@ func NormalizeTransportProfile(name string) string {
 	switch name {
 	case "", "default", "tcp", "reality", "vision", "vless-reality", TransportProfileRealityTCPVision:
 		return TransportProfileRealityTCPVision
-	case "xhttp", "reality-xhttp", TransportProfileRealityXHTTP:
-		return TransportProfileRealityXHTTP
 	case "plain-xhttp", "xhttp-plain", "emergency-xhttp", TransportProfilePlainXHTTP:
 		return TransportProfilePlainXHTTP
-	case "ws", "websocket", "ws-tls", "web", TransportProfileWSTLSWeb:
-		return TransportProfileWSTLSWeb
+	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
+		return TransportProfileTLSSelfSNIWeb
 	default:
 		return ""
 	}
 }
 
 // NormalizeEnabledProfiles returns unique enabled profile names in display order.
+// Unknown historical profile names are ignored so old local state remains
+// loadable without rendering removed profiles again.
 func NormalizeEnabledProfiles(primary string, raw string) []string {
 	seen := map[string]bool{}
 	var candidates []string

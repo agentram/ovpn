@@ -18,7 +18,7 @@ ovpn_firewall_extra_tcp_ports: []
 
 # The proxy host is still prepared with the same host baseline.
 # Runtime role-specific behavior is configured later with `ovpn server add --role proxy`.
-ovpn_xray_version: "26.3.27"
+ovpn_xray_version: "26.7.28"
 
 ovpn_block_tor_exit_nodes: false
 ovpn_tor_exit_block_port: 443

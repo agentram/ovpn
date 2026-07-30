@@ -40,6 +40,40 @@ func TestRootComposeMirrorsEmbeddedTemplates(t *testing.T) {
 	}
 }
 
+func TestAnsibleCamouflageCertsReadableByXrayRuntimeGroup(t *testing.T) {
+	t.Parallel()
+
+	taskRaw, err := os.ReadFile("../../ansible/roles/security/tasks/camouflage.yml")
+	if err != nil {
+		t.Fatalf("read camouflage tasks: %v", err)
+	}
+	task := string(taskRaw)
+	for _, want := range []string{
+		"name: Ensure self-SNI certificate directory exists",
+		"group: \"65532\"",
+		"mode: \"0750\"",
+	} {
+		if !strings.Contains(task, want) {
+			t.Fatalf("camouflage cert directory task missing %q:\n%s", want, task)
+		}
+	}
+
+	hookRaw, err := os.ReadFile("../../ansible/roles/security/templates/ovpn-camouflage-cert-deploy.sh.j2")
+	if err != nil {
+		t.Fatalf("read camouflage cert deploy hook: %v", err)
+	}
+	hook := string(hookRaw)
+	for _, want := range []string{
+		`install -d -m 0750 -o root -g 65532 "$cert_dir"`,
+		`install -m 0644 -o root -g 65532 "$live_dir/fullchain.pem" "$cert_dir/fullchain.pem"`,
+		`install -m 0640 -o root -g 65532 "$live_dir/privkey.pem" "$cert_dir/privkey.pem"`,
+	} {
+		if !strings.Contains(hook, want) {
+			t.Fatalf("camouflage cert hook missing %q:\n%s", want, hook)
+		}
+	}
+}
+
 type fakeRunner struct {
 	execCmds []string
 	copyOps  [][2]string
@@ -367,24 +401,143 @@ func TestRenderBundleConnectionDiagnosticsModeControlsAccessLog(t *testing.T) {
 	}
 }
 
+func TestRenderBundleIncludesTLSSelfSNIWebSidecar(t *testing.T) {
+	t.Parallel()
+
+	bundle, err := RenderBundle(Input{
+		Server: model.Server{
+			Name:            "vpn-a",
+			XrayVersion:     "26.3.27",
+			Domain:          "vpn-a.example.net",
+			PrimaryProfile:  model.TransportProfileTLSSelfSNIWeb,
+			EnabledProfiles: model.TransportProfileTLSSelfSNIWeb,
+		},
+		Users: []model.User{{
+			Username: "alice",
+			Email:    "alice@global",
+			UUID:     "11111111-1111-1111-1111-111111111111",
+			Enabled:  true,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("render TLS self-SNI bundle: %v", err)
+	}
+	defer CleanupBundle(bundle)
+
+	cfg := string(bundle.ConfigRaw)
+	for _, want := range []string{
+		`"tag": "vless-tcp-tls-selfsni-web"`,
+		`"security": "tls"`,
+		`"certificateFile": "/etc/xray/certs/fullchain.pem"`,
+		`"keyFile": "/etc/xray/certs/privkey.pem"`,
+		`"fallbacks"`,
+		`"dest": "ovpn-web:8080"`,
+	} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("expected TLS self-SNI config to contain %q, got:\n%s", want, cfg)
+		}
+	}
+	if strings.Contains(cfg, "realitySettings") {
+		t.Fatalf("TLS self-SNI-only config should not render REALITY settings:\n%s", cfg)
+	}
+
+	composeRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	compose := string(composeRaw)
+	for _, want := range []string{
+		"ovpn-web:",
+		"image: ${OVPN_WEB_IMAGE}",
+		"depends_on:\n      - ovpn-web",
+		"${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}:/etc/xray/certs:ro",
+		"${OVPN_CAMOUFLAGE_SITE_DIR:-/opt/ovpn/camouflage-site}:/usr/share/nginx/html:ro",
+		"./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro",
+	} {
+		if !strings.Contains(compose, want) {
+			t.Fatalf("expected TLS self-SNI compose to contain %q, got:\n%s", want, compose)
+		}
+	}
+	for _, forbidden := range []string{`"8443:8443/tcp"`, `"13179:13179/tcp"`} {
+		if strings.Contains(compose, forbidden) {
+			t.Fatalf("TLS self-SNI bundle should not expose unrelated profile port %s, got:\n%s", forbidden, compose)
+		}
+	}
+
+	nginxRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "web", "nginx.conf"))
+	if err != nil {
+		t.Fatalf("read camouflage nginx config: %v", err)
+	}
+	if !strings.Contains(string(nginxRaw), "listen 8080;") {
+		t.Fatalf("camouflage nginx config should listen internally on 8080, got:\n%s", string(nginxRaw))
+	}
+
+	envRaw, err := os.ReadFile(filepath.Join(bundle.Dir, ".env"))
+	if err != nil {
+		t.Fatalf("read env: %v", err)
+	}
+	env := string(envRaw)
+	for _, want := range []string{
+		"OVPN_WEB_IMAGE=nginx:1.29-alpine",
+		"OVPN_TLS_SELFSNI_CERT_DIR=/opt/ovpn/certs",
+		"OVPN_CAMOUFLAGE_SITE_DIR=/opt/ovpn/camouflage-site",
+	} {
+		if !strings.Contains(env, want) {
+			t.Fatalf("expected TLS self-SNI env to contain %q, got:\n%s", want, env)
+		}
+	}
+}
+
+func TestRenderBundleDefaultOmitsTLSSelfSNIWebSidecar(t *testing.T) {
+	t.Parallel()
+
+	bundle, err := RenderBundle(Input{
+		Server: model.Server{
+			Name:              "vpn-a",
+			XrayVersion:       "26.3.27",
+			Domain:            "vpn-a.example.net",
+			RealityPrivateKey: "priv",
+			RealityServerName: "www.microsoft.com",
+			RealityTarget:     "www.microsoft.com:443",
+			RealityShortIDs:   "abcd",
+		},
+	})
+	if err != nil {
+		t.Fatalf("render default bundle: %v", err)
+	}
+	defer CleanupBundle(bundle)
+
+	composeRaw, err := os.ReadFile(filepath.Join(bundle.Dir, "docker-compose.yml"))
+	if err != nil {
+		t.Fatalf("read compose: %v", err)
+	}
+	compose := string(composeRaw)
+	for _, forbidden := range []string{
+		"ovpn-web:",
+		"depends_on:\n      - ovpn-web",
+		"${OVPN_TLS_SELFSNI_CERT_DIR:-/opt/ovpn/certs}:/etc/xray/certs:ro",
+		"${OVPN_CAMOUFLAGE_SITE_DIR:-/opt/ovpn/camouflage-site}:/usr/share/nginx/html:ro",
+	} {
+		if strings.Contains(compose, forbidden) {
+			t.Fatalf("default bundle should not render TLS self-SNI sidecar data %q, got:\n%s", forbidden, compose)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(bundle.Dir, "web", "nginx.conf")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("default bundle should not write camouflage nginx config, stat err=%v", err)
+	}
+
+}
+
 func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 	t.Parallel()
 
 	base := []byte("ports:\n      - \"443:443/tcp\"\n      # OVPN_XRAY_PROFILE_PORTS\n")
 	got := string(injectXrayProfilePorts(base, []string{
 		model.TransportProfileRealityTCPVision,
-		model.TransportProfileRealityXHTTP,
 		model.TransportProfilePlainXHTTP,
-		model.TransportProfileWSTLSWeb,
 	}))
-	if !strings.Contains(got, `- "8443:8443/tcp"`) {
-		t.Fatalf("expected xhttp port mapping, got:\n%s", got)
-	}
 	if !strings.Contains(got, `- "13179:13179/tcp"`) {
 		t.Fatalf("expected plain xhttp port mapping, got:\n%s", got)
-	}
-	if strings.Contains(got, "8445") {
-		t.Fatalf("planned ws/tls profile must not expose a port, got:\n%s", got)
 	}
 	if !strings.Contains(got, "# OVPN_XRAY_PROFILE_PORTS") {
 		t.Fatalf("profile port marker should stay in the rendered compose for future insertions, got:\n%s", got)
@@ -680,8 +833,8 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if err := DeployRemote(context.Background(), r, ssh.Config{}); err != nil {
 		t.Fatalf("deploy remote: %v", err)
 	}
-	if len(r.execCmds) != 6 {
-		t.Fatalf("expected 6 commands, got %d", len(r.execCmds))
+	if len(r.execCmds) != 7 {
+		t.Fatalf("expected 7 commands, got %d", len(r.execCmds))
 	}
 	if !strings.Contains(r.execCmds[0], "/opt/ovpn-backups/ovpn-") {
 		t.Fatalf("first command should backup stack, got %q", r.execCmds[0])
@@ -698,57 +851,69 @@ func TestDeployRemoteCommandSequence(t *testing.T) {
 	if !strings.Contains(r.execCmds[1], "/opt/ovpn/.incoming") {
 		t.Fatalf("second command should validate staged bundle, got %q", r.execCmds[1])
 	}
-	if !strings.Contains(r.execCmds[3], "rm -f /opt/ovpn/agent/ovpn-agent") {
-		t.Fatalf("fourth command should unlink agent binary before copy, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[2], "missing TLS self-SNI certificate files") ||
+		!strings.Contains(r.execCmds[2], "ovpn_camouflage_enabled=true") {
+		t.Fatalf("third command should preflight TLS self-SNI certificate files with a clear hint, got %q", r.execCmds[2])
 	}
-	if !strings.Contains(r.execCmds[3], "rm -f /opt/ovpn/agent/ovpn-agent /opt/ovpn/monitoring/telegram-bot/ovpn-telegram-bot") {
-		t.Fatalf("fourth command should unlink agent+telegram bot binaries before copy, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[4], "rm -f /opt/ovpn/agent/ovpn-agent") {
+		t.Fatalf("fifth command should unlink agent binary before copy, got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
-		t.Fatalf("fourth command should apply validated staged bundle under sudo (to read root-owned config.json), got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[4], "rm -f /opt/ovpn/agent/ovpn-agent /opt/ovpn/monitoring/telegram-bot/ovpn-telegram-bot") {
+		t.Fatalf("fifth command should unlink agent+telegram bot binaries before copy, got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[3], "chmod 600 /opt/ovpn/.env") {
-		t.Fatalf("fourth command should lock down .env after copy, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[4], "sudo cp -a /opt/ovpn/.incoming/. /opt/ovpn/") {
+		t.Fatalf("fifth command should apply validated staged bundle under sudo (to read root-owned config.json), got %q", r.execCmds[4])
 	}
-	if strings.Contains(r.execCmds[3], "chown root:root /opt/ovpn/.env") {
-		t.Fatalf("fourth command must not force .env to root ownership (breaks non-root deployers), got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[4], "chmod 600 /opt/ovpn/.env") {
+		t.Fatalf("fifth command should lock down .env after copy, got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo chown 0:65532 /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[3], "sudo chmod 640 /opt/ovpn/xray/config.json") {
-		t.Fatalf("fourth command should lock down xray config to the xray runtime group, got %q", r.execCmds[3])
+	if strings.Contains(r.execCmds[4], "chown root:root /opt/ovpn/.env") {
+		t.Fatalf("fifth command must not force .env to root ownership (breaks non-root deployers), got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[3], "sudo chown 65532:65532 /opt/ovpn/logs") || !strings.Contains(r.execCmds[3], "sudo chmod 770 /opt/ovpn/logs") {
-		t.Fatalf("fourth command should make access log directory writable by xray runtime, got %q", r.execCmds[3])
+	if !strings.Contains(r.execCmds[4], "sudo chown 0:65532 /opt/ovpn/xray/config.json") || !strings.Contains(r.execCmds[4], "sudo chmod 640 /opt/ovpn/xray/config.json") {
+		t.Fatalf("fifth command should lock down xray config to the xray runtime group, got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[4], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[4], "up -d --force-recreate --remove-orphans") {
-		t.Fatalf("expected compose up command, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[4], "sudo chown 65532:65532 /opt/ovpn/logs") || !strings.Contains(r.execCmds[4], "sudo chmod 770 /opt/ovpn/logs") {
+		t.Fatalf("fifth command should make access log directory writable by xray runtime, got %q", r.execCmds[4])
 	}
-	if !strings.Contains(r.execCmds[4], "timeout 300 sh -c") {
-		t.Fatalf("expected compose up command to use bounded remote timeout, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[5], "docker compose --env-file .env -f docker-compose.yml") || !strings.Contains(r.execCmds[5], "up -d --force-recreate --remove-orphans") {
+		t.Fatalf("expected compose up command, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[4], "docker ps -a --format") || !strings.Contains(r.execCmds[4], "docker-compose.monitoring.yml") || !strings.Contains(r.execCmds[4], "--profile monitoring") {
-		t.Fatalf("expected compose up command to preserve active monitoring stack, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[5], "timeout 300 sh -c") {
+		t.Fatalf("expected compose up command to use bounded remote timeout, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[4], "--scale ovpn-telegram-bot=0") {
-		t.Fatalf("expected compose up command to guard empty telegram token when monitoring is active, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[5], "docker ps -a --format") || !strings.Contains(r.execCmds[5], "docker-compose.monitoring.yml") || !strings.Contains(r.execCmds[5], "--profile monitoring") {
+		t.Fatalf("expected compose up command to preserve active monitoring stack, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[4], "--remove-orphans") {
-		t.Fatalf("expected remove-orphans in deploy command, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[5], "--scale ovpn-telegram-bot=0") {
+		t.Fatalf("expected compose up command to guard empty telegram token when monitoring is active, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[4], "--force-recreate") {
-		t.Fatalf("expected force-recreate in deploy command, got %q", r.execCmds[4])
+	if !strings.Contains(r.execCmds[5], "--remove-orphans") {
+		t.Fatalf("expected remove-orphans in deploy command, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[5], "docker compose ps") {
-		t.Fatalf("expected final status command, got %q", r.execCmds[5])
+	if !strings.Contains(r.execCmds[5], "--force-recreate") {
+		t.Fatalf("expected force-recreate in deploy command, got %q", r.execCmds[5])
 	}
-	if !strings.Contains(r.execCmds[2], "$XRAY_IMAGE run -test -config /etc/xray/config.json") {
-		t.Fatalf("third command should validate xray config with image entrypoint-aware syntax, got %q", r.execCmds[2])
+	if !strings.Contains(r.execCmds[6], "docker compose ps") {
+		t.Fatalf("expected final status command, got %q", r.execCmds[6])
 	}
-	if !strings.Contains(r.execCmds[2], "-v /opt/ovpn/.incoming/logs:/var/log/ovpn") ||
-		!strings.Contains(r.execCmds[2], "sudo chown 65532:65532 /opt/ovpn/.incoming/logs") {
-		t.Fatalf("third command should mount a writable access log directory for xray validation, got %q", r.execCmds[2])
+	if !strings.Contains(r.execCmds[3], "$XRAY_IMAGE run -test -config /etc/xray/config.json") {
+		t.Fatalf("fourth command should validate xray config with image entrypoint-aware syntax, got %q", r.execCmds[3])
 	}
-	if strings.Contains(r.execCmds[2], "$XRAY_IMAGE xray run -test") {
-		t.Fatalf("xray test command should not include duplicate leading 'xray': %q", r.execCmds[2])
+	if !strings.Contains(r.execCmds[3], "-v /opt/ovpn/.incoming/logs:/var/log/ovpn") ||
+		!strings.Contains(r.execCmds[3], "sudo chown 65532:65532 /opt/ovpn/.incoming/logs") {
+		t.Fatalf("fourth command should mount a writable access log directory for xray validation, got %q", r.execCmds[3])
+	}
+	for _, want := range []string{
+		"OVPN_TLS_SELFSNI_CERT_DIR",
+		":/etc/xray/certs:ro",
+	} {
+		if !strings.Contains(r.execCmds[3], want) {
+			t.Fatalf("fourth command should mount TLS self-SNI cert dir when present; missing %q in %q", want, r.execCmds[3])
+		}
+	}
+	if strings.Contains(r.execCmds[3], "$XRAY_IMAGE xray run -test") {
+		t.Fatalf("xray test command should not include duplicate leading 'xray': %q", r.execCmds[3])
 	}
 }
 
@@ -781,6 +946,27 @@ func TestDeployRemoteReturnsXrayVersionHintForMissingImageTag(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "without 'v' prefix") {
 		t.Fatalf("expected xray version hint, got %v", err)
+	}
+}
+
+func TestDeployRemoteReturnsTLSSelfSNIPreflightHint(t *testing.T) {
+	t.Parallel()
+
+	r := &failingRunner{
+		failOn: "missing TLS self-SNI certificate files",
+		err:    errors.New("missing TLS self-SNI certificate files in /opt/ovpn/certs; run the Ansible security playbook with ovpn_camouflage_enabled=true before deploying vless-tcp-tls-selfsni-web"),
+	}
+	err := DeployRemote(context.Background(), r, ssh.Config{Host: "example-host"})
+	if err == nil {
+		t.Fatalf("expected deploy error")
+	}
+	for _, want := range []string{
+		"validate TLS self-SNI prerequisites",
+		"ovpn_camouflage_enabled=true",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("expected TLS self-SNI preflight hint %q, got %v", want, err)
+		}
 	}
 }
 

@@ -28,9 +28,21 @@ ovpn_firewall_allow_http: false
 ovpn_firewall_allow_https: true
 ovpn_firewall_extra_tcp_ports:
   - 13179 # VLESS XHTTP fallback profile
-  - 8443 # VLESS over XHTTP with REALITY
 ovpn_firewall_extra_udp_ports: []
 ovpn_firewall_remove_tcp_ports: []
+
+# Optional self-SNI HTTPS camouflage prerequisites. This is off by default and
+# only prepares certificates/firewall/site files; the Xray profile is enabled
+# separately with `ovpn server profile switch`.
+ovpn_camouflage_enabled: false
+ovpn_camouflage_domain: "{{ ovpn_domain | default(inventory_hostname) }}"
+ovpn_camouflage_cert_email: ""
+ovpn_camouflage_cert_dir: "{{ ovpn_deploy_root }}/certs"
+ovpn_camouflage_site_dir: "{{ ovpn_deploy_root }}/camouflage-site"
+ovpn_camouflage_site_title: "Project notes"
+ovpn_camouflage_site_heading: "Project notes"
+ovpn_camouflage_site_text: "A small public page for shared notes, documents, and status updates."
+ovpn_camouflage_site_accent: "#4f6f52"
 
 # Optional cleanup for explicitly declared apt source files and packages.
 ovpn_remove_apt_source_files: []
@@ -99,7 +111,7 @@ ovpn_agent_log_level: "info"
 
 # Xray/runtime defaults (kept in all.yml so bootstrap has required vars even
 # when no dedicated xray inventory group is used)
-ovpn_xray_version: "26.3.27"
+ovpn_xray_version: "26.7.28"
 ovpn_xray_image: "ghcr.io/xtls/xray-core:{{ ovpn_xray_version }}"
 ovpn_xray_config_path: "{{ ovpn_deploy_root }}/xray/config.json"
 ovpn_xray_api_port: 10085
@@ -107,8 +119,8 @@ ovpn_xray_inbound_port: 443
 
 # REALITY defaults; override per-host and keep private key in ansible-vault.
 ovpn_reality_private_key: ""
-ovpn_reality_server_name: "www.microsoft.com"
-ovpn_reality_target: "www.microsoft.com:443"
+ovpn_reality_server_name: "www.trip.com"
+ovpn_reality_target: "www.trip.com:443"
 ovpn_reality_short_id: "0123456789abcdef"
 ovpn_xray_bootstrap_uuid: "11111111-1111-1111-1111-111111111111"
 ovpn_xray_bootstrap_email: "bootstrap@example.com"
