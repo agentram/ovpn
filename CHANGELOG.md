@@ -8,6 +8,9 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## 1.8.0
 
+### Security
+- Updated the CI Ansible pin to `ansible-core 2.20.7`, which includes the fix for the `ansible-galaxy` argument-injection advisory.
+
 ### Added
 - Added opt-in `vless-tcp-tls-selfsni-web` transport profile: VLESS over TCP/TLS on `443/tcp` with Xray fallback to an internal static `ovpn-web` service for ordinary HTTPS responses.
 - Added optional Ansible self-SNI prerequisites in a separate `camouflage.yml` task file for certificate issuance, renewal hook, fallback site directory, and conditional `80/tcp` firewall access.
