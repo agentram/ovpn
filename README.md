@@ -96,7 +96,7 @@ flowchart LR
 - SSH/SCP deploy path: commands render files locally and apply them through normal server access.
 - Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
 - Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
-- Transport profiles: keep deprecated TCP/REALITY links for compatibility and use opt-in fallback profiles for degraded networks; plain XHTTP is available when operators accept its lack of transport security.
+- Transport profiles: keep the default TCP/REALITY baseline for compatibility and use opt-in fallback profiles for degraded networks; plain XHTTP is available when operators accept its lack of transport security, and self-SNI TCP/TLS can serve a normal HTTPS fallback page on the same domain.
 - Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
 - Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering. The rendered Xray config (REALITY private key + client UUIDs) is stored `0640 root:<xray-gid>`, and `ovpn-agent` mutating endpoints require a bearer token (`OVPN_AGENT_TOKEN`, auto-provisioned on deploy).
 - Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
@@ -108,6 +108,7 @@ flowchart LR
 - User lifecycle commands and VLESS link generation
 - Global-by-default user provisioning across enabled servers
 - Profile-aware VLESS link, QR, and export commands
+- Optional self-SNI HTTPS camouflage profile with an internal static fallback site
 - Rolling `30d` traffic quota enforcement
 - Lightweight per-user connection diagnostics and short targeted debug windows (`basic` mode is on by default; see `docs/cli.md`)
 - Optional Prometheus, Alertmanager, Grafana, and Telegram bot monitoring
@@ -116,7 +117,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.7.2`
+- Current pinned version: `1.8.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -161,6 +162,34 @@ export OVPN_SECURITY_PROFILE=off
 - Ansible tunes host conntrack for VPN/NAT workloads and monitoring alerts on missing/high/critical conntrack usage.
 
 See [`docs/security.md`](docs/security.md) for the full security model.
+See [`docs/transports.md`](docs/transports.md) for profile rollout, including the optional self-SNI HTTPS fallback profile.
+
+## Optional camouflage
+
+`vless-tcp-tls-selfsni-web` is off by default. It uses a real certificate for the VPN domain, keeps Xray as the public `443/tcp` listener, and sends ordinary HTTPS traffic to an internal static site.
+Keep `ovpn_camouflage_cert_email` set in production so certificate expiry and renewal failures can reach an operator.
+
+```yaml
+# 1. Enable the Ansible prerequisites in host_vars/<server-hostname>.yml.
+# Do this before switching the server profile.
+ovpn_camouflage_enabled: true
+ovpn_camouflage_domain: vpn.example.net
+ovpn_camouflage_cert_email: ops@example.net
+```
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/security.yml --limit vpn.example.net
+cd ..
+
+# 2. Switch the 443/tcp profile and deploy.
+./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn deploy <server>
+./ovpn doctor <server>
+curl -vk https://vpn.example.net/
+```
+
+Users need new links only if they switch to this profile. See [`docs/security.md`](docs/security.md) for certificate and firewall details.
 
 ## Capacity defaults
 
@@ -194,7 +223,7 @@ Use this flow for a first small server. Replace placeholders with your own value
   --domain <domain> \
   --ssh-user root \
   --ssh-port 22 \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 
 ./ovpn server init <server>
 ./ovpn doctor <server>
@@ -203,6 +232,7 @@ Use this flow for a first small server. Replace placeholders with your own value
 ```
 
 `user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
+New REALITY/TLS links default to `fp=firefox`; use `--fingerprint` or `--spider-x` only when you need an explicit client-link variant.
 See [`docs/transports.md`](docs/transports.md) before enabling fallback profiles or switching the default generated link profile.
 
 `server init` performs the first bootstrap/deploy for the VPN runtime. Use `deploy` later when you change runtime settings:
@@ -268,7 +298,7 @@ See [`README.ansible.md`](README.ansible.md) for inventory and hardening details
   --domain <domain> \
   --ssh-user root \
   --ssh-port 22 \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 ```
 
 ### 4. Initialize and deploy runtime

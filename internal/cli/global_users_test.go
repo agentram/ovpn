@@ -180,8 +180,10 @@ func TestEnsureRealityParityForServers(t *testing.T) {
 	other := base
 	other.Name = "b"
 	other.ProxyServiceUUID = "svc-b"
+	other.RealityServerName = "www.trip.com"
+	other.RealityTarget = "www.trip.com:443"
 	if err := ensureRealityParityForServers([]model.Server{base, other}); err != nil {
-		t.Fatalf("expected parity success, got %v", err)
+		t.Fatalf("expected per-server target/SNI to be allowed, got %v", err)
 	}
 	other.RealityPublicKey = "pub-drift"
 	if err := ensureRealityParityForServers([]model.Server{base, other}); err == nil {

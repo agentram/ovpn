@@ -57,7 +57,7 @@ Register a normal VPN host:
   --ssh-user root \
   --ssh-port 22 \
   --ssh-identity ~/.ssh/id_rsa \
-  --xray-version 26.3.27
+  --xray-version 26.7.28
 ```
 
 Useful server flags:
@@ -152,14 +152,23 @@ Generate the client credential:
 ./ovpn user link --server <server> --username alice
 ./ovpn user link --server <server> --username alice --qr=false
 ./ovpn user link --server <server> --username alice --qr-file ~/Desktop/alice.png
-./ovpn user link --server <server> --username alice --profile vless-reality-xhttp
-./ovpn user qr --server <server> --username alice --profile vless-reality-xhttp --out ~/Desktop/alice-xhttp.png
+./ovpn user link --server <server> --username alice --profile vless-reality-tcp-vision
+./ovpn user link --server <server> --username alice --profile vless-reality-tcp-vision --fingerprint chrome
+./ovpn user qr --server <server> --username alice --profile vless-reality-tcp-vision --fingerprint qq --spider-x /assets/alice.js --out ~/Desktop/alice-reality-qq.png
+./ovpn user qr --server <server> --username alice --profile vless-reality-tcp-vision --legacy-reality --out ~/Desktop/alice-reality-legacy.png
 ./ovpn user link --server <server> --username alice --profile vless-xhttp-plain
+./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
 ./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
+./ovpn user export --server <server> --username alice --profile vless-reality-tcp-vision --fingerprints firefox,qq,chrome --out ~/Downloads
 ```
 
 The `vless://` link and QR code are secrets.
 Anyone who has them can use that profile until you disable or remove the user.
+
+New REALITY/TLS links use `fp=firefox` by default. Existing imported client profiles are not changed.
+Use `--fingerprint` when you need a specific supported client fingerprint. Use `--spider-x` only for REALITY profiles; if omitted, ovpn generates a stable per-user path.
+Use `--legacy-reality` to reproduce the older REALITY client shape (`fp=chrome`, no `spx`) while troubleshooting client compatibility.
+The self-SNI profile uses normal TLS SNI and fallback routing, so `--spider-x` is rejected for `vless-tcp-tls-selfsni-web`.
 
 Transport profiles are server-side opt-in. See [`docs/transports.md`](transports.md) for the profile list, client compatibility notes, and rollout workflow.
 
@@ -210,13 +219,36 @@ List the profiles known to a server:
 ./ovpn server profile list <server>
 ```
 
-Enable an extra deployable profile and redeploy:
+Enable an extra profile and redeploy:
 
 ```bash
-./ovpn server profile enable <server> vless-reality-xhttp
 ./ovpn server profile enable <server> vless-xhttp-plain
 ./ovpn deploy <server>
 ./ovpn doctor <server>
+```
+
+Profiles removed in a release are no longer shown or rendered. If older local state contains a removed profile name, normal state normalization drops it; no separate cleanup command is required. Links for removed profiles cannot be generated after the profile is removed from the server.
+
+The `vless-tcp-tls-selfsni-web` profile uses `443/tcp`, so it conflicts with `vless-reality-tcp-vision`.
+Prepare its certificate/fallback site through Ansible first, then switch the server profile instead of enabling both:
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/security.yml --limit <server-hostname>
+cd ..
+
+./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn deploy <server>
+./ovpn doctor <server>
+curl -vk https://<domain>/
+```
+
+The required Ansible variables are:
+
+```yaml
+ovpn_camouflage_enabled: true
+ovpn_camouflage_domain: vpn-a.example.net
+ovpn_camouflage_cert_email: ops@example.net
 ```
 
 Change the primary profile used by `user link` when `--profile` is omitted:
@@ -416,7 +448,8 @@ For `proxy` servers it means:
 - domain destinations not matched by the preset's domain rules fall through to the foreign pool
 
 The freedom outbound prefers IPv4 for domain resolution.
-IPv6-literal destinations are not blocked by default because mobile clients may try IPv6 first and otherwise wait for timeout before IPv4 fallback.
+The minimal security profile blocks IPv6-literal destinations by default.
+This keeps IPv4-only VPS hosts from accepting client-preferred IPv6 targets that cannot be routed and would otherwise look like a connected-but-stalled VPN.
 
 ### Practical support flow
 

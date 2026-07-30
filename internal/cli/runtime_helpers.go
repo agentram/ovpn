@@ -510,7 +510,7 @@ func runtimeInboundTagsForServer(srv model.Server) []string {
 	seen := map[string]bool{}
 	for _, profile := range profiles {
 		meta, ok := model.LookupTransportProfile(profile)
-		if !ok || strings.TrimSpace(meta.InboundTag) == "" || meta.Status == "planned" {
+		if !ok || strings.TrimSpace(meta.InboundTag) == "" {
 			continue
 		}
 		if seen[meta.InboundTag] {
