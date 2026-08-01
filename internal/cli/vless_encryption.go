@@ -15,11 +15,11 @@ import (
 
 const (
 	vlessEncryptionAuthHeader = "Authentication: ML-KEM-768, Post-Quantum"
-	vlessServerPrefix         = "mlkem768x25519plus.native.600s."
-	vlessClientPrefix         = "mlkem768x25519plus.native.0rtt."
 )
 
 func parseVLESSEncryptionOutput(raw []byte) (string, string, error) {
+	// The strict field/section contract below was verified with Xray 26.7.28.
+	// Reject format changes before any generated key material is persisted.
 	var clientEncryption string
 	var serverDecryption string
 	inMLKEMSection := false
@@ -72,18 +72,11 @@ func parseVLESSEncryptionOutput(raw []byte) (string, string, error) {
 	if !foundMLKEMSection {
 		return "", "", errors.New("xray vlessenc did not return an ML-KEM-768 section")
 	}
-	if !validVLESSEncryptionValue(clientEncryption, vlessClientPrefix) ||
-		!validVLESSEncryptionValue(serverDecryption, vlessServerPrefix) {
+	if !model.IsValidVLESSEncryptionClientValue(clientEncryption) ||
+		!model.IsValidVLESSEncryptionServerValue(serverDecryption) {
 		return "", "", errors.New("xray vlessenc did not return the expected ML-KEM-768 native 0-RTT/600s pair")
 	}
 	return clientEncryption, serverDecryption, nil
-}
-
-func validVLESSEncryptionValue(value, prefix string) bool {
-	if !strings.HasPrefix(value, prefix) || strings.TrimSpace(strings.TrimPrefix(value, prefix)) == "" {
-		return false
-	}
-	return !strings.ContainsAny(value, " \t\r\n")
 }
 
 func (a *App) generateVLESSEncryptionPair(target model.Server) (string, string, error) {

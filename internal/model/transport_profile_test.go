@@ -69,3 +69,24 @@ func TestServerTransportProfileDefaults(t *testing.T) {
 		t.Fatalf("default server should enable tcp reality profile")
 	}
 }
+
+func TestVLESSEncryptionValueValidation(t *testing.T) {
+	t.Parallel()
+
+	if !IsValidVLESSEncryptionClientValue(VLESSEncryptionClientPrefix + "client-value") {
+		t.Fatal("expected valid client VLESS Encryption value")
+	}
+	if !IsValidVLESSEncryptionServerValue(VLESSEncryptionServerPrefix + "server-value") {
+		t.Fatal("expected valid server VLESS Encryption value")
+	}
+	for _, value := range []string{"", "mlkem768x25519plus.native.600s.", VLESSEncryptionServerPrefix + "server-value", VLESSEncryptionClientPrefix + "contains space"} {
+		if IsValidVLESSEncryptionClientValue(value) {
+			t.Fatalf("unexpected valid client value %q", value)
+		}
+	}
+	for _, value := range []string{"", "mlkem768x25519plus.native.600s.", VLESSEncryptionClientPrefix + "client-value", VLESSEncryptionServerPrefix + "contains space"} {
+		if IsValidVLESSEncryptionServerValue(value) {
+			t.Fatalf("unexpected valid server value %q", value)
+		}
+	}
+}

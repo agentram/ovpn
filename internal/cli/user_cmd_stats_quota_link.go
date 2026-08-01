@@ -547,7 +547,7 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 	encryption := ""
 	if profile == model.TransportProfileVLESSEncXHTTP {
 		encryption = strings.TrimSpace(srv.VLESSClientEncryption)
-		if !validVLESSEncryptionValue(encryption, vlessClientPrefix) {
+		if !model.IsValidVLESSEncryptionClientValue(encryption) {
 			return "", fmt.Errorf("profile %s has no valid client encryption value on server %s; disable and re-enable the profile to provision its cluster key pair", profile, srv.Name)
 		}
 	}

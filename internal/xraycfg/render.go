@@ -610,7 +610,7 @@ func ValidateSpec(spec Spec) error {
 		if spec.Role == model.ServerRoleProxy {
 			return fmt.Errorf("%s is only supported on vpn servers", model.TransportProfileVLESSEncXHTTP)
 		}
-		if !validVLESSEncryptionConfigValue(spec.VLESSServerDecryption, vlessServerPrefix) {
+		if !model.IsValidVLESSEncryptionServerValue(spec.VLESSServerDecryption) {
 			return fmt.Errorf("%s requires a valid ML-KEM-768 native server decryption value; enable the profile with `ovpn server profile enable <server> %s`", model.TransportProfileVLESSEncXHTTP, model.TransportProfileVLESSEncXHTTP)
 		}
 	}
@@ -686,18 +686,6 @@ type LinkInput struct {
 	Fingerprint string
 	SpiderX     string
 	Encryption  string
-}
-
-const (
-	vlessServerPrefix = "mlkem768x25519plus.native.600s."
-	vlessClientPrefix = "mlkem768x25519plus.native.0rtt."
-)
-
-func validVLESSEncryptionConfigValue(value, prefix string) bool {
-	value = strings.TrimSpace(value)
-	return strings.HasPrefix(value, prefix) &&
-		strings.TrimSpace(strings.TrimPrefix(value, prefix)) != "" &&
-		!strings.ContainsAny(value, " \t\r\n")
 }
 
 func NormalizeClientFingerprint(raw string) string {

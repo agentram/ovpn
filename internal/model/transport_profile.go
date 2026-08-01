@@ -3,6 +3,34 @@ package model
 import "strings"
 
 const (
+	// VLESSEncryptionClientPrefix identifies the ML-KEM native 0-RTT value
+	// supplied to VLESS Encryption clients.
+	VLESSEncryptionClientPrefix = "mlkem768x25519plus.native.0rtt."
+	// VLESSEncryptionServerPrefix identifies the ML-KEM native ticket value
+	// retained by the server as VLESS inbound decryption configuration.
+	VLESSEncryptionServerPrefix = "mlkem768x25519plus.native.600s."
+)
+
+// IsValidVLESSEncryptionClientValue reports whether value has the supported
+// ML-KEM native client form and contains non-whitespace key material.
+func IsValidVLESSEncryptionClientValue(value string) bool {
+	return isValidVLESSEncryptionValue(value, VLESSEncryptionClientPrefix)
+}
+
+// IsValidVLESSEncryptionServerValue reports whether value has the supported
+// ML-KEM native server form and contains non-whitespace key material.
+func IsValidVLESSEncryptionServerValue(value string) bool {
+	return isValidVLESSEncryptionValue(value, VLESSEncryptionServerPrefix)
+}
+
+func isValidVLESSEncryptionValue(value, prefix string) bool {
+	value = strings.TrimSpace(value)
+	return strings.HasPrefix(value, prefix) &&
+		strings.TrimSpace(strings.TrimPrefix(value, prefix)) != "" &&
+		!strings.ContainsAny(value, " \t\r\n")
+}
+
+const (
 	TransportProfileStatusDefault      = "default"
 	TransportProfileStatusFallback     = "fallback"
 	TransportProfileStatusCamouflage   = "camouflage"

@@ -282,7 +282,7 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 	}
 }
 
-func TestRenderServerJSONIncludesVLESSEncryptionXHTTP(t *testing.T) {
+func TestRenderServerJSONKeepsVisionForVLESSEncryptionXHTTP(t *testing.T) {
 	t.Parallel()
 
 	serverDecryption := "mlkem768x25519plus.native.600s." + strings.Repeat("S", 512)
@@ -323,7 +323,7 @@ func TestRenderServerJSONIncludesVLESSEncryptionXHTTP(t *testing.T) {
 	clients, _ := settings["clients"].([]any)
 	client, _ := clients[0].(map[string]any)
 	if got := client["flow"]; got != "xtls-rprx-vision" {
-		t.Fatalf("vless encryption client flow = %v", got)
+		t.Fatalf("VLESS Encryption XHTTP must retain Vision flow, got %v", got)
 	}
 	stream, _ := inbound["streamSettings"].(map[string]any)
 	if got := stream["network"]; got != "xhttp" {

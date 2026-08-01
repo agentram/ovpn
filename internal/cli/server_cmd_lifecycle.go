@@ -136,9 +136,15 @@ func (a *App) newServerAddCmd() *cobra.Command {
 				RealityTarget:     add.realityTGT,
 				Enabled:           true,
 			}
-			if add.role == model.ServerRoleVPN && len(existingServers) > 0 {
-				srv.VLESSClientEncryption = existingServers[0].VLESSClientEncryption
-				srv.VLESSServerDecryption = existingServers[0].VLESSServerDecryption
+			if add.role == model.ServerRoleVPN {
+				for _, existing := range existingServers {
+					if strings.TrimSpace(existing.VLESSClientEncryption) == "" {
+						continue
+					}
+					srv.VLESSClientEncryption = existing.VLESSClientEncryption
+					srv.VLESSServerDecryption = existing.VLESSServerDecryption
+					break
+				}
 			}
 			if err := a.store.AddServer(a.ctx, srv); err != nil {
 				return err
