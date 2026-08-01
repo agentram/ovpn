@@ -13,6 +13,52 @@ import (
 	"ovpn/internal/ssh"
 )
 
+func (a *App) checkVLESSEncryptionProfilePort(runner *ssh.Runner, cfg ssh.Config) doctor.Check {
+	cmd := strings.Join([]string{
+		"set -u",
+		"if sudo -n ss -ltnH 2>/dev/null | grep -Eq '[:.]13180[[:space:]]'; then echo VLESSENC_LISTEN=1; else echo VLESSENC_LISTEN=0; fi",
+		"if ! command -v ufw >/dev/null 2>&1; then echo VLESSENC_UFW=unmanaged",
+		"elif sudo -n ufw status 2>/dev/null | head -n1 | grep -qi inactive; then echo VLESSENC_UFW=inactive",
+		"elif sudo -n ufw status 2>/dev/null | grep -Eq '^13180/tcp[[:space:]]+ALLOW'; then echo VLESSENC_UFW=allowed",
+		"else echo VLESSENC_UFW=blocked; fi",
+	}, "; ")
+	res, err := a.execRemote(runner, cfg, 15*time.Second, cmd)
+	if err != nil {
+		return doctor.Check{
+			Name:    "VLESS Encryption profile port",
+			Status:  doctor.StatusWarn,
+			Message: "could not verify the experimental profile listener and firewall",
+			Details: []string{err.Error()},
+			Hint:    "Verify TCP/13180 manually, add it to `ovpn_firewall_extra_tcp_ports`, then run Ansible and `ovpn deploy <server>`.",
+		}
+	}
+
+	kv := doctor.ParseKV(res.Stdout)
+	listening := kv["VLESSENC_LISTEN"] == "1"
+	ufwState := kvOr(kv, "VLESSENC_UFW", "unknown")
+	check := doctor.Check{
+		Name:    "VLESS Encryption profile port",
+		Status:  doctor.StatusPass,
+		Message: "TCP/13180 is listening and is not blocked by managed UFW",
+		Details: []string{
+			"listen=" + kvOr(kv, "VLESSENC_LISTEN", "0"),
+			"ufw=" + ufwState,
+		},
+	}
+	if !listening {
+		check.Status = doctor.StatusWarn
+		check.Message = "the enabled VLESS Encryption profile is not listening on TCP/13180"
+		check.Hint = "Run `ovpn deploy <server>` and inspect Xray config/logs before issuing client links."
+		return check
+	}
+	if ufwState == "blocked" || ufwState == "unknown" {
+		check.Status = doctor.StatusWarn
+		check.Message = "TCP/13180 is listening but managed UFW does not allow it"
+		check.Hint = "Add 13180 to `ovpn_firewall_extra_tcp_ports`, apply the Ansible security role, then rerun `ovpn doctor <server>`."
+	}
+	return check
+}
+
 // checkAgentHealth verifies that ovpn-agent is reachable and that its Xray API checks pass.
 func (a *App) checkAgentHealth(runner *ssh.Runner, cfg ssh.Config, srv model.Server) doctor.Check {
 	agentBaseURL := a.agentBaseURL()

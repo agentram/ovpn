@@ -535,12 +535,24 @@ func TestInjectXrayProfilePortsAddsOnlyEnabledExtraPorts(t *testing.T) {
 	got := string(injectXrayProfilePorts(base, []string{
 		model.TransportProfileRealityTCPVision,
 		model.TransportProfilePlainXHTTP,
+		model.TransportProfileVLESSEncXHTTP,
 	}))
 	if !strings.Contains(got, `- "13179:13179/tcp"`) {
 		t.Fatalf("expected plain xhttp port mapping, got:\n%s", got)
 	}
+	if !strings.Contains(got, `- "13180:13180/tcp"`) {
+		t.Fatalf("expected VLESS Encryption XHTTP port mapping, got:\n%s", got)
+	}
 	if !strings.Contains(got, "# OVPN_XRAY_PROFILE_PORTS") {
 		t.Fatalf("profile port marker should stay in the rendered compose for future insertions, got:\n%s", got)
+	}
+
+	withoutVLESSEnc := string(injectXrayProfilePorts(base, []string{
+		model.TransportProfileRealityTCPVision,
+		model.TransportProfilePlainXHTTP,
+	}))
+	if strings.Contains(withoutVLESSEnc, "13180") {
+		t.Fatalf("disabled VLESS Encryption profile must not expose port 13180, got:\n%s", withoutVLESSEnc)
 	}
 }
 

@@ -458,6 +458,78 @@ func TestRealityPrivateKeyStoredEncryptedWhenSecretKeyConfigured(t *testing.T) {
 	}
 }
 
+func TestVLESSEncryptionValuesStoredEncryptedAndUpdatedAtomically(t *testing.T) {
+	resetSecretKeyCacheForTests()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("OVPN_SECRET_KEY", base64.RawStdEncoding.EncodeToString([]byte(strings.Repeat("v", 32))))
+
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "data"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	newServer := func(name, host string) *model.Server {
+		return &model.Server{
+			Name:                  name,
+			Host:                  host,
+			Domain:                name + ".example.com",
+			SSHUser:               "debian",
+			SSHPort:               22,
+			XrayVersion:           "26.7.28",
+			RealityPrivateKey:     "private-" + name,
+			RealityPublicKey:      "public-" + name,
+			RealityShortIDs:       "abcd1234",
+			RealityServerName:     "www.example.com",
+			RealityTarget:         "www.example.com:443",
+			VLESSClientEncryption: "mlkem768x25519plus.native.0rtt.client-old",
+			VLESSServerDecryption: "mlkem768x25519plus.native.600s.server-old",
+			Enabled:               true,
+		}
+	}
+	first := mustAddStoreTestServer(t, ctx, store, newServer("first", "192.0.2.1"))
+	second := mustAddStoreTestServer(t, ctx, store, newServer("second", "192.0.2.2"))
+
+	var rawClient, rawServer string
+	if err := store.db.QueryRowContext(ctx, `
+		SELECT vless_client_encryption, vless_server_decryption FROM servers WHERE id=?
+	`, first.ID).Scan(&rawClient, &rawServer); err != nil {
+		t.Fatalf("query encrypted values: %v", err)
+	}
+	for name, raw := range map[string]string{"client": rawClient, "server": rawServer} {
+		if !strings.HasPrefix(raw, encryptedFieldPrefix) || strings.Contains(raw, name+"-old") {
+			t.Fatalf("%s VLESS Encryption value is not encrypted at rest: %q", name, raw)
+		}
+	}
+
+	newClient := "mlkem768x25519plus.native.0rtt.client-new"
+	newServerValue := "mlkem768x25519plus.native.600s.server-new"
+	if err := store.SetVLESSEncryptionForServers(ctx, []int64{first.ID, second.ID}, newClient, newServerValue); err != nil {
+		t.Fatalf("set shared VLESS Encryption pair: %v", err)
+	}
+	for _, name := range []string{"first", "second"} {
+		got, err := store.GetServerByName(ctx, name)
+		if err != nil {
+			t.Fatalf("get %s: %v", name, err)
+		}
+		if got.VLESSClientEncryption != newClient || got.VLESSServerDecryption != newServerValue {
+			t.Fatalf("%s has unexpected VLESS Encryption pair", name)
+		}
+	}
+
+	if err := store.SetVLESSEncryptionForServers(ctx, []int64{first.ID, 999999}, "mlkem768x25519plus.native.0rtt.rollback", "mlkem768x25519plus.native.600s.rollback"); err == nil {
+		t.Fatalf("expected missing server to abort transaction")
+	}
+	got, err := store.GetServerByName(ctx, "first")
+	if err != nil {
+		t.Fatalf("get first after rollback: %v", err)
+	}
+	if got.VLESSClientEncryption != newClient || got.VLESSServerDecryption != newServerValue {
+		t.Fatalf("failed update was partially committed")
+	}
+}
+
 func mustAddStoreTestServer(t *testing.T, ctx context.Context, store *Store, srv *model.Server) *model.Server {
 	t.Helper()
 	if err := store.AddServer(ctx, srv); err != nil {
@@ -640,6 +712,9 @@ func TestMigrateBackfillsProxyPresetForLegacyProxyRows(t *testing.T) {
 	}
 	if srv.NormalizedProxyPreset() != model.ProxyPresetRU {
 		t.Fatalf("expected migrated proxy preset %q, got %q", model.ProxyPresetRU, srv.NormalizedProxyPreset())
+	}
+	if srv.VLESSClientEncryption != "" || srv.VLESSServerDecryption != "" {
+		t.Fatalf("legacy server should migrate with empty VLESS Encryption values")
 	}
 
 	var preset string

@@ -213,6 +213,7 @@ func RenderBundle(in Input) (*Bundle, error) {
 		RealityPublicKey:       in.Server.RealityPublicKey,
 		RealityServerName:      in.Server.RealityServerName,
 		RealityTarget:          in.Server.RealityTarget,
+		VLESSServerDecryption:  in.Server.VLESSServerDecryption,
 		ServiceUsers:           append([]xraycfg.ServiceUser(nil), in.ServiceUsers...),
 		ProxyRelay:             in.ProxyRelay,
 		SecurityProfile:        in.SecurityProfile,

@@ -231,6 +231,32 @@ func TestServerAddInheritsRealityBaselineWhenNotProvided(t *testing.T) {
 	}
 }
 
+func TestServerAddInheritsVLESSEncryptionFromPopulatedClusterMember(t *testing.T) {
+	t.Parallel()
+
+	app := newGlobalUsersTestApp(t)
+	_ = addGlobalUsersTestServer(t, app.store, "empty")
+	populated := addGlobalUsersTestServer(t, app.store, "populated")
+	populated.VLESSClientEncryption = testVLESSClientEncryption
+	populated.VLESSServerDecryption = testVLESSServerDecryption
+	if err := app.store.UpdateServer(app.ctx, populated); err != nil {
+		t.Fatalf("set cluster encryption pair: %v", err)
+	}
+
+	cmd := app.serverCmd()
+	cmd.SetArgs([]string{"add", "--name", "new", "--host", "10.0.0.2", "--domain", "new.example.com"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("server add failed: %v", err)
+	}
+	got, err := app.store.GetServerByName(app.ctx, "new")
+	if err != nil {
+		t.Fatalf("load new server: %v", err)
+	}
+	if got.VLESSClientEncryption != testVLESSClientEncryption || got.VLESSServerDecryption != testVLESSServerDecryption {
+		t.Fatalf("new server did not inherit populated VLESS Encryption pair: %+v", got)
+	}
+}
+
 func TestServerAddRejectsRealityMismatchAgainstBaseline(t *testing.T) {
 	t.Parallel()
 

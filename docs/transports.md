@@ -17,6 +17,7 @@ Transport profiles make that explicit: keep the default compatibility profile li
 | `vless-reality-tcp-vision` | default | `443/tcp` | Original VLESS + REALITY profile. Best compatibility baseline and kept for existing links. |
 | `vless-xhttp-plain` | fallback | `13179/tcp` | Plain XHTTP shape for affected networks; no transport security unless fronted by TLS separately. |
 | `vless-tcp-tls-selfsni-web` | camouflage | `443/tcp` | TCP/TLS profile with a real certificate and fallback to an internal static web service. Conflicts with `vless-reality-tcp-vision` because both own `443/tcp`. |
+| `vless-xhttp-vlessenc` | experimental | `13180/tcp` | XHTTP with VLESS Encryption. It adds PFS, replay protection, and a ticket-based client handshake, but is not a standalone DPI defence. |
 
 The former `vless-reality-xhttp` and `vless-ws-tls-web` profiles are removed from the supported profile set. When an old local database contains one of those names, `ovpn` drops it while normalizing the server record; it is not listed, rendered, or available for new links. No manual cleanup command is required.
 
@@ -24,6 +25,8 @@ The fallback profiles are not magic. They give you controlled A/B testing and fa
 The `vless-xhttp-plain` profile deliberately has `security=none`, `path=/`, and no REALITY parameters because it matches simple XHTTP profiles seen working in the field. That means Xray does not add REALITY/TLS transport security on this profile. HTTPS destinations inside the tunnel are still protected by HTTPS, but the VLESS/XHTTP transport itself is not protected like the REALITY profiles. Use it only when that tradeoff is acceptable, and keep monitoring whether it remains reliable for your users.
 
 The `vless-tcp-tls-selfsni-web` profile is different from both REALITY and plain XHTTP. It uses a real certificate for the same domain that clients connect to. Xray owns public `443/tcp`, valid VLESS clients pass through the TLS inbound, and ordinary or invalid HTTPS traffic falls back to an internal `ovpn-web` static site. This improves probing behavior because `https://<domain>/` returns a normal page, but it is not a guarantee that the traffic shape cannot be classified.
+
+`vless-xhttp-vlessenc` uses XHTTP `mode=auto` and Xray's `mlkem768x25519plus.native` VLESS Encryption mode. The server-side decryption value and client-side encryption value are different secrets. ovpn generates them once per VPN cluster, stores them encrypted in local state, and includes only the client value in links and QR codes. Generation runs over SSH on the selected server with its pinned Xray Docker image, so the operator workstation does not need Docker. Do not copy a server-side decryption value into a client or support request.
 
 ## Enable and Test
 
@@ -40,6 +43,26 @@ Enable an extra profile:
 ./ovpn deploy <server>
 ./ovpn doctor <server>
 ```
+
+Enable experimental VLESS Encryption + XHTTP only after opening its port through the host baseline:
+
+```yaml
+# ansible/inventories/production/host_vars/<server-hostname>.yml
+ovpn_firewall_extra_tcp_ports:
+  - 13180
+```
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit <server-hostname>
+cd ..
+
+./ovpn server profile enable <server> vless-xhttp-vlessenc
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+This profile is currently confirmed only with Mihomo. Treat Streisand, Happ, and Hiddify as unconfirmed until they import the link and pass real traffic tests with the installed client version.
 
 Self-SNI owns `443/tcp`, so switch to it instead of enabling it next to TCP/REALITY. The Ansible step only prepares the certificate and fallback site; the profile change happens in local ovpn state and is applied by deploy:
 
@@ -70,6 +93,7 @@ Generate a profile-specific link:
 ./ovpn user link --server <server> --username alice --profile vless-reality-tcp-vision
 ./ovpn user qr --server <server> --username alice --profile vless-xhttp-plain --out ~/Downloads/alice-plain-xhttp.png
 ./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
+./ovpn user qr --server <server> --username alice --profile vless-xhttp-vlessenc --out ~/Downloads/alice-vlessenc.png
 ```
 
 REALITY and TLS links default to `fp=firefox`. Existing profiles already imported by users do not change.
@@ -96,6 +120,7 @@ Profile-specific client fields:
 | `vless-reality-tcp-vision` | yes | yes | `reality_server_name` |
 | `vless-tcp-tls-selfsni-web` | yes | no | server domain |
 | `vless-xhttp-plain` | no | no | none |
+| `vless-xhttp-vlessenc` | no | no | none |
 
 Passing an unsupported field fails before ovpn prints a link or writes a QR code.
 For example, `--spider-x` with `vless-tcp-tls-selfsni-web` fails because self-SNI uses normal TLS and fallback routing, not REALITY spidering.
@@ -196,6 +221,7 @@ Client support differs by transport and version:
 - TCP + REALITY + vision is the compatibility baseline.
 - XHTTP is newer. Test the exact client and version before sending it broadly.
 - Plain XHTTP may import in clients that fail REALITY/XHTTP, but it does not provide the same stream-security layer unless you put it behind a separate TLS front.
+- VLESS Encryption + XHTTP requires a client implementation that supports the generated `encryption` parameter. Test it first with Mihomo; other clients are not yet confirmed.
 - TCP/TLS self-SNI needs a real certificate and a client that supports VLESS TCP TLS with vision flow. It is useful when you want the domain to answer like an ordinary HTTPS endpoint.
 - WS/TLS with a real web front is a separate implementation step, not just another link parameter.
 
@@ -213,6 +239,7 @@ Look for whether the server sees accepted connections, rejected connections, des
 
 - Do not promise that any profile is unblockable. Treat profiles as resilience tools.
 - Avoid opening ports you do not use; `ovpn` exposes extra Xray ports only for enabled deployable profiles.
+- Do not enable VLESS Encryption on the self-SNI profile: Xray's VLESS `decryption` setting is incompatible with the fallback model used by that profile.
 - Use separate users for separate people/devices when you need meaningful diagnostics.
 - REALITY failed-auth traffic is handled by its configured target. A local fake website is only technically correct for a separate TLS/WebSocket web-front design.
 - The self-SNI profile uses Xray VLESS TCP/TLS fallback. Per Xray's fallback model, fallback is available for VLESS/Trojan TCP+TLS and forwards failed auth or non-VLESS traffic to the configured destination. In `ovpn`, that destination is the internal `ovpn-web` sidecar.

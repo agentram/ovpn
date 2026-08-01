@@ -158,6 +158,7 @@ Generate the client credential:
 ./ovpn user qr --server <server> --username alice --profile vless-reality-tcp-vision --legacy-reality --out ~/Desktop/alice-reality-legacy.png
 ./ovpn user link --server <server> --username alice --profile vless-xhttp-plain
 ./ovpn user link --server <server> --username alice --profile vless-tcp-tls-selfsni-web
+./ovpn user qr --server <server> --username alice --profile vless-xhttp-vlessenc --out ~/Downloads/alice-vlessenc.png
 ./ovpn user export --server <server> --username alice --all-profiles --out ~/Downloads
 ./ovpn user export --server <server> --username alice --profile vless-reality-tcp-vision --fingerprints firefox,qq,chrome --out ~/Downloads
 ```
@@ -226,6 +227,17 @@ Enable an extra profile and redeploy:
 ./ovpn deploy <server>
 ./ovpn doctor <server>
 ```
+
+The experimental `vless-xhttp-vlessenc` profile listens on `13180/tcp`. Before enabling it, add `13180` to `ovpn_firewall_extra_tcp_ports` in the host's Ansible inventory and apply `playbooks/host-maintenance.yml`. Then enable, deploy, and validate it in the same way:
+
+```bash
+./ovpn server profile enable <server> vless-xhttp-vlessenc
+./ovpn deploy <server>
+./ovpn doctor <server>
+./ovpn user link --server <server> --username alice --profile vless-xhttp-vlessenc
+```
+
+This profile is experimental and currently confirmed with Mihomo only. Its link contains a client `encryption` value; the matching server `decryption` value is never included in output. The first enable generates the cluster pair on the selected server through SSH with its pinned Xray Docker image, so Docker is not required on the operator workstation. See [`docs/transports.md`](transports.md) before distributing it.
 
 Profiles removed in a release are no longer shown or rendered. If older local state contains a removed profile name, normal state normalization drops it; no separate cleanup command is required. Links for removed profiles cannot be generated after the profile is removed from the server.
 

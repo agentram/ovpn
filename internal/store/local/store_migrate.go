@@ -27,6 +27,8 @@ func (s *Store) migrate(ctx context.Context) error {
 			reality_short_ids TEXT NOT NULL,
 			reality_server_name TEXT NOT NULL,
 			reality_target TEXT NOT NULL,
+			vless_client_encryption TEXT NOT NULL DEFAULT '',
+			vless_server_decryption TEXT NOT NULL DEFAULT '',
 			primary_profile TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision',
 			enabled_profiles TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision',
 			proxy_preset TEXT NOT NULL DEFAULT '',
@@ -123,6 +125,8 @@ func (s *Store) migrate(ctx context.Context) error {
 		`ALTER TABLE servers ADD COLUMN proxy_service_uuid TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE servers ADD COLUMN primary_profile TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision';`,
 		`ALTER TABLE servers ADD COLUMN enabled_profiles TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision';`,
+		`ALTER TABLE servers ADD COLUMN vless_client_encryption TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE servers ADD COLUMN vless_server_decryption TEXT NOT NULL DEFAULT '';`,
 	}
 	for _, stmt := range optionalMigrations {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(strings.ToLower(err.Error()), "duplicate column name") {
