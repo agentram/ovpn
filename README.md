@@ -96,7 +96,7 @@ flowchart LR
 - SSH/SCP deploy path: commands render files locally and apply them through normal server access.
 - Docker runtime: Xray, `ovpn-agent`, optional proxy, and monitoring run under `/opt/ovpn`.
 - Multi-host user operations: user add/remove/enable/disable/quota commands apply to all enabled VPN servers by default.
-- Transport profiles: keep the default TCP/REALITY baseline for compatibility and use opt-in fallback profiles for degraded networks; plain XHTTP is available when operators accept its lack of transport security, and self-SNI TCP/TLS can serve a normal HTTPS fallback page on the same domain.
+- Transport profiles: keep the default TCP/REALITY baseline for compatibility and use opt-in fallback profiles for degraded networks; plain XHTTP is available when operators accept its lack of transport security, self-SNI TCP/TLS can serve a normal HTTPS fallback page on the same domain, and experimental VLESS Encryption + XHTTP is available for supported clients.
 - Optional proxy role: HAProxy can front a backend pool and use country presets for split routing.
 - Security defaults: Xray routing blocks BitTorrent and public tracker domains; Ansible can add host-level Tor exit filtering. The rendered Xray config (REALITY private key + client UUIDs) is stored `0640 root:<xray-gid>`, and `ovpn-agent` mutating endpoints require a bearer token (`OVPN_AGENT_TOKEN`, auto-provisioned on deploy).
 - Maintenance commands: `doctor`, `status`, logs, backups, restore, cleanup, monitoring, and release checks are part of the CLI.
@@ -163,6 +163,8 @@ export OVPN_SECURITY_PROFILE=off
 
 See [`docs/security.md`](docs/security.md) for the full security model.
 See [`docs/transports.md`](docs/transports.md) for profile rollout, including the optional self-SNI HTTPS fallback profile.
+
+For experimental VLESS Encryption + XHTTP, allow `13180/tcp` in the target host's Ansible inventory, apply `playbooks/host-maintenance.yml`, then enable `vless-xhttp-vlessenc`, deploy, and generate a profile-specific link. The first enable uses the target server's pinned Xray image over SSH, so Docker is not required on the operator workstation. The profile is currently confirmed with Mihomo only; see [`docs/transports.md`](docs/transports.md) before sending it to users.
 
 ## Optional camouflage
 

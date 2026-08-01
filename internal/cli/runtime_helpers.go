@@ -62,6 +62,9 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 	if err := a.ensureRealityParity(); err != nil {
 		return err
 	}
+	if err := a.ensureVLESSEncryptionParity(); err != nil {
+		return err
+	}
 	if err := a.materializeCanonicalUsersOnServer(srv); err != nil {
 		return fmt.Errorf("materialize global users on %s: %w", srv.Name, err)
 	}

@@ -78,6 +78,14 @@ func (a *App) ensureRealityParity() error {
 	return nil
 }
 
+// ensureTransportKeyParity verifies cluster-wide transport identities.
+func (a *App) ensureTransportKeyParity() error {
+	if err := a.ensureRealityParity(); err != nil {
+		return err
+	}
+	return a.ensureVLESSEncryptionParity()
+}
+
 // ensureRealityParityForServers verifies REALITY parity for provided servers.
 func ensureRealityParityForServers(servers []model.Server) error {
 	if len(servers) <= 1 {
@@ -127,7 +135,7 @@ func (a *App) resolveUserMutationServers() ([]model.Server, error) {
 		return nil, fmt.Errorf("no enabled servers found")
 	}
 	if len(servers) > 1 {
-		if err := a.ensureRealityParity(); err != nil {
+		if err := a.ensureTransportKeyParity(); err != nil {
 			return nil, err
 		}
 		if _, err := a.canonicalGlobalUsers(); err != nil {

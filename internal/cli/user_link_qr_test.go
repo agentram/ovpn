@@ -166,6 +166,74 @@ func TestUserLinkCanSelectTransportProfile(t *testing.T) {
 	}
 }
 
+func TestUserVLESSEncryptionXHTTPLinkAndQRHandleLongEncryptionValue(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	clientEncryption := "mlkem768x25519plus.native.0rtt." + strings.Repeat("A", 512)
+	srv.VLESSClientEncryption = clientEncryption
+	srv.VLESSServerDecryption = "mlkem768x25519plus.native.600s." + strings.Repeat("B", 512)
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfileVLESSEncXHTTP)
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	linkCmd := app.newUserLinkCmd()
+	linkCmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileVLESSEncXHTTP, "--qr=false"})
+	stdout, stderr, err := captureStdoutStderr(t, linkCmd.Execute)
+	if err != nil {
+		t.Fatalf("user link vless encryption xhttp: %v", err)
+	}
+	link := strings.TrimSpace(stdout)
+	for _, want := range []string{":13180?", "type=xhttp", "encryption=" + clientEncryption} {
+		if !strings.Contains(link, want) {
+			t.Fatalf("VLESS Encryption link missing %q: %s", want, link)
+		}
+	}
+	if strings.Contains(link, srv.VLESSServerDecryption) {
+		t.Fatalf("VLESS Encryption link leaked server decryption: %s", link)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	qrPath := filepath.Join(t.TempDir(), "alice-vlessenc.png")
+	qrCmd := app.newUserQRCmd()
+	qrCmd.SetArgs([]string{"--server", "main", "--username", "alice", "--profile", model.TransportProfileVLESSEncXHTTP, "--out", qrPath})
+	stdout, stderr, err = captureStdoutStderr(t, qrCmd.Execute)
+	if err != nil {
+		t.Fatalf("user qr vless encryption xhttp: %v", err)
+	}
+	if stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "QR saved: "+qrPath) {
+		t.Fatalf("expected saved status on stderr, got %q", stderr)
+	}
+	assertPNGQRCodeFile(t, qrPath)
+}
+
+func TestUserVLESSEncryptionXHTTPLinkRejectsInvalidClientEncryption(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	srv.VLESSClientEncryption = "invalid-client-value"
+	srv.VLESSServerDecryption = "mlkem768x25519plus.native.600s.server-value"
+	srv.EnabledProfiles = model.EnabledProfilesCSV(srv.NormalizedPrimaryProfile(), model.TransportProfileVLESSEncXHTTP)
+	if err := app.store.UpdateServer(app.ctx, srv); err != nil {
+		t.Fatalf("update server: %v", err)
+	}
+
+	_, err = buildUserProfileLink(*srv, model.User{Username: "alice", UUID: "11111111-1111-1111-1111-111111111111"}, model.TransportProfileVLESSEncXHTTP)
+	if err == nil || !strings.Contains(err.Error(), "no valid client encryption value") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestUserLinkRejectsRemovedTransportProfile(t *testing.T) {
 	app := newTestAppWithLinkedUser(t)
 	srv, err := app.store.GetServerByName(app.ctx, "main")
