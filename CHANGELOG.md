@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.9.0
+
 ### Added
 - Added experimental `vless-xhttp-vlessenc`: XHTTP on `13180/tcp` with Xray VLESS Encryption (`mlkem768x25519plus.native`), cluster-shared encrypted key material, and profile-specific client links.
 
