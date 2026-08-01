@@ -106,6 +106,9 @@ func (a *App) runDoctor(serverName string, opts doctorOptions) (doctor.Report, e
 		report.Add(a.checkProxyServiceRuntimeIdentity(runner, cfg, *srv))
 	}
 	report.Add(a.checkComposeState(runner, cfg, *srv))
+	if srv.IsTransportProfileEnabled(model.TransportProfileVLESSEncXHTTP) {
+		report.Add(a.checkVLESSEncryptionProfilePort(runner, cfg))
+	}
 	report.Add(a.checkXrayConfig(runner, cfg))
 	report.Add(a.checkAgentHealth(runner, cfg, *srv))
 	report.Add(a.checkDisk(runner, cfg))

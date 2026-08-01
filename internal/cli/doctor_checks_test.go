@@ -259,6 +259,65 @@ func TestDoctorDiskBranches(t *testing.T) {
 	}
 }
 
+func TestDoctorVLESSEncryptionProfilePortBranches(t *testing.T) {
+	t.Parallel()
+
+	app := newTestAppWithServer(t, false)
+	runner := &ssh.Runner{DryRun: true}
+	cfg := ssh.Config{Host: "example.com", User: "root"}
+
+	tests := []struct {
+		name       string
+		stdout     string
+		err        error
+		wantStatus doctor.Status
+		wantText   string
+	}{
+		{
+			name:       "allowed",
+			stdout:     "VLESSENC_LISTEN=1\nVLESSENC_UFW=allowed\n",
+			wantStatus: doctor.StatusPass,
+			wantText:   "not blocked",
+		},
+		{
+			name:       "ufw inactive",
+			stdout:     "VLESSENC_LISTEN=1\nVLESSENC_UFW=inactive\n",
+			wantStatus: doctor.StatusPass,
+			wantText:   "not blocked",
+		},
+		{
+			name:       "listener missing",
+			stdout:     "VLESSENC_LISTEN=0\nVLESSENC_UFW=allowed\n",
+			wantStatus: doctor.StatusWarn,
+			wantText:   "not listening",
+		},
+		{
+			name:       "ufw blocked",
+			stdout:     "VLESSENC_LISTEN=1\nVLESSENC_UFW=blocked\n",
+			wantStatus: doctor.StatusWarn,
+			wantText:   "does not allow",
+		},
+		{
+			name:       "probe failed",
+			err:        errors.New("remote failure"),
+			wantStatus: doctor.StatusWarn,
+			wantText:   "could not verify",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			app.remoteExecHook = func(ssh.Config, time.Duration, string) (ssh.Result, error) {
+				return ssh.Result{Stdout: tt.stdout}, tt.err
+			}
+			got := app.checkVLESSEncryptionProfilePort(runner, cfg)
+			if got.Status != tt.wantStatus || !strings.Contains(got.Message, tt.wantText) {
+				t.Fatalf("check = %+v, want status=%s text=%q", got, tt.wantStatus, tt.wantText)
+			}
+		})
+	}
+}
+
 func successfulDoctorExecHook(_ ssh.Config, _ time.Duration, cmd string) (ssh.Result, error) {
 	switch {
 	case strings.Contains(cmd, "HOSTNAME="):
@@ -285,6 +344,8 @@ func successfulDoctorExecHook(_ ssh.Config, _ time.Duration, cmd string) (ssh.Re
 		return ssh.Result{}, nil
 	case strings.Contains(cmd, "ps --all --format json"):
 		return ssh.Result{Stdout: `[{"Service":"xray","State":"running","Status":"Up 1m"},{"Service":"ovpn-agent","State":"running","Status":"Up 1m"}]`}, nil
+	case strings.Contains(cmd, "VLESSENC_LISTEN"):
+		return ssh.Result{Stdout: "VLESSENC_LISTEN=1\nVLESSENC_UFW=allowed\n"}, nil
 	case strings.Contains(cmd, "run -test"):
 		return ssh.Result{Stdout: "Configuration OK\n"}, nil
 	case strings.Contains(cmd, "runtime/user/add"):

@@ -544,6 +544,13 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 	if meta.Kind == "tls-selfsni-web" {
 		serverName = address
 	}
+	encryption := ""
+	if profile == model.TransportProfileVLESSEncXHTTP {
+		encryption = strings.TrimSpace(srv.VLESSClientEncryption)
+		if !validVLESSEncryptionValue(encryption, vlessClientPrefix) {
+			return "", fmt.Errorf("profile %s has no valid client encryption value on server %s; disable and re-enable the profile to provision its cluster key pair", profile, srv.Name)
+		}
+	}
 	label := "ovpn-" + u.Username
 	if requestedProfile || profile != model.TransportProfileRealityTCPVision {
 		label += "-" + profile
@@ -559,6 +566,7 @@ func buildUserProfileLink(srv model.Server, u model.User, profile string, opts .
 		Label:       label,
 		Fingerprint: fingerprint,
 		SpiderX:     spiderX,
+		Encryption:  encryption,
 	}), nil
 }
 

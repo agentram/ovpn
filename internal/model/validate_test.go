@@ -73,6 +73,25 @@ func TestServerValidate(t *testing.T) {
 	if err := invalidProfile.Validate(); err == nil || !strings.Contains(err.Error(), "enabled_profiles contains unsupported transport profile nope") {
 		t.Fatalf("expected enabled profile validation error, got %v", err)
 	}
+
+	incompleteVLESSEncryption := valid
+	incompleteVLESSEncryption.VLESSClientEncryption = "mlkem768x25519plus.native.0rtt.client"
+	if err := incompleteVLESSEncryption.Validate(); err == nil || !strings.Contains(err.Error(), "must be configured together") {
+		t.Fatalf("expected incomplete VLESS Encryption pair error, got %v", err)
+	}
+
+	missingVLESSEncryption := valid
+	missingVLESSEncryption.EnabledProfiles = TransportProfileRealityTCPVision + "," + TransportProfileVLESSEncXHTTP
+	if err := missingVLESSEncryption.Validate(); err == nil || !strings.Contains(err.Error(), "requires generated VLESS encryption values") {
+		t.Fatalf("expected missing VLESS Encryption values error, got %v", err)
+	}
+
+	validVLESSEncryption := missingVLESSEncryption
+	validVLESSEncryption.VLESSClientEncryption = "mlkem768x25519plus.native.0rtt.client"
+	validVLESSEncryption.VLESSServerDecryption = "mlkem768x25519plus.native.600s.server"
+	if err := validVLESSEncryption.Validate(); err != nil {
+		t.Fatalf("expected valid VLESS Encryption profile, got %v", err)
+	}
 }
 
 func TestUserValidate(t *testing.T) {

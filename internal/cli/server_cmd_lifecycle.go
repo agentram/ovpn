@@ -62,6 +62,11 @@ func (a *App) newServerAddCmd() *cobra.Command {
 				if err := ensureRealityParityForServers(existingServers); err != nil {
 					return err
 				}
+				if add.role == model.ServerRoleVPN {
+					if err := ensureVLESSEncryptionParityForServers(existingServers); err != nil {
+						return err
+					}
+				}
 				if _, err := a.canonicalGlobalUsers(); err != nil {
 					return err
 				}
@@ -130,6 +135,10 @@ func (a *App) newServerAddCmd() *cobra.Command {
 				RealityServerName: add.realitySNI,
 				RealityTarget:     add.realityTGT,
 				Enabled:           true,
+			}
+			if add.role == model.ServerRoleVPN && len(existingServers) > 0 {
+				srv.VLESSClientEncryption = existingServers[0].VLESSClientEncryption
+				srv.VLESSServerDecryption = existingServers[0].VLESSServerDecryption
 			}
 			if err := a.store.AddServer(a.ctx, srv); err != nil {
 				return err

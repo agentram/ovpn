@@ -9,15 +9,17 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
-		"":              TransportProfileRealityTCPVision,
-		"default":       TransportProfileRealityTCPVision,
-		"tcp":           TransportProfileRealityTCPVision,
-		"vless-reality": TransportProfileRealityTCPVision,
-		"xhttp":         "",
-		"plain-xhttp":   TransportProfilePlainXHTTP,
-		"self-sni":      TransportProfileTLSSelfSNIWeb,
-		"vless-tls":     TransportProfileTLSSelfSNIWeb,
-		"unknown":       "",
+		"":               TransportProfileRealityTCPVision,
+		"default":        TransportProfileRealityTCPVision,
+		"tcp":            TransportProfileRealityTCPVision,
+		"vless-reality":  TransportProfileRealityTCPVision,
+		"xhttp":          "",
+		"plain-xhttp":    TransportProfilePlainXHTTP,
+		"self-sni":       TransportProfileTLSSelfSNIWeb,
+		"vless-tls":      TransportProfileTLSSelfSNIWeb,
+		"vlessenc":       TransportProfileVLESSEncXHTTP,
+		"xhttp-vlessenc": TransportProfileVLESSEncXHTTP,
+		"unknown":        "",
 	}
 	for raw, want := range cases {
 		if got := NormalizeTransportProfile(raw); got != want {
@@ -29,10 +31,11 @@ func TestNormalizeTransportProfileAliases(t *testing.T) {
 func TestNormalizeEnabledProfilesDropsRemovedNamesAndKeepsKnownOrder(t *testing.T) {
 	t.Parallel()
 
-	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "vless-reality-xhttp,tcp,plain-xhttp,xhttp")
+	got := NormalizeEnabledProfiles(TransportProfilePlainXHTTP, "vless-reality-xhttp,tcp,plain-xhttp,xhttp,vlessenc")
 	want := []string{
 		TransportProfileRealityTCPVision,
 		TransportProfilePlainXHTTP,
+		TransportProfileVLESSEncXHTTP,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("NormalizeEnabledProfiles = %#v, want %#v", got, want)

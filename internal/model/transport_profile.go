@@ -3,9 +3,10 @@ package model
 import "strings"
 
 const (
-	TransportProfileStatusDefault    = "default"
-	TransportProfileStatusFallback   = "fallback"
-	TransportProfileStatusCamouflage = "camouflage"
+	TransportProfileStatusDefault      = "default"
+	TransportProfileStatusFallback     = "fallback"
+	TransportProfileStatusCamouflage   = "camouflage"
+	TransportProfileStatusExperimental = "experimental"
 )
 
 var transportProfiles = []TransportProfile{
@@ -32,6 +33,14 @@ var transportProfiles = []TransportProfile{
 		Port:        443,
 		InboundTag:  "vless-tcp-tls-selfsni-web",
 		Description: "VLESS over TCP/TLS with xtls-rprx-vision and HTTPS fallback to a normal internal web service.",
+	},
+	{
+		Name:        TransportProfileVLESSEncXHTTP,
+		Kind:        "vless-encryption-xhttp",
+		Status:      TransportProfileStatusExperimental,
+		Port:        13180,
+		InboundTag:  "vless-xhttp-vlessenc",
+		Description: "Experimental VLESS Encryption over XHTTP with ML-KEM-768/X25519 and ticket-based 0-RTT.",
 	},
 }
 
@@ -72,6 +81,8 @@ func NormalizeTransportProfile(name string) string {
 		return TransportProfilePlainXHTTP
 	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
 		return TransportProfileTLSSelfSNIWeb
+	case "vlessenc", "vless-enc", "xhttp-vlessenc", "vlessenc-xhttp", TransportProfileVLESSEncXHTTP:
+		return TransportProfileVLESSEncXHTTP
 	default:
 		return ""
 	}

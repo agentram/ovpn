@@ -57,6 +57,11 @@ func (a *App) newServerProfileEnableCmd() *cobra.Command {
 			if profile == "" {
 				return unsupportedTransportProfileError(args[1])
 			}
+			if profile == model.TransportProfileVLESSEncXHTTP {
+				if err := a.ensureVLESSEncryptionForServer(srv); err != nil {
+					return err
+				}
+			}
 			if profileConflictsOn443(srv.NormalizedEnabledProfiles(), profile) {
 				return fmt.Errorf("profile %s conflicts with an enabled 443/tcp profile on %s; use `ovpn server profile switch %s %s` to make it primary and replace the conflicting profile, then redeploy", profile, srv.Name, srv.Name, profile)
 			}
@@ -128,6 +133,11 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 			profile := model.NormalizeTransportProfile(args[1])
 			if profile == "" {
 				return unsupportedTransportProfileError(args[1])
+			}
+			if profile == model.TransportProfileVLESSEncXHTTP {
+				if err := a.ensureVLESSEncryptionForServer(srv); err != nil {
+					return err
+				}
 			}
 			srv.PrimaryProfile = profile
 			srv.EnabledProfiles = model.EnabledProfilesCSV(profile, strings.Join(removeConflicting443Profiles(srv.NormalizedEnabledProfiles(), profile), ","))
