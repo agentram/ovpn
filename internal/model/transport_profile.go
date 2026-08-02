@@ -3,9 +3,38 @@ package model
 import "strings"
 
 const (
-	TransportProfileStatusDefault    = "default"
-	TransportProfileStatusFallback   = "fallback"
-	TransportProfileStatusCamouflage = "camouflage"
+	// VLESSEncryptionClientPrefix identifies the ML-KEM native 0-RTT value
+	// supplied to VLESS Encryption clients.
+	VLESSEncryptionClientPrefix = "mlkem768x25519plus.native.0rtt."
+	// VLESSEncryptionServerPrefix identifies the ML-KEM native ticket value
+	// retained by the server as VLESS inbound decryption configuration.
+	VLESSEncryptionServerPrefix = "mlkem768x25519plus.native.600s."
+)
+
+// IsValidVLESSEncryptionClientValue reports whether value has the supported
+// ML-KEM native client form and contains non-whitespace key material.
+func IsValidVLESSEncryptionClientValue(value string) bool {
+	return isValidVLESSEncryptionValue(value, VLESSEncryptionClientPrefix)
+}
+
+// IsValidVLESSEncryptionServerValue reports whether value has the supported
+// ML-KEM native server form and contains non-whitespace key material.
+func IsValidVLESSEncryptionServerValue(value string) bool {
+	return isValidVLESSEncryptionValue(value, VLESSEncryptionServerPrefix)
+}
+
+func isValidVLESSEncryptionValue(value, prefix string) bool {
+	value = strings.TrimSpace(value)
+	return strings.HasPrefix(value, prefix) &&
+		strings.TrimSpace(strings.TrimPrefix(value, prefix)) != "" &&
+		!strings.ContainsAny(value, " \t\r\n")
+}
+
+const (
+	TransportProfileStatusDefault      = "default"
+	TransportProfileStatusFallback     = "fallback"
+	TransportProfileStatusCamouflage   = "camouflage"
+	TransportProfileStatusExperimental = "experimental"
 )
 
 var transportProfiles = []TransportProfile{
@@ -32,6 +61,14 @@ var transportProfiles = []TransportProfile{
 		Port:        443,
 		InboundTag:  "vless-tcp-tls-selfsni-web",
 		Description: "VLESS over TCP/TLS with xtls-rprx-vision and HTTPS fallback to a normal internal web service.",
+	},
+	{
+		Name:        TransportProfileVLESSEncXHTTP,
+		Kind:        "vless-encryption-xhttp",
+		Status:      TransportProfileStatusExperimental,
+		Port:        13180,
+		InboundTag:  "vless-xhttp-vlessenc",
+		Description: "Experimental VLESS Encryption over XHTTP with ML-KEM-768/X25519 and ticket-based 0-RTT.",
 	},
 }
 
@@ -72,6 +109,8 @@ func NormalizeTransportProfile(name string) string {
 		return TransportProfilePlainXHTTP
 	case "tls", "selfsni", "self-sni", "tls-selfsni", "tls-selfsni-web", "vless-tls", TransportProfileTLSSelfSNIWeb:
 		return TransportProfileTLSSelfSNIWeb
+	case "vlessenc", "vless-enc", "xhttp-vlessenc", "vlessenc-xhttp", TransportProfileVLESSEncXHTTP:
+		return TransportProfileVLESSEncXHTTP
 	default:
 		return ""
 	}

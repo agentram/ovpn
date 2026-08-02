@@ -11,6 +11,7 @@ const (
 	TransportProfileRealityTCPVision = "vless-reality-tcp-vision"
 	TransportProfilePlainXHTTP       = "vless-xhttp-plain"
 	TransportProfileTLSSelfSNIWeb    = "vless-tcp-tls-selfsni-web"
+	TransportProfileVLESSEncXHTTP    = "vless-xhttp-vlessenc"
 )
 
 type SSHConfig struct {
@@ -23,30 +24,32 @@ type SSHConfig struct {
 }
 
 type Server struct {
-	ID                int64      `json:"id"`
-	Name              string     `json:"name"`
-	Role              string     `json:"role"`
-	Host              string     `json:"host"`
-	Domain            string     `json:"domain"`
-	SSHUser           string     `json:"ssh_user"`
-	SSHPort           int        `json:"ssh_port"`
-	SSHIdentityFile   string     `json:"ssh_identity_file"`
-	SSHKnownHostsFile string     `json:"ssh_known_hosts_file"`
-	SSHStrictHostKey  bool       `json:"ssh_strict_host_key"`
-	XrayVersion       string     `json:"xray_version"`
-	RealityPrivateKey string     `json:"reality_private_key"`
-	RealityPublicKey  string     `json:"reality_public_key"`
-	RealityShortIDs   string     `json:"reality_short_ids"`
-	RealityServerName string     `json:"reality_server_name"`
-	RealityTarget     string     `json:"reality_target"`
-	PrimaryProfile    string     `json:"primary_profile"`
-	EnabledProfiles   string     `json:"enabled_profiles"`
-	ProxyPreset       string     `json:"proxy_preset"`
-	ProxyServiceUUID  string     `json:"proxy_service_uuid"`
-	Enabled           bool       `json:"enabled"`
-	CreatedAt         time.Time  `json:"created_at"`
-	UpdatedAt         time.Time  `json:"updated_at"`
-	LastDeployAt      *time.Time `json:"last_deploy_at,omitempty"`
+	ID                    int64      `json:"id"`
+	Name                  string     `json:"name"`
+	Role                  string     `json:"role"`
+	Host                  string     `json:"host"`
+	Domain                string     `json:"domain"`
+	SSHUser               string     `json:"ssh_user"`
+	SSHPort               int        `json:"ssh_port"`
+	SSHIdentityFile       string     `json:"ssh_identity_file"`
+	SSHKnownHostsFile     string     `json:"ssh_known_hosts_file"`
+	SSHStrictHostKey      bool       `json:"ssh_strict_host_key"`
+	XrayVersion           string     `json:"xray_version"`
+	RealityPrivateKey     string     `json:"reality_private_key"`
+	RealityPublicKey      string     `json:"reality_public_key"`
+	RealityShortIDs       string     `json:"reality_short_ids"`
+	RealityServerName     string     `json:"reality_server_name"`
+	RealityTarget         string     `json:"reality_target"`
+	VLESSClientEncryption string     `json:"vless_client_encryption"`
+	VLESSServerDecryption string     `json:"vless_server_decryption"`
+	PrimaryProfile        string     `json:"primary_profile"`
+	EnabledProfiles       string     `json:"enabled_profiles"`
+	ProxyPreset           string     `json:"proxy_preset"`
+	ProxyServiceUUID      string     `json:"proxy_service_uuid"`
+	Enabled               bool       `json:"enabled"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	LastDeployAt          *time.Time `json:"last_deploy_at,omitempty"`
 }
 
 type ProxyBackend struct {

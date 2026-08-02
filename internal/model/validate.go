@@ -63,6 +63,11 @@ func (s Server) Validate() error {
 	if strings.TrimSpace(s.RealityTarget) == "" {
 		errs = append(errs, "reality_target is required")
 	}
+	hasVLESSClientEncryption := strings.TrimSpace(s.VLESSClientEncryption) != ""
+	hasVLESSServerDecryption := strings.TrimSpace(s.VLESSServerDecryption) != ""
+	if hasVLESSClientEncryption != hasVLESSServerDecryption {
+		errs = append(errs, "vless encryption client and server values must be configured together")
+	}
 	primary := NormalizeTransportProfile(s.PrimaryProfile)
 	if primary == "" {
 		errs = append(errs, "primary_profile must be a supported transport profile")
@@ -89,6 +94,14 @@ func (s Server) Validate() error {
 		}
 		if !found {
 			errs = append(errs, "enabled_profiles must include primary_profile")
+		}
+	}
+	if s.IsTransportProfileEnabled(TransportProfileVLESSEncXHTTP) {
+		if role != ServerRoleVPN {
+			errs = append(errs, TransportProfileVLESSEncXHTTP+" is only supported for vpn role")
+		}
+		if !hasVLESSClientEncryption || !hasVLESSServerDecryption {
+			errs = append(errs, TransportProfileVLESSEncXHTTP+" requires generated VLESS encryption values")
 		}
 	}
 	if role == ServerRoleProxy {
