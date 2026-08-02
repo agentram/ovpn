@@ -8,6 +8,7 @@ Recommended host model:
 
 - Xray (`VLESS + REALITY`) on `443/tcp`
 - Optional XHTTP fallback profile on `13179/tcp`
+- Optional VLESS Encryption + XHTTP profile on `13180/tcp`
 - Optional self-SNI HTTPS camouflage profile on `443/tcp`, with a real certificate and an internal static fallback site
 - SSH control plane on `22/tcp`
 - Ansible for host baseline and hardening
@@ -21,6 +22,7 @@ Public surface should stay minimal:
 - Xray transport port (`443/tcp`)
 - Optional HTTP challenge port (`80/tcp`) when self-SNI certificate issuance is enabled
 - Optional XHTTP fallback port (`13179/tcp`) when that profile is enabled
+- Optional VLESS Encryption + XHTTP port (`13180/tcp`) when that profile is enabled
 - SSH (`22/tcp`)
 
 Internal-only surfaces:
@@ -132,6 +134,31 @@ curl -vk https://<domain>/
 ```
 
 Users need new links only when they switch to this profile.
+
+## Optional VLESS Encryption + XHTTP
+
+`vless-xhttp-vlessenc` is an experimental XHTTP profile on `13180/tcp`. It uses Xray's VLESS Encryption key agreement and replay protection, but it is not a replacement for testing the transport against the client networks that matter to you.
+
+Before enabling it, allow `13180/tcp` through the host firewall using the same Ansible inventory used for the host baseline:
+
+```yaml
+ovpn_firewall_extra_tcp_ports:
+  - 13180
+```
+
+Then apply host maintenance, enable the profile, deploy, and validate:
+
+```bash
+cd ansible
+ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml playbooks/host-maintenance.yml --limit <server-hostname>
+cd ..
+
+./ovpn server profile enable <server> vless-xhttp-vlessenc
+./ovpn deploy <server>
+./ovpn doctor <server>
+```
+
+The generated client link contains an `encryption` value. The matching server `decryption` value is kept encrypted in local ovpn state and must never be sent to users, logged, or pasted into a client. The current confirmed client is Mihomo; treat other clients as unconfirmed until they have passed an import and traffic test. Do not combine this VLESS Encryption setting with the self-SNI profile because its TLS fallback path requires a normal VLESS inbound without `decryption`.
 
 ## SSH and host hardening defaults
 

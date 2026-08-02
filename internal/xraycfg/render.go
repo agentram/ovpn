@@ -19,6 +19,7 @@ type Spec struct {
 	RealityServerName      string
 	RealityTarget          string
 	RealityPublicKey       string
+	VLESSServerDecryption  string
 	SecurityProfile        string
 	ThreatDNSServers       []string
 	LimitFallbackUpload    *FallbackRateLimit
@@ -216,7 +217,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 			},
 		},
 	}
-	cfg.Inbounds = append(cfg.Inbounds, buildProfileInbounds(spec.EnabledProfiles, users, plainUsers, realitySettings, tlsSelfSNISettings, spec.TLSSelfSNIFallbackDest)...)
+	cfg.Inbounds = append(cfg.Inbounds, buildProfileInbounds(spec.EnabledProfiles, users, plainUsers, realitySettings, tlsSelfSNISettings, spec.TLSSelfSNIFallbackDest, spec.VLESSServerDecryption)...)
 	if spec.SecurityProfile == SecurityProfileMinimal {
 		cfg.DNS = map[string]any{
 			"queryStrategy": "UseIPv4",
@@ -321,7 +322,7 @@ func normalizeEnabledProfiles(raw []string) []string {
 	return out
 }
 
-func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plainUsers []map[string]any, realitySettings map[string]any, tlsSelfSNISettings map[string]any, tlsSelfSNIFallbackDest string) []any {
+func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plainUsers []map[string]any, realitySettings map[string]any, tlsSelfSNISettings map[string]any, tlsSelfSNIFallbackDest string, vlessServerDecryption string) []any {
 	out := make([]any, 0, len(profiles))
 	for _, profile := range profiles {
 		switch profile {
@@ -339,6 +340,17 @@ func buildProfileInbounds(profiles []string, visionUsers []map[string]any, plain
 					"path": "/",
 					"mode": "auto",
 				},
+			}))
+		case model.TransportProfileVLESSEncXHTTP:
+			out = append(out, vlessInboundWithSettings("vless-xhttp-vlessenc", 13180, visionUsers, map[string]any{
+				"network":  "xhttp",
+				"security": "none",
+				"xhttpSettings": map[string]any{
+					"path": "/",
+					"mode": "auto",
+				},
+			}, map[string]any{
+				"decryption": vlessServerDecryption,
 			}))
 		case model.TransportProfileTLSSelfSNIWeb:
 			out = append(out, vlessInboundWithSettings("vless-tcp-tls-selfsni-web", 443, visionUsers, map[string]any{
@@ -594,6 +606,14 @@ func ValidateSpec(spec Spec) error {
 			return fmt.Errorf("%s requires fallback destination", model.TransportProfileTLSSelfSNIWeb)
 		}
 	}
+	if includesProfile(spec.EnabledProfiles, model.TransportProfileVLESSEncXHTTP) {
+		if spec.Role == model.ServerRoleProxy {
+			return fmt.Errorf("%s is only supported on vpn servers", model.TransportProfileVLESSEncXHTTP)
+		}
+		if !model.IsValidVLESSEncryptionServerValue(spec.VLESSServerDecryption) {
+			return fmt.Errorf("%s requires a valid ML-KEM-768 native server decryption value; enable the profile with `ovpn server profile enable <server> %s`", model.TransportProfileVLESSEncXHTTP, model.TransportProfileVLESSEncXHTTP)
+		}
+	}
 	if spec.Role != "" && spec.Role != model.ServerRoleVPN && spec.Role != model.ServerRoleProxy {
 		return fmt.Errorf("role must be %q or %q", model.ServerRoleVPN, model.ServerRoleProxy)
 	}
@@ -665,6 +685,7 @@ type LinkInput struct {
 	Profile     string
 	Fingerprint string
 	SpiderX     string
+	Encryption  string
 }
 
 func NormalizeClientFingerprint(raw string) string {
@@ -694,6 +715,8 @@ func BuildVLESSLink(in LinkInput) string {
 		switch profile {
 		case model.TransportProfilePlainXHTTP:
 			in.Port = 13179
+		case model.TransportProfileVLESSEncXHTTP:
+			in.Port = 13180
 		default:
 			in.Port = 443
 		}
@@ -730,6 +753,17 @@ func BuildVLESSLink(in LinkInput) string {
 			in.Flow,
 			in.ServerName,
 			url.QueryEscape("http/1.1"),
+			urlEscapeLabel(label),
+		)
+	case model.TransportProfileVLESSEncXHTTP:
+		return fmt.Sprintf(
+			"vless://%s@%s:%d?security=none&encryption=%s&type=xhttp&path=%s&mode=auto&flow=%s#%s",
+			in.UUID,
+			in.Address,
+			in.Port,
+			url.QueryEscape(in.Encryption),
+			url.QueryEscape("/"),
+			in.Flow,
 			urlEscapeLabel(label),
 		)
 	}

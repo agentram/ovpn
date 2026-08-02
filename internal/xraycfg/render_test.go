@@ -3,6 +3,7 @@ package xraycfg
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -169,6 +170,34 @@ func TestBuildVLESSLinkProfiles(t *testing.T) {
 	if strings.Contains(tlsSelfSNI, "pbk=") || strings.Contains(tlsSelfSNI, "sid=") {
 		t.Fatalf("tls self-sni link should not include REALITY params: %s", tlsSelfSNI)
 	}
+
+	clientEncryption := "mlkem768x25519plus.native.0rtt." + strings.Repeat("A", 512)
+	vlessEncXHTTP := BuildVLESSLink(LinkInput{
+		Address:    "example.com",
+		UUID:       "11111111-1111-1111-1111-111111111111",
+		Profile:    model.TransportProfileVLESSEncXHTTP,
+		Encryption: clientEncryption,
+		Label:      "ovpn encrypted",
+	})
+	for _, want := range []string{
+		":13180?",
+		"security=none",
+		"type=xhttp",
+		"path=%2F",
+		"mode=auto",
+		"flow=xtls-rprx-vision",
+		"encryption=" + url.QueryEscape(clientEncryption),
+		"#ovpn%20encrypted",
+	} {
+		if !strings.Contains(vlessEncXHTTP, want) {
+			t.Fatalf("vless encryption xhttp link missing %q: %s", want, vlessEncXHTTP)
+		}
+	}
+	for _, forbidden := range []string{"pbk=", "sni=", "sid=", "fp=", "spx="} {
+		if strings.Contains(vlessEncXHTTP, forbidden) {
+			t.Fatalf("vless encryption xhttp link should not contain %q: %s", forbidden, vlessEncXHTTP)
+		}
+	}
 }
 
 func TestBuildVLESSLinkHonorsExplicitFingerprint(t *testing.T) {
@@ -250,6 +279,81 @@ func TestRenderServerJSONIncludesEnabledTransportProfiles(t *testing.T) {
 	plainXHTTPSettings, _ := plainStream["xhttpSettings"].(map[string]any)
 	if got := plainXHTTPSettings["path"]; got != "/" {
 		t.Fatalf("plain xhttp path = %v", got)
+	}
+}
+
+func TestRenderServerJSONKeepsVisionForVLESSEncryptionXHTTP(t *testing.T) {
+	t.Parallel()
+
+	serverDecryption := "mlkem768x25519plus.native.600s." + strings.Repeat("S", 512)
+	raw, err := RenderServerJSON(Spec{
+		Role:                  model.ServerRoleVPN,
+		EnabledProfiles:       []string{model.TransportProfileVLESSEncXHTTP},
+		VLESSServerDecryption: serverDecryption,
+		SecurityProfile:       SecurityProfileMinimal,
+		ThreatDNSServers:      []string{"9.9.9.9"},
+		Users:                 []model.User{{UUID: "11111111-1111-1111-1111-111111111111", Email: "u@example.com", Enabled: true}},
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatalf("unmarshal rendered config: %v", err)
+	}
+	inbounds, _ := cfg["inbounds"].([]any)
+	var inbound map[string]any
+	for _, rawInbound := range inbounds {
+		candidate, _ := rawInbound.(map[string]any)
+		if candidate["tag"] == "vless-xhttp-vlessenc" {
+			inbound = candidate
+			break
+		}
+	}
+	if inbound == nil {
+		t.Fatalf("expected vless encryption xhttp inbound in %v", inbounds)
+	}
+	if got := inbound["port"]; got != float64(13180) {
+		t.Fatalf("vless encryption xhttp port = %v, want 13180", got)
+	}
+	settings, _ := inbound["settings"].(map[string]any)
+	if got := settings["decryption"]; got != serverDecryption {
+		t.Fatalf("server decryption = %v, want generated value", got)
+	}
+	clients, _ := settings["clients"].([]any)
+	client, _ := clients[0].(map[string]any)
+	if got := client["flow"]; got != "xtls-rprx-vision" {
+		t.Fatalf("VLESS Encryption XHTTP must retain Vision flow, got %v", got)
+	}
+	stream, _ := inbound["streamSettings"].(map[string]any)
+	if got := stream["network"]; got != "xhttp" {
+		t.Fatalf("vless encryption network = %v", got)
+	}
+	if got := stream["security"]; got != "none" {
+		t.Fatalf("vless encryption security = %v", got)
+	}
+	xhttpSettings, _ := stream["xhttpSettings"].(map[string]any)
+	if got := xhttpSettings["path"]; got != "/" {
+		t.Fatalf("vless encryption path = %v", got)
+	}
+	if got := xhttpSettings["mode"]; got != "auto" {
+		t.Fatalf("vless encryption mode = %v", got)
+	}
+}
+
+func TestValidateSpecRejectsMissingVLESSEncryptionDecryption(t *testing.T) {
+	t.Parallel()
+
+	for _, value := range []string{"", "mlkem768x25519plus.native.60s.invalid"} {
+		err := ValidateSpec(Spec{
+			Role:                  model.ServerRoleVPN,
+			EnabledProfiles:       []string{model.TransportProfileVLESSEncXHTTP},
+			ThreatDNSServers:      []string{"9.9.9.9"},
+			VLESSServerDecryption: value,
+		})
+		if err == nil || !strings.Contains(err.Error(), "server decryption") {
+			t.Fatalf("value %q: expected server decryption validation error, got %v", value, err)
+		}
 	}
 }
 

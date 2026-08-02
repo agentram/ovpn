@@ -33,17 +33,27 @@ func (s *Store) AddServer(ctx context.Context, srv *model.Server) error {
 	if err != nil {
 		return err
 	}
+	vlessClientEncryption, err := encryptSensitiveField(srv.VLESSClientEncryption)
+	if err != nil {
+		return err
+	}
+	vlessServerDecryption, err := encryptSensitiveField(srv.VLESSServerDecryption)
+	if err != nil {
+		return err
+	}
 	now := util.NowUTC().Format(time.RFC3339)
 	res, err := s.db.ExecContext(ctx, `
 		INSERT INTO servers (
 			name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
 			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key,
-			reality_short_ids, reality_server_name, reality_target, primary_profile, enabled_profiles,
+			reality_short_ids, reality_server_name, reality_target, vless_client_encryption,
+			vless_server_decryption, primary_profile, enabled_profiles,
 			proxy_preset, proxy_service_uuid, enabled, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, srv.Name, srv.Role, srv.Host, srv.Domain, srv.SSHUser, srv.SSHPort, srv.SSHIdentityFile, srv.SSHKnownHostsFile,
 		boolToInt(srv.SSHStrictHostKey), srv.XrayVersion, realityPrivateKey, srv.RealityPublicKey,
-		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.PrimaryProfile, srv.EnabledProfiles,
+		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, vlessClientEncryption,
+		vlessServerDecryption, srv.PrimaryProfile, srv.EnabledProfiles,
 		srv.ProxyPreset, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, now)
 	if err != nil {
 		return err
@@ -66,17 +76,27 @@ func (s *Store) UpdateServer(ctx context.Context, srv *model.Server) error {
 	if err != nil {
 		return err
 	}
+	vlessClientEncryption, err := encryptSensitiveField(srv.VLESSClientEncryption)
+	if err != nil {
+		return err
+	}
+	vlessServerDecryption, err := encryptSensitiveField(srv.VLESSServerDecryption)
+	if err != nil {
+		return err
+	}
 	now := util.NowUTC().Format(time.RFC3339)
 	_, err = s.db.ExecContext(ctx, `
 		UPDATE servers SET
 			role=?, host=?, domain=?, ssh_user=?, ssh_port=?, ssh_identity_file=?, ssh_known_hosts_file=?,
 			ssh_strict_host_key=?, xray_version=?, reality_private_key=?, reality_public_key=?,
-			reality_short_ids=?, reality_server_name=?, reality_target=?, primary_profile=?, enabled_profiles=?,
+			reality_short_ids=?, reality_server_name=?, reality_target=?, vless_client_encryption=?,
+			vless_server_decryption=?, primary_profile=?, enabled_profiles=?,
 			proxy_preset=?, proxy_service_uuid=?, enabled=?, updated_at=?
 		WHERE id=?
 	`, srv.Role, srv.Host, srv.Domain, srv.SSHUser, srv.SSHPort, srv.SSHIdentityFile, srv.SSHKnownHostsFile,
 		boolToInt(srv.SSHStrictHostKey), srv.XrayVersion, realityPrivateKey, srv.RealityPublicKey,
-		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, srv.PrimaryProfile, srv.EnabledProfiles,
+		srv.RealityShortIDs, srv.RealityServerName, srv.RealityTarget, vlessClientEncryption,
+		vlessServerDecryption, srv.PrimaryProfile, srv.EnabledProfiles,
 		srv.ProxyPreset, srv.ProxyServiceUUID, boolToInt(srv.Enabled), now, srv.ID)
 	return err
 }
@@ -92,8 +112,9 @@ func (s *Store) SetServerLastDeploy(ctx context.Context, serverID int64) error {
 func (s *Store) GetServerByName(ctx context.Context, name string) (*model.Server, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
-			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, primary_profile, enabled_profiles,
+				ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
+				reality_server_name, reality_target, vless_client_encryption, vless_server_decryption,
+				primary_profile, enabled_profiles,
 			proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers WHERE name=?
 	`, name)
@@ -104,8 +125,9 @@ func (s *Store) GetServerByName(ctx context.Context, name string) (*model.Server
 func (s *Store) GetServerByID(ctx context.Context, id int64) (*model.Server, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
-			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, primary_profile, enabled_profiles,
+				ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
+				reality_server_name, reality_target, vless_client_encryption, vless_server_decryption,
+				primary_profile, enabled_profiles,
 			proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers WHERE id=?
 	`, id)
@@ -116,8 +138,9 @@ func (s *Store) GetServerByID(ctx context.Context, id int64) (*model.Server, err
 func (s *Store) ListServers(ctx context.Context) ([]model.Server, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, role, host, domain, ssh_user, ssh_port, ssh_identity_file, ssh_known_hosts_file,
-			ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
-			reality_server_name, reality_target, primary_profile, enabled_profiles,
+				ssh_strict_host_key, xray_version, reality_private_key, reality_public_key, reality_short_ids,
+				reality_server_name, reality_target, vless_client_encryption, vless_server_decryption,
+				primary_profile, enabled_profiles,
 			proxy_preset, proxy_service_uuid, enabled, created_at, updated_at, last_deploy_at
 		FROM servers ORDER BY id
 	`)
@@ -134,6 +157,47 @@ func (s *Store) ListServers(ctx context.Context) ([]model.Server, error) {
 		out = append(out, *srv)
 	}
 	return out, rows.Err()
+}
+
+// SetVLESSEncryptionForServers stores one VLESS Encryption pair on all selected
+// servers atomically, preventing a partially updated HA cluster.
+func (s *Store) SetVLESSEncryptionForServers(ctx context.Context, serverIDs []int64, clientEncryption, serverDecryption string) error {
+	if len(serverIDs) == 0 {
+		return errors.New("at least one server is required")
+	}
+	encryptedClient, err := encryptSensitiveField(clientEncryption)
+	if err != nil {
+		return err
+	}
+	encryptedServer, err := encryptSensitiveField(serverDecryption)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	now := util.NowUTC().Format(time.RFC3339)
+	for _, serverID := range serverIDs {
+		result, err := tx.ExecContext(ctx, `
+			UPDATE servers
+			SET vless_client_encryption=?, vless_server_decryption=?, updated_at=?
+			WHERE id=?
+		`, encryptedClient, encryptedServer, now, serverID)
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return fmt.Errorf("server id %d not found", serverID)
+		}
+	}
+	return tx.Commit()
 }
 
 // DeleteServerByName removes a server record and its dependent rows.

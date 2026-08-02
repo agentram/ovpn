@@ -18,7 +18,8 @@ func scanServer(row scanner) (*model.Server, error) {
 	if err := row.Scan(
 		&srv.ID, &srv.Name, &srv.Role, &srv.Host, &srv.Domain, &srv.SSHUser, &srv.SSHPort, &srv.SSHIdentityFile, &srv.SSHKnownHostsFile,
 		&strict, &srv.XrayVersion, &srv.RealityPrivateKey, &srv.RealityPublicKey, &srv.RealityShortIDs,
-		&srv.RealityServerName, &srv.RealityTarget, &srv.PrimaryProfile, &srv.EnabledProfiles,
+		&srv.RealityServerName, &srv.RealityTarget, &srv.VLESSClientEncryption, &srv.VLESSServerDecryption,
+		&srv.PrimaryProfile, &srv.EnabledProfiles,
 		&srv.ProxyPreset, &srv.ProxyServiceUUID, &enabled, &created, &updated, &lastDeploy,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -45,6 +46,16 @@ func scanServer(row scanner) (*model.Server, error) {
 		return nil, err
 	}
 	srv.RealityPrivateKey = realityPrivateKey
+	vlessClientEncryption, err := decryptSensitiveField(srv.VLESSClientEncryption)
+	if err != nil {
+		return nil, err
+	}
+	srv.VLESSClientEncryption = vlessClientEncryption
+	vlessServerDecryption, err := decryptSensitiveField(srv.VLESSServerDecryption)
+	if err != nil {
+		return nil, err
+	}
+	srv.VLESSServerDecryption = vlessServerDecryption
 	return srv, nil
 }
 
