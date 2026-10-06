@@ -107,7 +107,7 @@ ovpn_disable_motd_news: true
 ovpn_prepare_base_stack: false
 ovpn_base_stack_compose_filename: "docker-compose.base.yml"
 ovpn_base_bundle_src: ""
-ovpn_agent_image: "alpine:3.23.4"
+ovpn_agent_image: "alpine:3.24.2"
 ovpn_agent_log_level: "info"
 
 # Xray/runtime defaults (kept in all.yml so bootstrap has required vars even
