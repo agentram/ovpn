@@ -20,7 +20,7 @@ func envWithFileOverride(key string) (string, bool) {
 	fileKey := key + "_FILE"
 	if filePath := strings.TrimSpace(os.Getenv(fileKey)); filePath != "" {
 		cleanPath := filepath.Clean(filePath)
-		// #nosec G304 -- operator-controlled local path override for secret file loading.
+		// #nosec G304,G703 -- operator-controlled local path override for secret file loading.
 		b, err := os.ReadFile(cleanPath)
 		if err != nil {
 			slog.Warn("failed to read *_FILE override; falling back", "key", fileKey, "path", cleanPath, "error", err)

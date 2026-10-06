@@ -92,9 +92,13 @@ func (a *App) configCmd() *cobra.Command {
 				return fmt.Errorf("json invalid: %w", err)
 			}
 			xrayImage := "ghcr.io/xtls/xray-core:" + normalizeXrayVersionTag(srv.XrayVersion)
-			configFile := filepath.Join(os.TempDir(), fmt.Sprintf("ovpn-validate-%s.json", srv.Name))
-			defer os.Remove(configFile)
-			if err := os.WriteFile(configFile, jsonRaw, 0o644); err != nil {
+			configDir, err := os.MkdirTemp("", "ovpn-validate-")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(configDir)
+			configFile := filepath.Join(configDir, "config.json")
+			if err := os.WriteFile(configFile, jsonRaw, 0o600); err != nil {
 				return err
 			}
 			if _, err := exec.LookPath("docker"); err == nil {

@@ -66,12 +66,18 @@ func ValidateConfigWithDockerAndMounts(ctx context.Context, xrayImage string, co
 	}
 	// ghcr.io/xtls/xray-core images use /usr/local/bin/xray as ENTRYPOINT, so the command
 	// passed to `docker run` must not include a second leading `xray` token.
-	args := []string{"run", "--rm", "-v", fmt.Sprintf("%s:/etc/xray/config.json:ro", configPath)}
+	// Local inputs belong to the CLI user and may intentionally be mode 0600
+	// (geodata under umask 077 and temporary TLS keys). Use that identity for
+	// this disposable validation container without changing source permissions.
+	args := []string{"run", "--rm", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "-v", fmt.Sprintf("%s:/etc/xray/config.json:ro", configPath)}
 	args = append(args, extraMounts...)
 	args = append(args, xrayImage, "run", "-test", "-config", "/etc/xray/config.json")
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
+		if isXrayGeodataPermissionError(string(out)) {
+			return fmt.Errorf("xray config validation failed: %w: %s; hint: check read permissions for the local geodata files mounted into the validation container", err, strings.TrimSpace(string(out)))
+		}
 		if isLikelyXrayGeositeResourceError(string(out)) {
 			return fmt.Errorf("xray config validation failed: %w: %s; hint: set OVPN_SECURITY_PROFILE=off to bypass BT/tracker geosite rules when this image lacks geosite resources", err, strings.TrimSpace(string(out)))
 		}
@@ -187,6 +193,12 @@ func isLikelyXrayGeositeResourceError(errText string) bool {
 		(strings.Contains(text, "no such file") || strings.Contains(text, "failed") || strings.Contains(text, "not found"))
 }
 
+func isXrayGeodataPermissionError(errText string) bool {
+	text := strings.ToLower(errText)
+	return strings.Contains(text, "permission denied") &&
+		(strings.Contains(text, "geosite.dat") || strings.Contains(text, "geoip.dat"))
+}
+
 // buildDeployApplyCommand renders the script that swaps the validated bundle into the live runtime directory, preserving existing secret files.
 func buildDeployApplyCommand() string {
 	// When ovpn-agent is running, truncating /opt/ovpn/agent/ovpn-agent in-place can fail with
@@ -284,6 +296,9 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	xrayCtx, cancelXray := ssh.TimeoutCtx(ctx, deployXrayValidateTimeout)
 	defer cancelXray()
 	if _, err := runner.Exec(xrayCtx, cfg, withRemoteTimeout(deployXrayValidateTimeout, xrayTestCmd)); err != nil {
+		if isXrayGeodataPermissionError(err.Error()) {
+			return fmt.Errorf("validate xray config in container on %s: %w; hint: check geodata read permissions for the Xray runtime user", cfg.Host, err)
+		}
 		if isLikelyXrayVersionTagError(err.Error()) {
 			return fmt.Errorf("validate xray config in container on %s: %w; hint: use xray version without 'v' prefix (example: 26.7.28)", cfg.Host, err)
 		}

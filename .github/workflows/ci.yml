@@ -95,6 +95,11 @@ jobs:
           set -euo pipefail
           go test -json -covermode=atomic -coverprofile=coverage.out ./... | tee test-report.jsonl
 
+      - name: Docker geodata permission regression
+        env:
+          OVPN_TEST_DOCKER: '1'
+        run: go test -v ./internal/deploy -run '^TestValidateConfigWithDockerPrivateGeodata$'
+
       - name: Test embedded runtime asset path
         id: runtimeassets_test
         run: |
@@ -143,16 +148,16 @@ jobs:
       - name: GolangCI-Lint
         id: golangci
         # golangci/golangci-lint-action v9.3.0
-        uses: golangci/golangci-lint-action@d583c34f0599d37dbac4a198b9c83201be380893
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a
         with:
-          version: v2.12.2
+          version: v2.14.0
           args: --timeout=5m
 
       - name: Install gosec
         id: install_gosec
         run: |
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.27.1
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
 
       - name: Gosec gate (high confidence/high severity)
         id: gosec_gate

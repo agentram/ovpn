@@ -638,3 +638,19 @@ For a shared profile:
 
 Do not leave targeted debug running longer than needed.
 Use `debug list` during support and `debug stop` when finished.
+
+## Local config validation
+
+Validation uses local geodata and the CLI user's UID/GID. Files with owner-only
+permissions remain readable without changing their permissions. Custom geodata
+paths use `OVPN_PROXY_GEOSITE_PATH` and `OVPN_PROXY_GEOIP_PATH`.
+
+With Docker running and CLI version `1.10.0` or later, replace `<server>` with
+the existing local proxy name:
+
+```bash
+OVPN_SECURITY_PROFILE=minimal ./ovpn config validate --server <server>
+```
+
+Expected result: `config valid`. If access is denied, check local file ownership
+and read permissions; keep the security profile enabled.

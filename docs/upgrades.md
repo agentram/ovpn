@@ -208,3 +208,12 @@ Quota semantics are rolling 30d. Updated public fields/metrics:
 - Metrics:
   - `ovpn_agent_user_window_30d_usage_bytes`
   - `ovpn_agent_user_window_30d_quota_bytes`
+
+## Dependency pins
+
+Go and library versions are defined in `go.mod`; runtime images are defined in
+`internal/defaults/images.go`. Updated image defaults take effect on deployment.
+Keep Xray API dependencies aligned with the pinned runtime revision.
+
+gRPC remains on patched `1.83.2` because [GO-2026-6443](https://pkg.go.dev/vuln/GO-2026-6443)
+lists `1.84.0` as affected.

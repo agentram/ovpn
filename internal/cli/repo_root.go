@@ -63,6 +63,7 @@ func isRepoRoot(root string) bool {
 	if strings.TrimSpace(root) == "" {
 		return false
 	}
+	// #nosec G304,G703 -- local repository discovery intentionally reads an operator-selected directory.
 	mod, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
 		return false
@@ -74,6 +75,7 @@ func isRepoRoot(root string) bool {
 		filepath.Join("cmd", "ovpn-agent"),
 		filepath.Join("cmd", "ovpn-telegram-bot"),
 	} {
+		// #nosec G703 -- fixed repository markers under the operator-selected local root.
 		info, err := os.Stat(filepath.Join(root, rel))
 		if err != nil || !info.IsDir() {
 			return false
