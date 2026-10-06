@@ -6,6 +6,17 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.10.0
+
+### Fixed
+- Local config validation uses the CLI user's UID/GID to read owner-only geodata without changing file permissions (#44).
+- Geodata permission errors now point to filesystem access instead of disabling the security profile.
+
+### Security
+- Validation configs use private temporary directories and `0600` permissions, with automatic cleanup.
+- Updated Go to `1.27.1`, dependencies, pinned Actions, security tools and runtime images; consolidated Dependabot #39, #41 and #43.
+- Aligned the Xray Go module with runtime `26.7.28`, including its TLS pinning fix; retained patched gRPC `1.83.2`.
+
 ## 1.9.0
 
 ### Added

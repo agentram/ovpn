@@ -169,7 +169,7 @@ func TestRenderBundleWithOverride(t *testing.T) {
 		TelegramClientsRUPDFSource: tmpClientsRUPDF,
 		RenderedOverride:           override,
 		XrayImage:                  "ghcr.io/xtls/xray-core:26.3.27",
-		AgentImage:                 "alpine:3.23.4",
+		AgentImage:                 "alpine:3.24.2",
 	})
 	if err != nil {
 		t.Fatalf("render bundle: %v", err)
@@ -241,7 +241,7 @@ func TestRenderBundleWithOverride(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(bundle.Dir, "logs")); err != nil {
 		t.Fatalf("expected logs dir in bundle: %v", err)
 	}
-	if !strings.Contains(string(gotEnv), "PROMETHEUS_IMAGE=prom/prometheus:v3.11.2") {
+	if !strings.Contains(string(gotEnv), "PROMETHEUS_IMAGE=prom/prometheus:v3.15.0") {
 		t.Fatalf("missing prometheus image in env: %q", string(gotEnv))
 	}
 	for _, p := range []string{
@@ -478,7 +478,7 @@ func TestRenderBundleIncludesTLSSelfSNIWebSidecar(t *testing.T) {
 	}
 	env := string(envRaw)
 	for _, want := range []string{
-		"OVPN_WEB_IMAGE=nginx:1.29-alpine",
+		"OVPN_WEB_IMAGE=nginx:1.30.5-alpine",
 		"OVPN_TLS_SELFSNI_CERT_DIR=/opt/ovpn/certs",
 		"OVPN_CAMOUFLAGE_SITE_DIR=/opt/ovpn/camouflage-site",
 	} {
@@ -580,11 +580,11 @@ func TestRenderBundleAppliesMonitoringAndTelegramDefaults(t *testing.T) {
 	}
 	env := string(envRaw)
 	for _, want := range []string{
-		"PROMETHEUS_IMAGE=prom/prometheus:v3.11.2",
-		"ALERTMANAGER_IMAGE=prom/alertmanager:v0.32.0",
-		"GRAFANA_IMAGE=grafana/grafana:12.4.3",
+		"PROMETHEUS_IMAGE=prom/prometheus:v3.15.0",
+		"ALERTMANAGER_IMAGE=prom/alertmanager:v0.34.1",
+		"GRAFANA_IMAGE=grafana/grafana:12.4.12",
 		"OVPN_AGENT_HOST_PORT=19000",
-		"OVPN_TELEGRAM_BOT_IMAGE=alpine:3.23.4",
+		"OVPN_TELEGRAM_BOT_IMAGE=alpine:3.24.2",
 		"OVPN_TELEGRAM_BOT_HOST_PORT=19001",
 		"OVPN_TELEGRAM_CLIENTS_PDF_PATH=/opt/ovpn-telegram-bot/assets/clients.pdf",
 		"OVPN_TELEGRAM_CLIENTS_RU_PDF_PATH=/opt/ovpn-telegram-bot/assets/clients-ru.pdf",
@@ -673,7 +673,7 @@ func TestRenderBundleProxyIncludesHAProxyAndGeodata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read env: %v", err)
 	}
-	if !strings.Contains(string(gotEnv), "HAPROXY_IMAGE=haproxy:3.2.15-alpine3.23") {
+	if !strings.Contains(string(gotEnv), "HAPROXY_IMAGE=haproxy:3.2.25-alpine3.24") {
 		t.Fatalf("expected haproxy image in env, got:\n%s", string(gotEnv))
 	}
 	if !strings.Contains(string(gotEnv), "OVPN_TELEGRAM_HAPROXY_URL=http://haproxy:8404/metrics") {
