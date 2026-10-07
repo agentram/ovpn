@@ -130,7 +130,7 @@ Ansible only prepares certificates, firewall access, and the fallback site; it d
 ./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
 ./ovpn deploy <server>
 ./ovpn doctor <server>
-curl -vk https://<domain>/
+curl --fail --show-error https://<domain>/
 ```
 
 Users need new links only when they switch to this profile.

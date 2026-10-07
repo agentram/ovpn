@@ -6,6 +6,7 @@ services:
     command: ["run", "-config", "/etc/xray/config.json"]
     ports:
       - "443:443/tcp"
+      # OVPN_XRAY_PROFILE_PORTS
     expose:
       - "10085"
     volumes:
@@ -13,8 +14,10 @@ services:
       - ./logs:/var/log/ovpn
       - ./geodata/geosite.dat:/usr/local/share/xray/geosite.dat:ro
       - ./geodata/geoip.dat:/usr/local/share/xray/geoip.dat:ro
+      # OVPN_XRAY_TLS_SELFSNI_VOLUMES
     depends_on:
       - haproxy
+      # OVPN_XRAY_TLS_SELFSNI_EXTRA_DEPENDS_ON
     logging:
       driver: json-file
       options:
@@ -22,6 +25,8 @@ services:
         max-file: "5"
     networks:
       - ovpn-net
+
+  # OVPN_CAMOUFLAGE_WEB_SERVICE
 
   haproxy:
     image: ${HAPROXY_IMAGE}

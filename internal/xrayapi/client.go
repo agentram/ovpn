@@ -104,7 +104,8 @@ func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) er
 func accountForInbound(inboundTag, uuid string) *vless.Account {
 	acc := &vless.Account{Id: uuid}
 	// Keep runtime adds aligned with rendered config for REALITY/VLESS inbounds.
-	if strings.TrimSpace(inboundTag) == "" || strings.EqualFold(inboundTag, "vless-reality") {
+	switch strings.ToLower(strings.TrimSpace(inboundTag)) {
+	case "", "vless-reality", "vless-tcp-tls-selfsni-web":
 		acc.Flow = defaultVLESSFlow
 	}
 	return acc

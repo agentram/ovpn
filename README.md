@@ -117,7 +117,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.10.0`
+- Current pinned version: `1.11.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -138,7 +138,7 @@ flowchart LR
 
 ## Requirements
 
-- Release binary, or Go `1.26.2+` when building from source
+- Release binary, or Go `1.27.1+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
 - Clean Linux host recommended

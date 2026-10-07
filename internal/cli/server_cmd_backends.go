@@ -43,8 +43,8 @@ func (a *App) newServerBackendAttachCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !backend.IsVPN() {
-				return fmt.Errorf("server %s is role %s, expected vpn backend", backend.Name, backend.NormalizedRole())
+			if err := a.ensureVPNBackendsCompatible([]model.Server{*backend}); err != nil {
+				return err
 			}
 			existingBackends, err := a.attachedBackendServers(*proxy)
 			if err != nil {

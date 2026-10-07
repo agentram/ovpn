@@ -593,9 +593,6 @@ func ValidateSpec(spec Spec) error {
 		if includesProfile(spec.EnabledProfiles, model.TransportProfileRealityTCPVision) {
 			return fmt.Errorf("%s conflicts with %s because both require 443/tcp; disable one profile before deploy", model.TransportProfileTLSSelfSNIWeb, model.TransportProfileRealityTCPVision)
 		}
-		if spec.Role == model.ServerRoleProxy {
-			return fmt.Errorf("%s is only supported on vpn servers", model.TransportProfileTLSSelfSNIWeb)
-		}
 		if strings.TrimSpace(spec.Domain) == "" {
 			return fmt.Errorf("%s requires server domain for TLS SNI", model.TransportProfileTLSSelfSNIWeb)
 		}
