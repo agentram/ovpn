@@ -171,6 +171,8 @@ func injectTLSSelfSNIWeb(composeTpl []byte, profiles []string) []byte {
 		}, "\n") + "\n"
 		text = strings.Replace(text, dependsMarker, depends, 1)
 	}
+	extraDependsMarker := "      # OVPN_XRAY_TLS_SELFSNI_EXTRA_DEPENDS_ON\n"
+	text = strings.Replace(text, extraDependsMarker, "      - ovpn-web\n"+extraDependsMarker, 1)
 	serviceMarker := "  # OVPN_CAMOUFLAGE_WEB_SERVICE\n"
 	if strings.Contains(text, serviceMarker) {
 		webService := `  ovpn-web:

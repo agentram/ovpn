@@ -152,7 +152,7 @@ func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
 		check.Status = doctor.StatusFail
 		check.Message = "attached backends are not parity-compatible"
 		check.Details = []string{err.Error()}
-		check.Hint = "Align REALITY and proxy service UUID values across backend vpn servers."
+		check.Hint = "Keep vless-reality-tcp-vision enabled on backend vpn servers and align their REALITY and proxy service UUID values."
 		return check
 	}
 	var names []string

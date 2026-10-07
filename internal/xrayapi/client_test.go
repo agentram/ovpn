@@ -43,3 +43,23 @@ func TestAccountForInboundSetsVisionFlowWhenTagEmpty(t *testing.T) {
 		t.Fatalf("unexpected flow for empty tag: %q", acc.Flow)
 	}
 }
+
+func TestAccountForInboundPreservesTransportFlow(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		tag  string
+		flow string
+	}{
+		{"vless-tcp-tls-selfsni-web", defaultVLESSFlow},
+		{" VLESS-TCP-TLS-SELFSNI-WEB ", defaultVLESSFlow},
+		{"vless-xhttp-plain", ""},
+		{"vless-xhttp-vlessenc", ""},
+	} {
+		t.Run(tc.tag, func(t *testing.T) {
+			acc := accountForInbound(tc.tag, "test-uuid")
+			if acc.Id != "test-uuid" || acc.Flow != tc.flow {
+				t.Fatalf("runtime account = %+v, want id=test-uuid flow=%q", acc, tc.flow)
+			}
+		})
+	}
+}

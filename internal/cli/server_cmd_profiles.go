@@ -109,6 +109,9 @@ func (a *App) newServerProfileDisableCmd() *cobra.Command {
 				fmt.Printf("profile %s is already disabled on %s\n", profile, srv.Name)
 				return nil
 			}
+			if err := a.validateAttachedBackendProfiles(*srv, next); err != nil {
+				return err
+			}
 			srv.EnabledProfiles = model.EnabledProfilesCSV(primary, strings.Join(next, ","))
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
@@ -139,8 +142,12 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 					return err
 				}
 			}
+			enabled := model.EnabledProfilesCSV(profile, strings.Join(removeConflicting443Profiles(srv.NormalizedEnabledProfiles(), profile), ","))
+			if err := a.validateAttachedBackendProfiles(*srv, strings.Split(enabled, ",")); err != nil {
+				return err
+			}
 			srv.PrimaryProfile = profile
-			srv.EnabledProfiles = model.EnabledProfilesCSV(profile, strings.Join(removeConflicting443Profiles(srv.NormalizedEnabledProfiles(), profile), ","))
+			srv.EnabledProfiles = enabled
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}

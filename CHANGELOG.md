@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.11.0
+
+### Added
+- Support `vless-tcp-tls-selfsni-web` on proxy servers, including TLS certificates and the internal HTTPS fallback site (#45).
+
+### Fixed
+- Require REALITY on proxy VPN backends and reject profile changes that would disable their relay listener.
+- Preserve the Vision flow when re-enabling self-SNI users through the runtime API or quota recovery.
+- Clarify proxy certificate preparation, source-build requirements and HTTPS verification.
+
 ## 1.10.0
 
 ### Fixed

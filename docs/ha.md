@@ -27,6 +27,8 @@ The proxy host is a normal `ovpn` server record with:
 The proxy host does not replace existing backends.
 It is an extra entrypoint layered on top of them.
 
+The proxy's client entrypoint can use `vless-tcp-tls-selfsni-web` with its own domain, certificate and fallback site; follow the [self-SNI setup](transports.md#enable-and-test). The proxy-to-backend connection still uses REALITY on `443/tcp`, so attached VPN backends must retain `vless-reality-tcp-vision`.
+
 ## How the proxy host is bootstrapped
 
 Host bootstrap remains the same as for regular VPN nodes.
