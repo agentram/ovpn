@@ -153,6 +153,9 @@ func (a *App) ensureVPNBackendsCompatible(backends []model.Server) error {
 		if !backend.IsVPN() {
 			return fmt.Errorf("server %s is role %s, expected vpn backend", backend.Name, backend.NormalizedRole())
 		}
+		if !backend.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
+			return fmt.Errorf("vpn backend %s requires %s on 443/tcp for the proxy relay", backend.Name, model.TransportProfileRealityTCPVision)
+		}
 	}
 	base := backends[0]
 	var issues []string
@@ -165,6 +168,25 @@ func (a *App) ensureVPNBackendsCompatible(backends []model.Server) error {
 	}
 	if len(issues) > 0 {
 		return fmt.Errorf("REALITY parity check failed:\n- %s", strings.Join(issues, "\n- "))
+	}
+	return nil
+}
+
+func (a *App) validateAttachedBackendProfiles(srv model.Server, profiles []string) error {
+	if !srv.IsVPN() {
+		return nil
+	}
+	for _, profile := range profiles {
+		if profile == model.TransportProfileRealityTCPVision {
+			return nil
+		}
+	}
+	attached, err := a.store.BackendHasAttachedProxy(a.ctx, srv.ID)
+	if err != nil {
+		return fmt.Errorf("check proxy attachments for %s: %w", srv.Name, err)
+	}
+	if attached {
+		return fmt.Errorf("vpn backend %s is attached to a proxy and requires %s on 443/tcp; detach it before disabling or replacing that profile", srv.Name, model.TransportProfileRealityTCPVision)
 	}
 	return nil
 }

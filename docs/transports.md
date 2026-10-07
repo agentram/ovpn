@@ -66,6 +66,8 @@ This profile is currently confirmed only with Mihomo. Treat Streisand, Happ, and
 
 Self-SNI owns `443/tcp`, so switch to it instead of enabling it next to TCP/REALITY. The Ansible step only prepares the certificate and fallback site; the profile change happens in local ovpn state and is applied by deploy:
 
+This works for both `vpn` and `proxy` servers. On a proxy, use its own domain and certificate; preset routing and HAProxy failover stay in place. Attached VPN backends must keep `vless-reality-tcp-vision` enabled on `443/tcp`: self-SNI changes only the client-to-proxy connection.
+
 ```yaml
 # host_vars/<server-hostname>.yml
 ovpn_camouflage_enabled: true
@@ -84,7 +86,7 @@ cd ..
 ./ovpn doctor <server>
 
 # Invalid or ordinary HTTPS traffic should see a normal fallback page.
-curl -vk https://<domain>/
+curl --fail --show-error https://<domain>/
 ```
 
 Generate a profile-specific link:
