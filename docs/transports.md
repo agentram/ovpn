@@ -64,12 +64,14 @@ cd ..
 
 This profile is currently confirmed only with Mihomo. Treat Streisand, Happ, and Hiddify as unconfirmed until they import the link and pass real traffic tests with the installed client version.
 
-Self-SNI owns `443/tcp`, so switch to it instead of enabling it next to TCP/REALITY. The Ansible step only prepares the certificate and fallback site; the profile change happens in local ovpn state and is applied by deploy:
+Self-SNI owns `443/tcp`, so switch to it instead of enabling it next to TCP/REALITY. The Ansible security role prepares the certificate, firewall and fallback site; the profile change happens in local ovpn state and is applied by deploy.
 
 This works for both `vpn` and `proxy` servers. On a proxy, use its own domain and certificate; preset routing and HAProxy failover stay in place. Attached VPN backends must keep `vless-reality-tcp-vision` enabled on `443/tcp`: self-SNI changes only the client-to-proxy connection.
 
+Point the domain's DNS records at the server and allow inbound `80/tcp` and `443/tcp`. Port 80 must be free for certbot's standalone HTTP-01 challenge. For a proxy, keep the host in the inventory's `proxy_servers` group and put these settings in its private host vars:
+
 ```yaml
-# host_vars/<server-hostname>.yml
+# ansible/inventories/production/host_vars/<server-hostname>.yml
 ovpn_camouflage_enabled: true
 ovpn_camouflage_domain: vpn-a.example.net
 ovpn_camouflage_cert_email: ops@example.net
@@ -82,6 +84,7 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/production/hosts.yml 
 cd ..
 
 ./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
+./ovpn config validate --server <server>
 ./ovpn deploy <server>
 ./ovpn doctor <server>
 

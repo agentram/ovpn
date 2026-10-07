@@ -252,7 +252,7 @@ cd ..
 ./ovpn server profile switch <server> vless-tcp-tls-selfsni-web
 ./ovpn deploy <server>
 ./ovpn doctor <server>
-curl -vk https://<domain>/
+curl --fail --show-error https://<domain>/
 ```
 
 The required Ansible variables are:
