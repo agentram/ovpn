@@ -4,38 +4,41 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 
 	"ovpn/internal/model"
 )
 
 type Spec struct {
-	Role                   string
-	ProxyPreset            string
-	Domain                 string
-	RealityPrivateKey      string
-	RealityServerName      string
-	RealityTarget          string
-	RealityPublicKey       string
-	VLESSServerDecryption  string
-	SecurityProfile        string
-	ThreatDNSServers       []string
-	LimitFallbackUpload    *FallbackRateLimit
-	LimitFallbackDownload  *FallbackRateLimit
-	ShortIDs               []string
-	EnabledProfiles        []string
-	APIListen              string
-	APIPort                int
-	LogLevel               string
-	AccessLogPath          string
-	TLSSelfSNICertFile     string
-	TLSSelfSNIKeyFile      string
-	TLSSelfSNIFallbackDest string
-	Users                  []model.User
-	ServiceUsers           []ServiceUser
-	ProxyRelay             *ProxyRelay
+	Role                    string
+	ProxyPreset             string
+	Domain                  string
+	RealityPrivateKey       string
+	RealityServerName       string
+	RealityTarget           string
+	RealityMinClientVersion string
+	RealityPublicKey        string
+	VLESSServerDecryption   string
+	SecurityProfile         string
+	ThreatDNSServers        []string
+	LimitFallbackUpload     *FallbackRateLimit
+	LimitFallbackDownload   *FallbackRateLimit
+	ShortIDs                []string
+	EnabledProfiles         []string
+	APIListen               string
+	APIPort                 int
+	LogLevel                string
+	AccessLogPath           string
+	TLSSelfSNICertFile      string
+	TLSSelfSNIKeyFile       string
+	TLSSelfSNIFallbackDest  string
+	Users                   []model.User
+	ServiceUsers            []ServiceUser
+	ProxyRelay              *ProxyRelay
 }
 
 type FallbackRateLimit struct {
@@ -144,6 +147,9 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 		"serverNames": []string{spec.RealityServerName},
 		"privateKey":  spec.RealityPrivateKey,
 		"shortIds":    spec.ShortIDs,
+	}
+	if spec.RealityMinClientVersion != "" {
+		realitySettings["minClientVer"] = spec.RealityMinClientVersion
 	}
 	if spec.LimitFallbackUpload != nil {
 		realitySettings["limitFallbackUpload"] = map[string]any{
@@ -535,6 +541,9 @@ func resolveProxyPreset(raw string) (proxyPreset, error) {
 
 // ValidateSpec checks that a Spec has the REALITY and security fields required to render a valid config.
 func ValidateSpec(spec Spec) error {
+	if err := model.ValidateRealityMinClientVersion(spec.RealityMinClientVersion); err != nil {
+		return err
+	}
 	if spec.SecurityProfile == "" {
 		spec.SecurityProfile = SecurityProfileMinimal
 	}
@@ -721,6 +730,7 @@ func BuildVLESSLink(in LinkInput) string {
 	if in.Flow == "" {
 		in.Flow = "xtls-rprx-vision"
 	}
+	endpoint := net.JoinHostPort(strings.Trim(in.Address, "[]"), strconv.Itoa(in.Port))
 	label := in.Label
 	if strings.TrimSpace(label) == "" {
 		label = "ovpn"
@@ -733,19 +743,17 @@ func BuildVLESSLink(in LinkInput) string {
 	switch profile {
 	case model.TransportProfilePlainXHTTP:
 		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=none&encryption=none&type=xhttp&path=%s&mode=auto#%s",
+			"vless://%s@%s?security=none&encryption=none&type=xhttp&path=%s&mode=auto#%s",
 			in.UUID,
-			in.Address,
-			in.Port,
+			endpoint,
 			url.QueryEscape("/"),
 			urlEscapeLabel(label),
 		)
 	case model.TransportProfileTLSSelfSNIWeb:
 		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=tls&encryption=none&fp=%s&type=tcp&flow=%s&sni=%s&alpn=%s&headerType=none#%s",
+			"vless://%s@%s?security=tls&encryption=none&fp=%s&type=tcp&flow=%s&sni=%s&alpn=%s&headerType=none#%s",
 			in.UUID,
-			in.Address,
-			in.Port,
+			endpoint,
 			fingerprint,
 			in.Flow,
 			in.ServerName,
@@ -754,10 +762,9 @@ func BuildVLESSLink(in LinkInput) string {
 		)
 	case model.TransportProfileVLESSEncXHTTP:
 		return fmt.Sprintf(
-			"vless://%s@%s:%d?security=none&encryption=%s&type=xhttp&path=%s&mode=auto&flow=%s#%s",
+			"vless://%s@%s?security=none&encryption=%s&type=xhttp&path=%s&mode=auto&flow=%s#%s",
 			in.UUID,
-			in.Address,
-			in.Port,
+			endpoint,
 			url.QueryEscape(in.Encryption),
 			url.QueryEscape("/"),
 			in.Flow,
@@ -770,10 +777,9 @@ func BuildVLESSLink(in LinkInput) string {
 		spx = "&spx=" + url.QueryEscape(spiderX)
 	}
 	return fmt.Sprintf(
-		"vless://%s@%s:%d?security=reality&encryption=none&pbk=%s&fp=%s&type=tcp&flow=%s&sni=%s&sid=%s%s#%s",
+		"vless://%s@%s?security=reality&encryption=none&pbk=%s&fp=%s&type=tcp&flow=%s&sni=%s&sid=%s%s#%s",
 		in.UUID,
-		in.Address,
-		in.Port,
+		endpoint,
 		in.Password,
 		fingerprint,
 		in.Flow,
@@ -786,6 +792,5 @@ func BuildVLESSLink(in LinkInput) string {
 
 // urlEscapeLabel escapes a value for use as the fragment label of a VLESS link.
 func urlEscapeLabel(v string) string {
-	replacer := strings.NewReplacer(" ", "%20", "#", "%23")
-	return replacer.Replace(v)
+	return (&url.URL{Fragment: v}).EscapedFragment()
 }

@@ -217,6 +217,15 @@ func checkLocalConfig(srv model.Server) doctor.Check {
 		return check
 	}
 	var warns []string
+	if srv.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
+		minimum := srv.RealityMinClientVersion
+		if minimum == "" {
+			minimum = "Xray default (third-party client cores may be refused)"
+		} else {
+			warns = append(warns, "custom REALITY minimum client version is enabled; keep client TLS fingerprints current")
+		}
+		check.Details = append(check.Details, "reality_min_client_version="+minimum)
+	}
 	if isFloatingXrayTag(srv.XrayVersion) {
 		warns = append(warns, "xray_version uses a floating tag; pin an explicit version")
 	}

@@ -1,4 +1,4 @@
-.PHONY: fmt-check vet test test-cover test-race lint gosec govulncheck docker-validate ansible-lint ansible-syntax repo-hygiene templates-validate actionlint docs-pdf ci-local
+.PHONY: fmt-check vet test test-cover test-race lint gosec govulncheck docker-validate client-compatibility ansible-lint ansible-syntax repo-hygiene templates-validate actionlint docs-pdf ci-local
 
 fmt-check:
 	@files="$$(gofmt -l $$(git ls-files '*.go'))"; \
@@ -25,7 +25,7 @@ lint:
 	golangci-lint run --timeout=5m
 
 gosec:
-	gosec ./...
+	golangci-lint run --enable-only gosec --timeout=5m
 
 govulncheck:
 	govulncheck ./...
@@ -36,6 +36,9 @@ docker-validate:
 	cp .env.example .env
 	docker compose --env-file .env -f docker-compose.yml config -q
 	docker compose --env-file .env -f docker-compose.monitoring.yml config -q
+
+client-compatibility:
+	OVPN_TEST_CLIENT_COMPAT=1 go test -v ./internal/cli -run '^TestClientCoreCompatibility$$' -count=1
 
 ansible-lint:
 	ANSIBLE_CONFIG=ansible/ansible.cfg ansible-lint -c .ansible-lint ansible

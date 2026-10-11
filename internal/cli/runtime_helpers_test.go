@@ -9,6 +9,38 @@ import (
 	"ovpn/internal/model"
 )
 
+func TestRedeployKeepsExpiredUsersDisabledWithoutQuotaBlocks(t *testing.T) {
+	app := newTestAppWithServer(t, false)
+	srv, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	srv.LastDeployAt = &now
+	expired := now.Add(-24 * time.Hour)
+	users := []model.User{
+		{Username: "active", Email: "active@example.net", Enabled: true},
+		{Username: "expired", Email: "expired@example.net", Enabled: true, ExpiryDate: &expired},
+		{Username: "disabled", Email: "disabled@example.net", Enabled: false},
+	}
+	app.remoteHTTPHook = func(_ model.Server, method, url string, _ any) ([]byte, error) {
+		if method != "GET" || !strings.Contains(url, "/quota/status") {
+			t.Fatalf("unexpected remote request %s %s", method, url)
+		}
+		return []byte(`{"users":[]}`), nil
+	}
+	filtered, err := app.usersForRuntimeConfig(*srv, users)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filtered[0].Enabled || filtered[1].Enabled || filtered[2].Enabled {
+		t.Fatal("redeploy resurrected an expired or disabled user")
+	}
+	if !users[1].Enabled {
+		t.Fatal("runtime filtering mutated desired user state")
+	}
+}
+
 func TestRuntimeHelpersQuotaBlockedFilteringAndApply(t *testing.T) {
 	app := newTestAppWithServer(t, false)
 	srv, err := app.store.GetServerByName(app.ctx, "main")

@@ -27,6 +27,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			reality_short_ids TEXT NOT NULL,
 			reality_server_name TEXT NOT NULL,
 			reality_target TEXT NOT NULL,
+			reality_min_client_version TEXT NOT NULL DEFAULT '',
 			vless_client_encryption TEXT NOT NULL DEFAULT '',
 			vless_server_decryption TEXT NOT NULL DEFAULT '',
 			primary_profile TEXT NOT NULL DEFAULT 'vless-reality-tcp-vision',
@@ -117,6 +118,7 @@ func (s *Store) migrate(ctx context.Context) error {
 		}
 	}
 	optionalMigrations := []string{
+		`ALTER TABLE servers ADD COLUMN reality_min_client_version TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE users ADD COLUMN quota_enabled INTEGER NOT NULL DEFAULT 1;`,
 		`ALTER TABLE users ADD COLUMN quota_blocked INTEGER NOT NULL DEFAULT 0;`,
 		`ALTER TABLE users ADD COLUMN quota_blocked_at TEXT;`,

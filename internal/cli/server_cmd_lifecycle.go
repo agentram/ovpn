@@ -20,22 +20,23 @@ import (
 // newServerAddCmd builds the `server add` command that registers a server in local state.
 func (a *App) newServerAddCmd() *cobra.Command {
 	var add struct {
-		name         string
-		role         string
-		proxyPreset  string
-		host         string
-		domain       string
-		sshUser      string
-		sshPort      int
-		identityFile string
-		knownHosts   string
-		strict       bool
-		xrayVersion  string
-		realitySNI   string
-		realityTGT   string
-		privateKey   string
-		publicKey    string
-		shortID      string
+		name             string
+		role             string
+		proxyPreset      string
+		host             string
+		domain           string
+		sshUser          string
+		sshPort          int
+		identityFile     string
+		knownHosts       string
+		strict           bool
+		xrayVersion      string
+		realitySNI       string
+		realityTGT       string
+		minClientVersion string
+		privateKey       string
+		publicKey        string
+		shortID          string
 	}
 	addCmd := &cobra.Command{
 		Use:   "add",
@@ -54,6 +55,10 @@ func (a *App) newServerAddCmd() *cobra.Command {
 			if add.role == "" {
 				return fmt.Errorf("role must be %q or %q", model.ServerRoleVPN, model.ServerRoleProxy)
 			}
+			minClientVersion, err := parseRealityMinClientVersion(add.minClientVersion)
+			if err != nil {
+				return err
+			}
 			existingServers, err := a.listEnabledServersByRole(add.role)
 			if err != nil {
 				return err
@@ -71,6 +76,9 @@ func (a *App) newServerAddCmd() *cobra.Command {
 					return err
 				}
 				baseline := existingServers[0]
+				if !cmd.Flags().Changed("reality-min-client-version") {
+					minClientVersion = baseline.RealityMinClientVersion
+				}
 				if !cmd.Flags().Changed("reality-private-key") {
 					add.privateKey = baseline.RealityPrivateKey
 				}
@@ -118,23 +126,24 @@ func (a *App) newServerAddCmd() *cobra.Command {
 				}
 			}
 			srv := &model.Server{
-				Name:              add.name,
-				Role:              add.role,
-				ProxyPreset:       add.proxyPreset,
-				Host:              add.host,
-				Domain:            add.domain,
-				SSHUser:           add.sshUser,
-				SSHPort:           add.sshPort,
-				SSHIdentityFile:   add.identityFile,
-				SSHKnownHostsFile: add.knownHosts,
-				SSHStrictHostKey:  add.strict,
-				XrayVersion:       normalizeXrayVersionTag(add.xrayVersion),
-				RealityPrivateKey: add.privateKey,
-				RealityPublicKey:  add.publicKey,
-				RealityShortIDs:   add.shortID,
-				RealityServerName: add.realitySNI,
-				RealityTarget:     add.realityTGT,
-				Enabled:           true,
+				Name:                    add.name,
+				Role:                    add.role,
+				ProxyPreset:             add.proxyPreset,
+				Host:                    add.host,
+				Domain:                  add.domain,
+				SSHUser:                 add.sshUser,
+				SSHPort:                 add.sshPort,
+				SSHIdentityFile:         add.identityFile,
+				SSHKnownHostsFile:       add.knownHosts,
+				SSHStrictHostKey:        add.strict,
+				XrayVersion:             normalizeXrayVersionTag(add.xrayVersion),
+				RealityPrivateKey:       add.privateKey,
+				RealityPublicKey:        add.publicKey,
+				RealityShortIDs:         add.shortID,
+				RealityServerName:       add.realitySNI,
+				RealityTarget:           add.realityTGT,
+				RealityMinClientVersion: minClientVersion,
+				Enabled:                 true,
 			}
 			if add.role == model.ServerRoleVPN {
 				for _, existing := range existingServers {
@@ -157,6 +166,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 			if srv.IsProxy() {
 				fmt.Printf("proxy preset: %s\n", srv.NormalizedProxyPreset())
 			}
+			printRealityMinClientVersion(srv.RealityMinClientVersion)
 			fmt.Printf("reality public key: %s\n", srv.RealityPublicKey)
 			fmt.Printf("reality short id: %s\n", srv.RealityShortIDs)
 			if srv.ProxyServiceUUID != "" {
@@ -180,6 +190,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	addCmd.Flags().StringVar(&add.realityTGT, "reality-target", "www.trip.com:443", "REALITY target")
 	addCmd.Flags().StringVar(&add.privateKey, "reality-private-key", "", "REALITY private key")
 	addCmd.Flags().StringVar(&add.publicKey, "reality-public-key", "", "REALITY public key")
+	addCmd.Flags().StringVar(&add.minClientVersion, "reality-min-client-version", "", "REALITY minimum client version (x.y.z or default); inherits from the first enabled server of the same role")
 	addCmd.Flags().StringVar(&add.shortID, "reality-short-id", "", "REALITY short ID (hex)")
 	_ = addCmd.MarkFlagRequired("name")
 	_ = addCmd.MarkFlagRequired("host")

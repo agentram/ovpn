@@ -100,6 +100,12 @@ jobs:
           OVPN_TEST_DOCKER: '1'
         run: go test -v ./internal/deploy -run '^TestValidateConfigWithDockerPrivateGeodata$'
 
+      - name: Client core compatibility regression
+        id: client_compatibility
+        env:
+          OVPN_TEST_CLIENT_COMPAT: '1'
+        run: go test -v ./internal/cli -run '^TestClientCoreCompatibility$' -count=1
+
       - name: Test embedded runtime asset path
         id: runtimeassets_test
         run: |
@@ -153,16 +159,6 @@ jobs:
           version: v2.14.0
           args: --timeout=5m
 
-      - name: Install gosec
-        id: install_gosec
-        run: |
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
-
-      - name: Gosec gate (high confidence/high severity)
-        id: gosec_gate
-        run: gosec -severity high -confidence high ./...
-
       - name: Validate example JSON config
         id: json_validate
         run: jq empty examples/xray-config.example.json
@@ -184,9 +180,9 @@ jobs:
           GOFMT_OUTCOME: ${{ steps.gofmt.outcome }}
           GOVET_OUTCOME: ${{ steps.govet.outcome }}
           GOTEST_OUTCOME: ${{ steps.gotest.outcome }}
+          CLIENT_COMPATIBILITY_OUTCOME: ${{ steps.client_compatibility.outcome }}
           RUNTIMEASSETS_TEST_OUTCOME: ${{ steps.runtimeassets_test.outcome }}
           GOLANGCI_OUTCOME: ${{ steps.golangci.outcome }}
-          GOSEC_GATE_OUTCOME: ${{ steps.gosec_gate.outcome }}
           JSON_VALIDATE_OUTCOME: ${{ steps.json_validate.outcome }}
           COMPOSE_VALIDATE_OUTCOME: ${{ steps.compose_validate.outcome }}
           COVERAGE_TOTAL: ${{ steps.coverage.outputs.total }}
@@ -217,9 +213,9 @@ jobs:
           gofmt_status="$(status_icon "${GOFMT_OUTCOME}")"
           govet_status="$(status_icon "${GOVET_OUTCOME}")"
           gotest_status="$(status_icon "${GOTEST_OUTCOME}")"
+          client_compatibility_status="$(status_icon "${CLIENT_COMPATIBILITY_OUTCOME}")"
           runtimeassets_test_status="$(status_icon "${RUNTIMEASSETS_TEST_OUTCOME}")"
           golangci_status="$(status_icon "${GOLANGCI_OUTCOME}")"
-          gosec_status="$(status_icon "${GOSEC_GATE_OUTCOME}")"
           json_validate_status="$(status_icon "${JSON_VALIDATE_OUTCOME}")"
           compose_validate_status="$(status_icon "${COMPOSE_VALIDATE_OUTCOME}")"
 
@@ -241,9 +237,9 @@ jobs:
             echo "- ${gofmt_status} gofmt"
             echo "- ${govet_status} go vet"
             echo "- ${gotest_status} go test"
+            echo "- ${client_compatibility_status} client core compatibility"
             echo "- ${runtimeassets_test_status} runtimeassets tagged test"
-            echo "- ${golangci_status} golangci-lint"
-            echo "- ${gosec_status} gosec gate (high/high)"
+            echo "- ${golangci_status} golangci-lint (including gosec high/high)"
             echo "- ${json_validate_status} JSON example validation"
             echo "- ${compose_validate_status} docker compose validation"
           } >> "$GITHUB_STEP_SUMMARY"
