@@ -219,7 +219,37 @@ Xray pin. Prerelease images can be tested per server with
 compatibility review. See `docs/upgrades.md` for the backup, deploy,
 validation, and rollback sequence.
 
+## REALITY Client Version Policy
+
+Xray `26.7.28` rejects older client version identifiers by default, including
+those sent by some sing-box based clients. If updated clients still time out
+and their logs show REALITY verification failures, an operator can opt in to a
+lower minimum:
+
+```bash
+ovpn server backup <server>
+ovpn server set-reality-min-client-version <server> 1.0.0
+ovpn deploy <server>
+ovpn doctor <server>
+```
+
+Existing links remain valid. The setting survives init, redeploy and user
+changes; new servers inherit it from the first enabled server of the same role
+unless `server add --reality-min-client-version <x.y.z|default>` is supplied.
+To restore upstream behavior, set `default` and deploy again. This affects only
+REALITY ingress, on either VPN or proxy servers; no Ansible change is needed.
+
+Lowering this gate admits clients with older TLS fingerprints that can be
+easier to identify. Keep clients updated and enable it deliberately. It does
+not fix an unreachable target, unsupported transport or network filtering.
+
 ## Client Compatibility
+
+REALITY TCP/Vision and TCP/TLS self-SNI HTTPS traffic are regression-tested
+with Xray `26.7.28`, sing-box `1.14.3` and Mihomo `1.19.32`, using Chrome and
+Firefox fingerprints with the explicit `1.0.0` minimum for REALITY. Run
+`make client-compatibility` with Docker to repeat the matrix. These are core-level tests using generated link values;
+GUI import, system VPN mode and individual device builds need separate checks.
 
 Client support differs by transport and version:
 

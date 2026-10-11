@@ -484,9 +484,6 @@ func (a *App) usersForRuntimeConfig(srv model.Server, users []model.User) ([]mod
 			blocked[row.Email] = row
 		}
 	}
-	if len(blocked) == 0 {
-		return users, nil
-	}
 	filtered := make([]model.User, 0, len(users))
 	for _, u := range users {
 		if !effectiveUserEnabled(u) {

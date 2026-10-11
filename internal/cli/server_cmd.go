@@ -13,6 +13,7 @@ func (a *App) serverCmd() *cobra.Command {
 		a.newServerListCmd(),
 		a.newServerSetXrayVersionCmd(),
 		a.newServerSetRealityTargetCmd(),
+		a.newServerSetRealityMinClientVersionCmd(),
 		a.newServerStatusCmd(),
 		a.newServerBackupCmd(),
 		a.newServerRestoreCmd(),

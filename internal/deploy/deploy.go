@@ -72,7 +72,7 @@ func ValidateConfigWithDockerAndMounts(ctx context.Context, xrayImage string, co
 	args := []string{"run", "--rm", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "-v", fmt.Sprintf("%s:/etc/xray/config.json:ro", configPath)}
 	args = append(args, extraMounts...)
 	args = append(args, xrayImage, "run", "-test", "-config", "/etc/xray/config.json")
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...) // #nosec G702 -- Fixed executable and separate argv; image and bind mounts are explicit operator inputs.
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if isXrayGeodataPermissionError(string(out)) {

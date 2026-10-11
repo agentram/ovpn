@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.11.1
+
+### Added
+- Persist a per-server REALITY minimum client version, configurable before init or through `server set-reality-min-client-version`; retain the upstream default unless explicitly changed.
+- Test REALITY and TCP/TLS self-SNI HTTPS traffic with Xray, sing-box and Mihomo cores in an isolated Docker network.
+
+### Fixed
+- Preserve the selected REALITY client policy across redeploys and user changes; new servers inherit it from the first enabled server of the same role unless overridden.
+- Keep expired users out of deployed configs even when no quota blocks exist.
+- Generate valid IPv6 VLESS endpoints and escape profile labels correctly.
+
+### Security
+- Run the gosec high/high gate through golangci-lint for Go 1.27 export-format support.
+- Update Go to `1.27.2` and `golang.org/x/net` to `0.60.0` for the HTTP/2 security fixes.
+
 ## 1.11.0
 
 ### Added

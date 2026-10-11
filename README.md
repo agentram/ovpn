@@ -117,7 +117,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.11.0`
+- Current pinned version: `1.11.1`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -138,7 +138,7 @@ flowchart LR
 
 ## Requirements
 
-- Release binary, or Go `1.27.1+` when building from source
+- Release binary, or Go `1.27.2+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
 - Clean Linux host recommended
@@ -234,6 +234,7 @@ Use this flow for a first small server. Replace placeholders with your own value
 ```
 
 `user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
+For REALITY client timeouts after an Xray upgrade, see the [client compatibility setting](docs/transports.md#reality-client-version-policy).
 New REALITY/TLS links default to `fp=firefox`; use `--fingerprint` or `--spider-x` only when you need an explicit client-link variant.
 See [`docs/transports.md`](docs/transports.md) before enabling fallback profiles or switching the default generated link profile.
 

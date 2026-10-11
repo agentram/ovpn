@@ -63,6 +63,9 @@ func (s Server) Validate() error {
 	if strings.TrimSpace(s.RealityTarget) == "" {
 		errs = append(errs, "reality_target is required")
 	}
+	if err := ValidateRealityMinClientVersion(s.RealityMinClientVersion); err != nil {
+		errs = append(errs, err.Error())
+	}
 	hasVLESSClientEncryption := strings.TrimSpace(s.VLESSClientEncryption) != ""
 	hasVLESSServerDecryption := strings.TrimSpace(s.VLESSServerDecryption) != ""
 	if hasVLESSClientEncryption != hasVLESSServerDecryption {
