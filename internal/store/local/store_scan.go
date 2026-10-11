@@ -18,7 +18,7 @@ func scanServer(row scanner) (*model.Server, error) {
 	if err := row.Scan(
 		&srv.ID, &srv.Name, &srv.Role, &srv.Host, &srv.Domain, &srv.SSHUser, &srv.SSHPort, &srv.SSHIdentityFile, &srv.SSHKnownHostsFile,
 		&strict, &srv.XrayVersion, &srv.RealityPrivateKey, &srv.RealityPublicKey, &srv.RealityShortIDs,
-		&srv.RealityServerName, &srv.RealityTarget, &srv.VLESSClientEncryption, &srv.VLESSServerDecryption,
+		&srv.RealityServerName, &srv.RealityTarget, &srv.RealityMinClientVersion, &srv.VLESSClientEncryption, &srv.VLESSServerDecryption,
 		&srv.PrimaryProfile, &srv.EnabledProfiles,
 		&srv.ProxyPreset, &srv.ProxyServiceUUID, &enabled, &created, &updated, &lastDeploy,
 	); err != nil {

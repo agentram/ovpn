@@ -4,11 +4,21 @@ run:
 linters:
   default: none
   enable:
+    - gosec
     - govet
     - ineffassign
     - staticcheck
     - unused
+  settings:
+    gosec:
+      severity: high
+      confidence: high
   exclusions:
+    # Match the standalone scanner scope: production packages, excluding tests.
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
     generated: lax
     paths:
       - third_party$

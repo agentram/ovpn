@@ -35,6 +35,7 @@ Use `--debug` only for operator-side CLI troubleshooting; targeted per-user debu
 | Check CLI version | `./ovpn version` |
 | Register host | `./ovpn server add ...` |
 | First deploy | `./ovpn server init <server>` |
+| Set REALITY client policy | `./ovpn server set-reality-min-client-version <server> <x.y.z\|default>` |
 | Normal deploy | `./ovpn deploy <server>` |
 | Full health check | `./ovpn doctor <server>` |
 | Include recent logs in doctor | `./ovpn doctor <server> --include-logs --tail 100` |
@@ -66,6 +67,7 @@ Useful server flags:
 - `--proxy-preset ru|cn`: routing preset for proxy role
 - `--ssh-known-hosts <path>`: known hosts file
 - `--ssh-strict-host-key=false`: disable strict host key checking for temporary labs only
+- `--reality-min-client-version <x.y.z|default>`: override the REALITY client version policy; otherwise inherit from the first enabled server of the same role
 - `--reality-server-name`, `--reality-target`: REALITY camouflage target settings
 - `--reality-private-key`, `--reality-public-key`, `--reality-short-id`: reuse known REALITY material instead of generating it
 

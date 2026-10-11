@@ -713,6 +713,17 @@ func TestMigrateBackfillsProxyPresetForLegacyProxyRows(t *testing.T) {
 	if srv.NormalizedProxyPreset() != model.ProxyPresetRU {
 		t.Fatalf("expected migrated proxy preset %q, got %q", model.ProxyPresetRU, srv.NormalizedProxyPreset())
 	}
+	if srv.RealityMinClientVersion != "" {
+		t.Fatal("legacy migration must preserve the Xray default client policy")
+	}
+	srv.RealityMinClientVersion = "1.0.0"
+	if err := store.UpdateServer(ctx, srv); err != nil {
+		t.Fatalf("update migrated client policy: %v", err)
+	}
+	reloaded, err := store.GetServerByID(ctx, srv.ID)
+	if err != nil || reloaded.RealityMinClientVersion != "1.0.0" {
+		t.Fatalf("migrated client policy did not persist: %v", err)
+	}
 	if srv.VLESSClientEncryption != "" || srv.VLESSServerDecryption != "" {
 		t.Fatalf("legacy server should migrate with empty VLESS Encryption values")
 	}
