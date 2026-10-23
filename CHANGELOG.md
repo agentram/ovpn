@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.11.2
+
+### Fixed
+- Preserve service-specific certificate, runtime and snapshot ownership during `server init` instead of recursively reassigning the deployment directories (#49).
+- Explain how to restore self-SNI certificate permissions after an earlier init reset them.
+- Add a Linux Docker regression for repeated bootstrap and certificate access by the unprivileged Xray runtime on VPN and proxy servers.
+
+### Security
+- Require Go `1.27.3` for the `crypto/x509` certificate distrust fix (GO-2026-6809).
+
 ## 1.11.1
 
 ### Added
