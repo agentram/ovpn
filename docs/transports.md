@@ -92,6 +92,10 @@ cd ..
 curl --fail --show-error https://<domain>/
 ```
 
+`server init` preserves the certificate directory's `root:65532` ownership.
+If an earlier init reset it, rerun the security playbook above to restore the
+`0750` directory and `0640` private key, then retry `server init` or `deploy`.
+
 Generate a profile-specific link:
 
 ```bash
