@@ -95,10 +95,10 @@ jobs:
           set -euo pipefail
           go test -json -covermode=atomic -coverprofile=coverage.out ./... | tee test-report.jsonl
 
-      - name: Docker geodata permission regression
+      - name: Docker file permission regressions
         env:
           OVPN_TEST_DOCKER: '1'
-        run: go test -v ./internal/deploy -run '^TestValidateConfigWithDockerPrivateGeodata$'
+        run: go test -v ./internal/deploy -run '^Test(ValidateConfigWithDockerPrivateGeodata|BootstrapPreservesSelfSNICertificatePermissions)$'
 
       - name: Client core compatibility regression
         id: client_compatibility

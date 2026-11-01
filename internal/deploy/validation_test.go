@@ -85,3 +85,39 @@ func TestValidateConfigWithDockerRequiresImage(t *testing.T) {
 		t.Fatalf("expected missing image error, got %v", err)
 	}
 }
+
+func TestDeployRemoteSelfSNICertificatePermissionHint(t *testing.T) {
+	for _, path := range []string{"/etc/xray/certs/fullchain.pem", "/etc/xray/certs/privkey.pem"} {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			r := &failingRunner{failOn: "run -test -config /etc/xray/config.json", err: fmt.Errorf("failed to parse certificate > open %s: permission denied", path)}
+			err := DeployRemote(context.Background(), r, ssh.Config{Host: "example-host"})
+			if err == nil {
+				t.Fatal("expected certificate validation failure")
+			}
+			for _, want := range []string{path, "ovpn_camouflage_enabled=true", "root:65532", "0750", "0640", "retry init or deploy"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("missing recovery detail %q: %v", want, err)
+				}
+			}
+			if len(r.execCmds) != 4 {
+				t.Fatal("certificate failure must stop before applying or restarting the runtime")
+			}
+			if strings.Contains(err.Error(), "OVPN_SECURITY_PROFILE=off") {
+				t.Fatal("certificate permissions must not suggest disabling security")
+			}
+		})
+	}
+}
+
+func TestSelfSNICertificatePermissionHintIsSpecific(t *testing.T) {
+	for _, message := range []string{
+		"open /etc/xray/certs/fullchain.pem: no such file or directory",
+		"open /etc/xray/config.json: permission denied",
+		"open geosite.dat: permission denied",
+		"failed to parse certificate: invalid PEM",
+	} {
+		if isXraySelfSNICertificatePermissionError(message) {
+			t.Fatalf("unrelated error classified as a certificate permission failure: %s", message)
+		}
+	}
+}
