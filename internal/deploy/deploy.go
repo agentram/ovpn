@@ -94,7 +94,8 @@ func buildBootstrapCommand() string {
 		"if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi",
 		"if ! sudo docker compose version >/dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y docker-compose-plugin; fi",
 		"sudo mkdir -p " + RemoteDir + " " + RemoteBackupDir,
-		"sudo chown -R $USER:$USER " + RemoteDir + " " + RemoteBackupDir,
+		// Runtime children and snapshots retain their service-specific ownership.
+		"sudo chown \"$USER:$(id -gn)\" " + RemoteDir + " " + RemoteBackupDir,
 	}, " && ")
 }
 
@@ -199,6 +200,12 @@ func isXrayGeodataPermissionError(errText string) bool {
 		(strings.Contains(text, "geosite.dat") || strings.Contains(text, "geoip.dat"))
 }
 
+func isXraySelfSNICertificatePermissionError(errText string) bool {
+	text := strings.ToLower(errText)
+	return strings.Contains(text, "permission denied") &&
+		(strings.Contains(text, "/etc/xray/certs/fullchain.pem") || strings.Contains(text, "/etc/xray/certs/privkey.pem"))
+}
+
 // buildDeployApplyCommand renders the script that swaps the validated bundle into the live runtime directory, preserving existing secret files.
 func buildDeployApplyCommand() string {
 	// When ovpn-agent is running, truncating /opt/ovpn/agent/ovpn-agent in-place can fail with
@@ -296,6 +303,9 @@ func DeployRemote(ctx context.Context, runner Runner, cfg ssh.Config) error {
 	xrayCtx, cancelXray := ssh.TimeoutCtx(ctx, deployXrayValidateTimeout)
 	defer cancelXray()
 	if _, err := runner.Exec(xrayCtx, cfg, withRemoteTimeout(deployXrayValidateTimeout, xrayTestCmd)); err != nil {
+		if isXraySelfSNICertificatePermissionError(err.Error()) {
+			return fmt.Errorf("validate xray config in container on %s: %w; hint: rerun the Ansible security playbook with ovpn_camouflage_enabled=true to restore self-SNI certificate permissions (root:%d, directory 0750, private key 0640), then retry init or deploy", cfg.Host, err, XrayRuntimeGID)
+		}
 		if isXrayGeodataPermissionError(err.Error()) {
 			return fmt.Errorf("validate xray config in container on %s: %w; hint: check geodata read permissions for the Xray runtime user", cfg.Host, err)
 		}
