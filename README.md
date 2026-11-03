@@ -4,11 +4,70 @@
 [![Security](https://github.com/agentram/ovpn/actions/workflows/security.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/security.yml)
 [![Release](https://github.com/agentram/ovpn/actions/workflows/release.yml/badge.svg)](https://github.com/agentram/ovpn/actions/workflows/release.yml)
 
-`ovpn` operates self-hosted Xray (`VLESS + REALITY`) VPN servers from a local Go CLI over SSH.
+`ovpn` deploys and operates self-hosted Xray (`VLESS + REALITY`) servers from a local Go CLI over SSH: provision servers, issue client access, check the runtime, and recover from backups.
 
 The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
 It is intended for operators who prefer a local CLI and SSH workflow over a web panel. It is not a hosted VPN service; it gives you reproducible files and commands for your own servers.
+
+[Download a release](https://github.com/agentram/ovpn/releases/latest) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
+
+## Quick start
+
+### 1. Download the CLI
+
+Open the [latest release](https://github.com/agentram/ovpn/releases/latest) and choose the archive for your workstation:
+
+| Workstation | Archive suffix |
+| --- | --- |
+| Linux, Intel/AMD 64-bit | `linux_amd64.tar.gz` |
+| Linux, ARM64 | `linux_arm64.tar.gz` |
+| macOS, Apple Silicon | `darwin_arm64.tar.gz` |
+| macOS, Intel | `darwin_amd64.tar.gz` |
+
+Extract the archive and open a terminal in that directory. It contains one executable, `ovpn`, with the Linux runtime assets embedded. Go and Docker are not required on the workstation for release binaries. For a source build, see [Development](DEVELOPMENT.md).
+
+### 2. Prepare a server
+
+Use a clean Debian `12+` or Ubuntu `22.04+` host with:
+
+- SSH key access; the example uses `root` and port `22`.
+- A domain name that resolves to the host.
+- Port `443/tcp` free and allowed through the host and provider firewalls.
+
+Before continuing, connect once with `ssh -i <ssh-private-key> root@<server-ip>` and verify the host key. Replace all placeholders below with your own values, including the SSH private key path.
+For host hardening before a production deployment, follow the [Ansible bootstrap](README.ansible.md).
+
+### 3. Deploy and create access
+
+```bash
+./ovpn version
+
+./ovpn server add \
+  --name <server> \
+  --host <server-ip> \
+  --domain <domain> \
+  --ssh-user root \
+  --ssh-port 22 \
+  --ssh-identity <ssh-private-key>
+
+./ovpn server init <server>
+./ovpn doctor <server>
+./ovpn user add --username <user>
+./ovpn user link \
+  --server <server> \
+  --username <user>
+```
+
+`server init` installs Docker/Compose if needed and performs the first runtime deployment. Use `./ovpn deploy <server>` for later runtime changes.
+On an existing installation, `user add` provisions the user across all enabled servers.
+
+### 4. Connect a client
+
+`user link` prints a personal VLESS link and terminal QR code. Import either into your client, connect, and load an HTTPS page while checking that the client's traffic counter increases. Follow the [client guide](docs/clients.md) for platform-specific instructions. Treat the link and QR code as credentials.
+
+`doctor` checks the server runtime; a successful request through the client confirms the client path. If it fails, keep the default REALITY profile and follow the [REALITY troubleshooting steps](docs/transports.md#xray-version-and-reality-failures) before changing transports.
+Use `--qr=false` for link-only output in scripts.
 
 ## Fast navigation
 
@@ -117,7 +176,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.11.2`
+- Current pinned version: `1.11.3`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -207,42 +266,6 @@ Users need new links only if they switch to this profile. See [`docs/security.md
   - Container OOM events: alerted from cAdvisor
   - Grafana background reporting and update checks: disabled
   - Memory and transient collector warnings use longer windows before firing, but still send resolved Telegram notifications.
-
-## Quick start
-
-Use this flow for a first small server. Replace placeholders with your own values.
-
-```bash
-# Use the release archive for your workstation OS/arch, or build from source for development.
-# Release archives contain one executable: ovpn.
-# Source build:
-# go build -o ovpn ./cmd/ovpn
-./ovpn version
-
-./ovpn server add \
-  --name <server> \
-  --host <server-ip> \
-  --domain <domain> \
-  --ssh-user root \
-  --ssh-port 22 \
-  --xray-version 26.7.28
-
-./ovpn server init <server>
-./ovpn doctor <server>
-./ovpn user add --username <user>
-./ovpn user link --server <server> --username <user>
-```
-
-`user link` prints the client link and a terminal QR code by default for mobile onboarding. Use `--qr=false` when you need link-only output for scripts.
-For REALITY client timeouts after an Xray upgrade, see the [client compatibility setting](docs/transports.md#reality-client-version-policy).
-New REALITY/TLS links default to `fp=firefox`; use `--fingerprint` or `--spider-x` only when you need an explicit client-link variant.
-See [`docs/transports.md`](docs/transports.md) before enabling fallback profiles or switching the default generated link profile.
-
-`server init` performs the first bootstrap/deploy for the VPN runtime. Use `deploy` later when you change runtime settings:
-
-```bash
-./ovpn deploy <server>
-```
 
 ## Production flow
 

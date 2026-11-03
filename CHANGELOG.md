@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.11.3
+
+### Fixed
+- Complete the project site's first-server example with user creation and remove the redundant deploy after `server init`.
+- Put release downloads and the first-connection workflow near the start of the README and project site, with SSH prerequisites and client verification steps.
+
 ## 1.11.2
 
 ### Fixed

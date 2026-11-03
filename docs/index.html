@@ -52,6 +52,8 @@
         scroll-behavior: smooth;
       }
 
+      section[id] { scroll-margin-top: 88px; }
+
       body {
         width: 100%;
         max-width: 100%;
@@ -417,6 +419,11 @@
         align-items: start;
       }
 
+      #quick-start p:not(.section-lede) {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
       .tech-list {
         display: grid;
         gap: 10px;
@@ -505,6 +512,8 @@
           padding: 14px 0;
         }
 
+        .topbar { position: static; }
+
         .nav {
           display: grid;
           grid-template-columns: 1fr;
@@ -592,7 +601,7 @@
         <a class="brand" href="./">ovpn</a>
         <nav class="nav" aria-label="Primary navigation">
           <a href="https://github.com/agentram/ovpn">GitHub</a>
-          <a href="https://x.com/OVPN_project">X</a>
+          <a href="#quick-start">Quick start</a>
           <a href="#design">Design</a>
           <a href="#architecture">Architecture</a>
           <a href="#docs">Docs</a>
@@ -608,12 +617,12 @@
             <div class="eyebrow">For operators and engineers</div>
             <h1>ovpn</h1>
             <p class="lede">
-              A source-available Go CLI for operating self-hosted Xray VLESS + REALITY servers. State stays local, deploys go over SSH/SCP, and the runtime runs as Docker Compose on Linux hosts.
+              Deploy Xray servers, issue client access, check the runtime, and recover from backups with a local Go CLI. State stays local and deployments go over SSH. Source-available under a non-commercial license.
             </p>
             <div class="actions">
-              <a class="button primary" href="https://github.com/agentram/ovpn">View repository</a>
-              <a class="button" href="https://x.com/OVPN_project">Follow on X</a>
-              <a class="button" href="#architecture">Architecture</a>
+              <a class="button primary" href="https://github.com/agentram/ovpn/releases/latest">Download CLI</a>
+              <a class="button" href="#quick-start">First connection</a>
+              <a class="button" href="https://github.com/agentram/ovpn">View repository</a>
             </div>
             <div class="quick-nav" aria-label="Fast navigation">
               <a href="#design">design</a>
@@ -646,6 +655,53 @@
           <span>HAProxy can front several VPN backends and apply country preset routing.</span>
         </div>
       </div>
+
+      <section class="wrap" id="quick-start">
+        <h2>Your first connection</h2>
+        <p class="section-lede">
+          Download the CLI, deploy a server, create a user, and import the link or QR code into a client.
+        </p>
+        <div class="split">
+          <div>
+            <h3>1. Download the CLI</h3>
+            <p>
+              Choose an archive from the <a href="https://github.com/agentram/ovpn/releases/latest">latest release</a> for Linux or macOS, on Intel/AMD 64-bit or ARM64. Extract it and open a terminal in that directory. Release binaries include the Linux runtime assets; Go and Docker are not required on your workstation.
+            </p>
+            <h3>2. Prepare a server</h3>
+            <p>
+              Use a clean Debian 12+ or Ubuntu 22.04+ host, a domain that resolves to it, and SSH key access. Port <code>443/tcp</code> must be free and allowed through the host and provider firewalls.
+              Connect once with <code>ssh -i &lt;ssh-private-key&gt; root@&lt;server-ip&gt;</code> and verify the host key. Replace all placeholders in the commands, including the SSH private key path.
+            </p>
+            <h3>3. Deploy and create access</h3>
+            <p>
+              Run the commands shown here. <code>server init</code> installs Docker/Compose if needed and performs the first runtime deployment. Use <code>deploy</code> for later runtime changes. On an existing installation, <code>user add</code> provisions the user across all enabled servers.
+            </p>
+            <h3>4. Connect a client</h3>
+            <p>
+              Import the personal VLESS link or terminal QR code, connect, and load an HTTPS page while checking the client's traffic counter. The <a href="doc.html?doc=clients.md">client guide</a> has platform-specific instructions. Treat the link and QR code as credentials.
+            </p>
+            <p>
+              <code>doctor</code> checks the server runtime; a successful request through the client confirms the client path. See the <a href="https://github.com/agentram/ovpn#quick-start">full quick start</a> for download choices and troubleshooting, and the <a href="https://github.com/agentram/ovpn/blob/main/README.ansible.md">Ansible bootstrap</a> for production host hardening.
+            </p>
+          </div>
+          <pre class="terminal" id="quick-commands"><code>./ovpn version
+
+./ovpn server add \
+  --name &lt;server&gt; \
+  --host &lt;server-ip&gt; \
+  --domain &lt;domain&gt; \
+  --ssh-user root \
+  --ssh-port 22 \
+  --ssh-identity &lt;ssh-private-key&gt;
+
+./ovpn server init &lt;server&gt;
+./ovpn doctor &lt;server&gt;
+./ovpn user add --username &lt;user&gt;
+./ovpn user link \
+  --server &lt;server&gt; \
+  --username &lt;user&gt;</code></pre>
+        </div>
+      </section>
 
       <section class="wrap" id="design">
         <h2>Control plane without a public admin API</h2>
@@ -749,34 +805,16 @@
       </section>
 
       <section class="wrap" id="automation">
-        <div class="split">
-          <div>
-            <h2>Automation surface</h2>
-            <p class="section-lede">
-              The CLI is the operator surface for initial bootstrap, normal deploys, user lifecycle, quotas, monitoring, and recovery.
-            </p>
-            <ul class="tech-list">
-              <li><code>server init</code> and <code>deploy</code> render desired state and apply it through SSH/SCP.</li>
-              <li><code>user add</code>, <code>user rm</code>, <code>quota-set</code>, and expiry commands mirror users across enabled servers.</li>
-              <li><code>doctor</code>, <code>status</code>, logs, backups, restore, cleanup, and monitoring are built-in workflows.</li>
-              <li>GitHub Actions cover Go quality, Ansible quality, security scans, and self-contained release packaging.</li>
-            </ul>
-          </div>
-          <pre class="terminal" id="quick-commands"><code>./ovpn version
-
-./ovpn server add \
-  --name &lt;server&gt; \
-  --host &lt;server-ip&gt; \
-  --domain &lt;domain&gt; \
-  --ssh-user root \
-  --ssh-port 22
-
-./ovpn server init &lt;server&gt;
-./ovpn deploy &lt;server&gt;
-./ovpn doctor &lt;server&gt;
-./ovpn user quota-set --username &lt;user&gt; --monthly-gb 400
-./ovpn user link --server &lt;server&gt; --username &lt;user&gt;</code></pre>
-        </div>
+        <h2>Automation surface</h2>
+        <p class="section-lede">
+          The CLI is the operator surface for initial bootstrap, normal deploys, user lifecycle, quotas, monitoring, and recovery.
+        </p>
+        <ul class="tech-list">
+          <li><code>server init</code> and <code>deploy</code> render desired state and apply it through SSH/SCP.</li>
+          <li><code>user add</code>, <code>user rm</code>, <code>quota-set</code>, and expiry commands mirror users across enabled servers.</li>
+          <li><code>doctor</code>, <code>status</code>, logs, backups, restore, cleanup, and monitoring are built-in workflows.</li>
+          <li>GitHub Actions cover Go quality, Ansible quality, security scans, and self-contained release packaging.</li>
+        </ul>
       </section>
 
       <section class="wrap" id="docs">
