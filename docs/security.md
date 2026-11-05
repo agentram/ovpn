@@ -278,6 +278,8 @@ export OVPN_TELEGRAM_BOT_HOST_PORT=19002
 
 ## Secrets and state handling
 
+Optional [subscription delivery](subscriptions.md) exposes prepared client bundles through per-subscription tokens. Give the delivery account only those bundles and TLS files, without control state or SSH keys. Tokens in URLs and bundle contents are credentials; suppress subscription paths in reverse-proxy logs. Delivery-token revocation stops downloads, while VPN-user disable/removal revokes credentials already imported by clients.
+
 - Local DB (`~/.ovpn/ovpn.db`) contains sensitive metadata.
 - Remote runtime (`/opt/ovpn`) contains runtime secrets/config.
 - Backups may contain secrets and must be treated as sensitive.

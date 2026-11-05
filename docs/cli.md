@@ -39,6 +39,7 @@ Use `--debug` only for operator-side CLI troubleshooting; targeted per-user debu
 | Normal deploy | `./ovpn deploy <server>` |
 | Full health check | `./ovpn doctor <server>` |
 | Check client HTTPS traffic | `./ovpn user probe --server <server> --username <user> --json` |
+| Export a multi-server subscription | `./ovpn user subscription export --username <user> --out ./subscription.txt` |
 | Include recent logs in doctor | `./ovpn doctor <server> --include-logs --tail 100` |
 | Compose status | `./ovpn server status <server>` |
 | Service logs | `./ovpn server logs <server> --service xray --tail 200` |
@@ -170,6 +171,8 @@ The `vless://` link and QR code are secrets.
 Anyone who has them can use that profile until you disable or remove the user.
 
 `user export --format xray-checker` writes private JSON client configurations instead of links and QR codes. `user probe` checks HTTPS traffic through the same client parameters from the operator machine. Both require an active user and an enabled profile. See [traffic probes and Xray Checker](probes.md) for commands and monitoring setup.
+
+For one file or stable URL containing the user's active nodes, see [client subscriptions](subscriptions.md). `user subscription publish` prepares delivery snapshots; `subscription serve` and `subscription revoke` work without opening the local control database. Delivery-token revocation and VPN-user revocation are separate operations.
 
 New REALITY/TLS links use `fp=firefox` by default. Existing imported client profiles are not changed.
 Use `--fingerprint` when you need a specific supported client fingerprint. Use `--spider-x` only for REALITY profiles; if omitted, ovpn generates a stable per-user path.

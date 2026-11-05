@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 	"ovpn/internal/deploy"
 	"ovpn/internal/model"
 	"ovpn/internal/probe"
+	"ovpn/internal/subscription"
 	"ovpn/internal/xraycfg"
 )
 
@@ -158,7 +160,10 @@ func TestClientCoreCompatibility(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if core == "native" {
+		if core == "native-subscription" {
+			link = compatibilitySubscriptionLink(t, app, current.Name, user.Username)
+		}
+		if core == "native" || core == "native-subscription" {
 			parsed, err := url.Parse(link)
 			if err != nil {
 				t.Fatal(err)
@@ -260,6 +265,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 	}
 	t.Run("xray-default-policy", func(t *testing.T) { check(t, "xray", "chrome", true) })
 	t.Run("native-default-policy", func(t *testing.T) { check(t, "native", "firefox", true) })
+	t.Run("subscription-default-policy", func(t *testing.T) { check(t, "native-subscription", "firefox", true) })
 	t.Run("sing-box-default-policy-refused", func(t *testing.T) { check(t, "sing-box", "chrome", false) })
 	renderServer("1.0.0", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
@@ -287,6 +293,49 @@ func TestClientCoreCompatibility(t *testing.T) {
 			t.Run("tls-self-sni/"+core+"/"+fingerprint, func(t *testing.T) { check(t, core, fingerprint, true) })
 		}
 	}
+	t.Run("tls-self-sni/subscription", func(t *testing.T) { check(t, "native-subscription", "firefox", true) })
+}
+
+func compatibilitySubscriptionLink(t *testing.T, app *App, server, username string) string {
+	t.Helper()
+	entries, err := app.subscriptionEntries(subscriptionSelection{username: username, server: server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	store, err := subscription.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	id, token, err := store.Publish("", username, "", entries, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := subscription.NewHandler(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handler.Close()
+	delivery := httptest.NewTLSServer(handler)
+	defer delivery.Close()
+	client := delivery.Client()
+	client.Timeout = 3 * time.Second
+	response, err := client.Get(delivery.URL + "/sub/" + id + "/" + token)
+	if err != nil {
+		t.Fatal("subscription HTTPS download failed")
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil || response.StatusCode != http.StatusOK {
+		t.Fatal("subscription HTTP response failed")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(string(body))
+	links := strings.Fields(string(decoded))
+	if err != nil || len(links) != 1 {
+		t.Fatal("subscription should deliver exactly one primary-profile link")
+	}
+	return links[0]
 }
 
 func compatibilityClientConfig(t *testing.T, core, link string) ([]byte, []string) {

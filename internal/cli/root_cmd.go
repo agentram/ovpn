@@ -52,6 +52,9 @@ func NewRootCmd() *cobra.Command {
 			slog.SetDefault(app.logger)
 			app.ctx = cmd.Context()
 			app.logger.Debug("starting command", "command", cmd.CommandPath(), "dry_run", app.dryRun)
+			if cmd.Annotations["ovpn.local-state"] == "none" {
+				return nil
+			}
 			if app.dataDir == "" {
 				app.dataDir = util.DefaultDataDir()
 			}
@@ -90,6 +93,7 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(app.serverCmd())
 	cmd.AddCommand(app.doctorCmd())
 	cmd.AddCommand(app.userCmd())
+	cmd.AddCommand(app.subscriptionCmd())
 	cmd.AddCommand(app.statsCmd())
 	cmd.AddCommand(app.configCmd())
 	cmd.AddCommand(app.deployCmd())

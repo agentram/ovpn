@@ -86,6 +86,7 @@ For an optional HTTPS check from the operator machine, run `./ovpn user probe --
 - [Transport profiles](docs/transports.md)
 - [Monitoring](#7-optional-monitoring)
 - [Traffic probes and Xray Checker](docs/probes.md)
+- [Client subscriptions](docs/subscriptions.md)
 - [Documentation map](#documentation-map)
 
 ## Production model
@@ -171,6 +172,7 @@ flowchart LR
 - Global-by-default user provisioning across enabled servers
 - Profile-aware VLESS link, QR, and export commands
 - HTTPS traffic probes and private Xray Checker configuration exports
+- Multi-server client subscriptions with stable URLs, delivery-token rotation and a separate read-only delivery service
 - Optional self-SNI HTTPS camouflage profile with an internal static fallback site
 - Rolling `30d` traffic quota enforcement
 - Lightweight per-user connection diagnostics and short targeted debug windows (`basic` mode is on by default; see `docs/cli.md`)

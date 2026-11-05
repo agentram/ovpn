@@ -24,6 +24,7 @@ func (a *App) userCmd() *cobra.Command {
 		a.newUserQRCmd(),
 		a.newUserExportCmd(),
 		a.newUserProbeCmd(),
+		a.newUserSubscriptionCmd(),
 	)
 	return cmd
 }

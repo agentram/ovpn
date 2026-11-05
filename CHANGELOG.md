@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Export per-user multi-server subscriptions and publish stable URLs with token rotation, revocation and per-profile expiry filtering. An optional read-only delivery service consumes prepared bundles without the control database or SSH keys, and requires TLS outside loopback.
 - Export private, profile-aware Xray JSON files for Xray Checker with `user export --format xray-checker`.
 - Check HTTPS traffic over TCP/REALITY or TCP/TLS from the operator machine with `user probe`, using the pinned Xray client core and credential-free JSON results. Probes enforce TLS verification, time and response-size limits, and the expected HTTP status without redirects or a direct fallback.
 
