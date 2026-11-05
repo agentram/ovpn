@@ -14,7 +14,7 @@ Plan approximately **6–10 engineering weeks** for a credible operator MVP thro
 
 ## First implementation slice
 
-Progress: the read-only Wails/React host, bundled-worker verification, handshake, inventory, shared native probe path and English/Russian settings are implemented in [the development build](../../desktop.md). This does not complete Stage 0: native Windows/Linux, SSH/vault and accessibility gates remain.
+Progress: the read-only Wails/React host, bundled-worker verification, handshake, server/user policy inventory, shared native probe path and English/Russian settings are implemented in [the development build](../../desktop.md). This does not complete Stage 0: native Windows/Linux, SSH/vault and accessibility gates remain.
 
 Build a signed-development native shell and a minimal machine worker that returns `engine.hello`, redacted inventory and one native HTTPS check. Include a demo workspace. No real remote write actions are enabled until the operation engine gates pass.
 
@@ -61,3 +61,5 @@ Keep the current CLI available and compatible throughout extraction. Desktop art
 Use a short reproducible demo and a disposable lab to recruit pilot users. A Habr Part 2 can show one complete journey and a failure/recovery case; an English adaptation can follow. Publish measured results and clearly scoped compatibility instead of unsupported superiority claims. Design patterns and screenshots should link to reproducible examples and small contributor tasks.
 
 The current design work is included as a proposal under the existing PR. It does not turn the 1.12.0 CLI work into a claim that desktop binaries have shipped.
+
+The [complete application plan](application-plan.md) refines the next increments: reviewed user lifecycle first, then scheduled observation/Checker, Knife diagnostics, fleet assignments and recovery. Monitoring and integration screens are explicit design previews until their backend gates pass.

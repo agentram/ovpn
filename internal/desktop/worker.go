@@ -193,3 +193,15 @@ func (w *Worker) Check(ctx context.Context, request dto.CheckRequest) (dto.Check
 	err := w.call(ctx, "checks.run", request, &result)
 	return result, err
 }
+
+func (w *Worker) Users(ctx context.Context, cursor string) (dto.UserPage, error) {
+	var result dto.UserPage
+	if len(cursor) > 4096 {
+		return result, errors.New("INVALID_PARAMS")
+	}
+	err := w.call(ctx, "users.list", struct {
+		Cursor string `json:"cursor"`
+		Limit  int    `json:"limit"`
+	}{cursor, 50}, &result)
+	return result, err
+}

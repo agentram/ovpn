@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Expose paged desktop user-policy inventory without client credentials, add clearer green/red/amber status styling and expand the application plan with monitoring, Checker/Knife integration and change/recovery workflow previews. Live writes and scheduled third-party checks remain planned.
 - Add the first OVPN Desk development build: English/Russian React UI, a Wails host with a verified bundled worker, read-only inventory and explicit native HTTPS checks. Add protocol 1 via `ovpn machine --stdio --protocol 1`; server write workflows and public desktop installers remain future work.
 - Document the OVPN Desk architecture and visual direction, with an interactive desktop prototype using sample data. This is a design proposal, not a native desktop release.
 - Export per-user multi-server subscriptions and publish stable URLs with token rotation, revocation and per-profile expiry filtering. An optional read-only delivery service consumes prepared bundles without the control database or SSH keys, and requires TLS outside loopback.

@@ -17,6 +17,7 @@
         "engineVersion": "1.12.0",
         "capabilities": [
           "inventory.read",
+          "users.read",
           "checks.run"
         ]
       }
@@ -111,6 +112,7 @@
     "engine.hello",
     "workspace.summary",
     "servers.list",
+    "users.list",
     "checks.run"
   ]
 }

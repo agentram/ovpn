@@ -60,8 +60,9 @@ func TestHandshakeStrictEnvelopeAndReadOnlyMethods(t *testing.T) {
 {"id":"f","method":"workspace.summary","params":{"secret":"ignored?"}}
 {"id":"g","method":"workspace.summary","params":{},"extra":1}
 {"id":"h","method":"checks.run","params":{"serverId":"node-1","username":"monitor"}}
+{"id":"i","method":"users.list","params":{"limit":2}}
 `, backend)
-	want := []string{"HANDSHAKE_REQUIRED", "PROTOCOL_MISMATCH", "", "", "METHOD_NOT_FOUND", "INVALID_PARAMS", "INVALID_REQUEST", ""}
+	want := []string{"HANDSHAKE_REQUIRED", "PROTOCOL_MISMATCH", "", "", "METHOD_NOT_FOUND", "INVALID_PARAMS", "INVALID_REQUEST", "", ""}
 	if len(responses) != len(want) {
 		t.Fatalf("responses: %d", len(responses))
 	}
@@ -74,7 +75,7 @@ func TestHandshakeStrictEnvelopeAndReadOnlyMethods(t *testing.T) {
 			t.Fatalf("response %d: %s", i, got)
 		}
 	}
-	if backend.calls != 2 {
+	if backend.calls != 3 {
 		t.Fatalf("invalid requests reached backend: %d", backend.calls)
 	}
 	var hello protocol.Hello
@@ -103,4 +104,9 @@ func TestOversizedInputStopsWithoutDispatch(t *testing.T) {
 	if backend.calls != 0 || !strings.Contains(output.String(), "MESSAGE_TOO_LARGE") || output.Len() > 256 {
 		t.Fatal("invalid oversized response")
 	}
+}
+
+func (f *fakeBackend) Users(context.Context, string, int) (dto.UserPage, error) {
+	f.calls++
+	return dto.UserPage{Items: []dto.User{}}, nil
 }

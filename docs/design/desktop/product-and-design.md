@@ -1,6 +1,6 @@
 # Product and visual direction
 
-Status: design proposal. Working name: **OVPN Desk**. Audience: one operator or a small team managing a self-hosted Xray fleet. The primary promise is a short, inspectable route from a new server to verified user access.
+Status: design proposal. The expanded [application plan](application-plan.md), [monitoring/integration architecture](monitoring-and-integrations.md) and [visual update](design-update.md) refine this baseline. Working name: **OVPN Desk**. Audience: one operator or a small team managing a self-hosted Xray fleet. The primary promise is a short, inspectable route from a new server to verified user access.
 
 ## Interaction model
 
@@ -45,10 +45,10 @@ Extend the current website: graphite, silver and a restrained cold accent. The r
 | Raised | `#171D21` | `#F2F5F3` | Selection and secondary controls. |
 | Primary text | `#EDF0EB` | `#1A2529` | Content and major values. |
 | Secondary text | `#A0AAA9` | `#526468` | Labels and descriptions. |
-| Accent | `#A6C9D5` | `#285E74` | Focus, active context and selected actions. |
-| Verified | `#96C9AC` | `#256746` | Confirmed checks, with an icon and text. |
-| Attention | `#E0BA7F` | `#825816` | Degradation or required review. |
-| Failure/destructive | `#EFA4A5` | `#A6343D` | Failed operations and destructive actions. |
+| Accent | `#72D5E8` | `#135C76` | Focus, active context and selected actions. |
+| Verified | `#4ADE80` | `#146C3A` | Confirmed checks, with an icon and text. |
+| Attention | `#FBBF24` | `#85540C` | Degradation or required review. |
+| Failure/destructive | `#FB7185` | `#A91D3A` | Failed operations and destructive actions. |
 
 Use the system UI font stack; package any chosen brand font locally. Monospace is for identifiers, versions and measurements. Production typography target: 14px body/table text, 12px secondary labels, 24–30px page headings. Small uppercase captions are secondary navigation, never essential instructions.
 

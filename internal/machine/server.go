@@ -16,6 +16,7 @@ import (
 type Backend interface {
 	Summary(context.Context) (dto.Summary, error)
 	Servers(context.Context, string, int) (dto.ServerPage, error)
+	Users(context.Context, string, int) (dto.UserPage, error)
 	Check(context.Context, dto.CheckRequest) (dto.Check, error)
 }
 
@@ -49,7 +50,7 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 				err = &app.Error{Code: "PROTOCOL_MISMATCH"}
 			} else {
 				ready = true
-				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: []string{"inventory.read", "checks.run"}}
+				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: []string{"inventory.read", "users.read", "checks.run"}}
 			}
 		} else if !ready {
 			err = &app.Error{Code: "HANDSHAKE_REQUIRED"}
@@ -99,6 +100,15 @@ func dispatch(ctx context.Context, backend Backend, request protocol.Request) (a
 			return nil, bad
 		}
 		return backend.Servers(ctx, params.Cursor, params.Limit)
+	case "users.list":
+		var params struct {
+			Cursor string `json:"cursor,omitempty"`
+			Limit  int    `json:"limit,omitempty"`
+		}
+		if protocol.Decode(request.Params, &params) != nil {
+			return nil, bad
+		}
+		return backend.Users(ctx, params.Cursor, params.Limit)
 	case "checks.run":
 		var params dto.CheckRequest
 		if protocol.Decode(request.Params, &params) != nil {

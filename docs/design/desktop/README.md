@@ -4,6 +4,9 @@ Status: **design proposal and interactive prototype**, with a separate [first de
 
 OVPN Desk is an operator application for Linux, macOS and Windows: connect a server, deliver access, verify traffic and recover from a change. The initial product manages servers; a system-wide VPN/TUN client is a separate scope.
 
+- [Complete application plan and delivery priorities](application-plan.md)
+- [Monitoring, automation and Checker/Knife adapters](monitoring-and-integrations.md)
+- [Brighter operational visual system](design-update.md)
 - [Architecture and decisions](architecture.md)
 - [Product, UX and visual system](product-and-design.md)
 - [Implementation sequence and acceptance gates](roadmap.md)
@@ -42,7 +45,7 @@ The visual work here is original, based on OVPN's existing graphite/silver brand
 | Inventory, users, deployment, backups, doctor | Implemented in Go; orchestration is coupled to Cobra handlers | Extract shared use cases and redacted DTOs; keep CLI behavior compatible. |
 | Native HTTPS probe and checker JSON export | Implemented | Source/freshness model, scoped monitoring identity and checker adapter. |
 | Stable subscription snapshots and token lifecycle | Implemented | Guided publish/rotate/revoke UI; remote delivery placement; optional publish-after-change workflow. |
-| Desktop UI and machine API | First read-only Wails/React slice, protocol handshake, inventory and explicit native check implemented | Durable operation execution is required before real write actions. |
+| Desktop UI and machine API | Read-only Wails/React server/user inventory, policy projection, explicit checks and broader workflow previews implemented | Durable operation execution is required before real write actions. |
 | Plan fingerprints, per-host cross-process locks, isolated staging and recovery reconciliation | Not a complete shared workflow | Implement and test before safe desktop deployment. |
 | Node assignments, encrypted restore drill, client import matrix | Proposed extensions | Separate milestones and compatibility evidence. |
 

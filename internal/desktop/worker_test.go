@@ -128,3 +128,7 @@ func TestWorkerRejectsUntrustedExecutableBeforeLaunch(t *testing.T) {
 		}
 	}
 }
+
+func (f helperBackend) Users(context.Context, string, int) (dto.UserPage, error) {
+	return dto.UserPage{Items: []dto.User{}}, nil
+}

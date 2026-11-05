@@ -1,0 +1,22 @@
+package dto
+
+// User contains configured access policy, not a claim of runtime connectivity.
+type User struct {
+	Username         string `json:"username"`
+	ConfiguredNodes  int    `json:"configuredNodes"`
+	EnabledNodes     int    `json:"enabledNodes"`
+	EligibleNodes    int    `json:"eligibleNodes"`
+	DisabledNodes    int    `json:"disabledNodes"`
+	ExpiredNodes     int    `json:"expiredNodes"`
+	BlockedNodes     int    `json:"blockedNodes"`
+	EarliestExpiry   string `json:"earliestExpiry,omitempty"`
+	QuotaMinBytes    int64  `json:"quotaMinBytes"`
+	QuotaMaxBytes    int64  `json:"quotaMaxBytes"`
+	PolicyDiff       bool   `json:"policyDiff"`
+	IdentityConflict bool   `json:"identityConflict"`
+}
+
+type UserPage struct {
+	Items      []User `json:"items"`
+	NextCursor string `json:"nextCursor,omitempty"`
+}

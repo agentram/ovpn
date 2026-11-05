@@ -1,6 +1,6 @@
 # OVPN Desk development build
 
-The first desktop slice reads an existing workspace and runs explicit native HTTPS checks. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
+The development build reads existing server/user inventory and runs explicit native HTTPS checks. Users shows configured assignments, policy differences, quota limits and expiry without exposing credentials. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
 
 English is the default. Settings offers Russian and dark/light themes; only these preferences are persisted in WebView storage. The application starts with a clearly labelled demo workspace. Select **Local workspace** to read real inventory. No database is created or migrated by desktop queries.
 
@@ -44,6 +44,12 @@ npm --prefix apps/desktop/frontend run dev
 
 Open `http://127.0.0.1:8940/`. This serves the demo UI; the native bridge requires the desktop application. Production assets are bundled locally and cannot be replaced by an inherited frontend-devserver setting.
 
+## Users and product workflow previews
+
+Open **Users** in Local workspace to inspect configured access. Policy states are local evidence: Allowed does not establish runtime distribution or user connectivity. The last manual check is linked to its selected user and one server/profile; it expires and does not certify every assignment. Quotas remain per-server rolling 30-day policies. The displayed assignment count refers to configured records on enabled nodes. Search filters the loaded page; load additional pages explicitly.
+
+Demo workspace offers simulated user creation/suspension. **Monitoring**, **Integrations** and **Changes & recovery** show the planned product workflows. The demo scheduler generates fixture measurements only; it does not start network traffic. Production scheduling, Checker/Knife execution and live user writes are not enabled by these screens. See the [complete application plan](design/desktop/application-plan.md) and [monitoring/integration design](design/desktop/monitoring-and-integrations.md).
+
 ## Check traffic
 
 Open **Checks**, select an enabled server and a TCP/REALITY or TCP/TLS profile, enter an existing active monitoring username and press **Run HTTPS check**. The request uses the pinned native Xray client and verifies `https://example.com/`, HTTP 200 and its certificate, with a 20-second timeout and a 1 MiB body limit. It does not create users or deploy configuration. Existing encryption keys are resolved as in the CLI; OS-vault migration is not implemented yet.
@@ -64,7 +70,7 @@ Send one JSON object per line. Start every session with:
 {"id":"servers-1","method":"servers.list","params":{"limit":50}}
 ```
 
-Implemented methods: `engine.hello`, `workspace.summary`, `servers.list` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The handshake advertises only `inventory.read` and `checks.run`. Proposed operation methods in the [architecture](design/desktop/architecture.md) are not implemented or advertised.
+Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The handshake advertises only `inventory.read`, `users.read` and `checks.run`. Proposed operation methods in the [architecture](design/desktop/architecture.md) are not implemented or advertised.
 
 The worker processes requests sequentially, rejects unknown fields, bounds messages to 1 MiB and returns stable errors without raw database, path or tunnel diagnostics. Its stdout carries protocol envelopes only. The host verifies the worker digest and exact engine/protocol versions, serializes calls and terminates the session on timeout or malformed output. An explicit later action may reconnect; a failed check is not automatically repeated.
 

@@ -88,6 +88,15 @@ func (s *DeskService) Servers(ctx context.Context, cursor string) (dto.ServerPag
 	defer cancel()
 	return w.Servers(ctx, cursor)
 }
+func (s *DeskService) Users(ctx context.Context, cursor string) (dto.UserPage, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.UserPage{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.Users(ctx, cursor)
+}
 func (s *DeskService) Check(ctx context.Context, request dto.CheckRequest) (dto.Check, error) {
 	w, err := s.connect()
 	if err != nil {

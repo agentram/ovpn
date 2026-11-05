@@ -1,6 +1,6 @@
 # Desktop architecture
 
-Status: target architecture. The [first development slice](../../desktop.md) implements a read-only host/worker, inventory and explicit HTTPS checks. Operation plans, journal, write locks, OS vault and checker supervision below remain proposed. The static prototype and operation examples are design artifacts.
+Status: target architecture. The [first development slice](../../desktop.md) implements a read-only host/worker, server/user inventory and explicit HTTPS checks. See the [complete product plan](application-plan.md) and [observation/integration design](monitoring-and-integrations.md) for the expanded application. Operation plans, journal, write locks, OS vault and checker supervision below remain proposed. The static prototype and operation examples are design artifacts.
 
 ## 1. Runtime choice
 
