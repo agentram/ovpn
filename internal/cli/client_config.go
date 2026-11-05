@@ -1,31 +1,19 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"ovpn/internal/clientcfg"
+	"ovpn/internal/clientprofile"
 	"ovpn/internal/model"
 )
 
 func validateClientCheckUser(srv model.Server, user model.User) error {
-	if !srv.Enabled || !user.Enabled || model.IsExpiredAt(user.ExpiryDate, time.Now().UTC()) || user.QuotaBlocked {
-		return fmt.Errorf("client checks require an enabled server and an active user")
-	}
-	return nil
+	return clientprofile.ValidateCheckUser(srv, user)
 }
-
 func clientConfigForUser(srv model.Server, user model.User, profile string, opts userLinkOptions) (clientcfg.Config, error) {
-	if err := validateClientCheckUser(srv, user); err != nil {
-		return clientcfg.Config{}, err
-	}
-	link, err := buildUserProfileLink(srv, user, profile, opts)
-	if err != nil {
-		return clientcfg.Config{}, err
-	}
-	return clientcfg.FromLink(link)
+	return clientprofile.ConfigForUser(srv, user, profile, opts.shared())
 }
 
 func writePrivateClientConfig(path string, data []byte) error {

@@ -1,5 +1,5 @@
 {
-  "status": "proposed-examples-not-implemented",
+  "status": "target-examples-operation-methods-not-implemented",
   "protocolVersion": 1,
   "transport": "bounded-json-lines-over-stdio",
   "handshake": {
@@ -17,9 +17,7 @@
         "engineVersion": "1.12.0",
         "capabilities": [
           "inventory.read",
-          "checks.run",
-          "operations.plan",
-          "operations.execute"
+          "checks.run"
         ]
       }
     }
@@ -108,5 +106,11 @@
     "Use stable storage identifiers rather than human-readable labels as identity.",
     "Production validation must reject unknown fields and enforce revision preconditions.",
     "Messages must not contain raw model.Server records, private keys, bearer tokens or client links outside explicit one-time delivery."
+  ],
+  "implementedMethods": [
+    "engine.hello",
+    "workspace.summary",
+    "servers.list",
+    "checks.run"
   ]
 }

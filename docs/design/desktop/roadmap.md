@@ -14,6 +14,8 @@ Plan approximately **6–10 engineering weeks** for a credible operator MVP thro
 
 ## First implementation slice
 
+Progress: the read-only Wails/React host, bundled-worker verification, handshake, inventory, shared native probe path and English/Russian settings are implemented in [the development build](../../desktop.md). This does not complete Stage 0: native Windows/Linux, SSH/vault and accessibility gates remain.
+
 Build a signed-development native shell and a minimal machine worker that returns `engine.hello`, redacted inventory and one native HTTPS check. Include a demo workspace. No real remote write actions are enabled until the operation engine gates pass.
 
 First extraction targets:

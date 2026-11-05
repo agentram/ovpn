@@ -99,5 +99,6 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(app.deployCmd())
 	cmd.AddCommand(app.restartCmd())
 	cmd.AddCommand(app.versionCmd())
+	cmd.AddCommand(app.machineCmd())
 	return cmd
 }

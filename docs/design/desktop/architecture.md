@@ -1,10 +1,10 @@
 # Desktop architecture
 
-Status: proposed. Baseline: OVPN source `fa2d838`; prototype and contracts in this folder are design artifacts. Items described as new services or commands do not yet exist.
+Status: target architecture. The [first development slice](../../desktop.md) implements a read-only host/worker, inventory and explicit HTTPS checks. Operation plans, journal, write locks, OS vault and checker supervision below remain proposed. The static prototype and operation examples are design artifacts.
 
 ## 1. Runtime choice
 
-Choose **Wails 3 + React + TypeScript**, with a native Go host and the existing OVPN executable as a typed local worker. Evaluate stable `v3.1.0` in the platform spike; do not track nightly builds. The release and its Go module metadata were verified, but native dependencies were not installed in this design phase.
+Choose **Wails 3 + React + TypeScript**, with a native Go host and the existing OVPN executable as a typed local worker. Evaluate stable `v3.1.0` in the platform spike; do not track nightly builds. The first macOS host is built and exercised with the local worker; native Windows/Linux packaging remains unverified.
 
 [Wails v3.1.0](https://github.com/wailsapp/wails/releases/tag/v3.1.0) provides a current desktop baseline. Its [installation requirements](https://v3.wails.io/quick-start/installation/) include platform WebViews and native build dependencies. Do not turn vendor size or memory comparisons into OVPN performance claims: embedded Xray changes the application's footprint.
 
@@ -57,7 +57,7 @@ Closing a window leaves an explicitly enabled tray operation running. Quitting, 
 
 ## 3. Machine and application contracts
 
-`machine-api.json` is a **proposed wire example**, not an implemented JSON Schema or API. Proposed worker invocation: `ovpn machine --stdio --protocol 1`.
+`machine-api.json` includes **target wire examples**, not a JSON Schema. The implemented worker invocation is `ovpn machine --stdio --protocol 1`; see the development guide for the implemented read-only subset. Operation examples below remain future work.
 
 - Stdout contains protocol envelopes only; stderr contains bounded, redacted diagnostics.
 - Query methods: `engine.hello`, `workspace.summary`, `servers.list`, `operations.get`. Explicit traffic action: `checks.run`. Write flow: `operations.plan`, `operations.start`, `operations.cancel`; subscription publication/rotation/revocation are operation kinds rather than unplanned write methods.
@@ -137,4 +137,4 @@ Native and checker timing are not universal RTT. Preserve the measurement method
 | Windows | Windows 10/11 x64; signed installer + WebView2 preflight | Native run, OpenSSH/ssh-agent/scp detection, path quoting, known_hosts, Credential Manager, interrupted-operation recovery. ARM64 follows its own validation. |
 | Linux | Ubuntu 24.04+ / Debian 13+ default GTK4 baseline | WebKitGTK dependencies, X11/Wayland, Secret Service, packaged worker and SSH. Any GTK3 legacy build is separately tested and time-bounded. |
 
-The current CLI release matrix covers Linux/macOS only. The Windows cross-build passed, but runtime behavior remains unverified. Prefer native build runners for each platform; cross-compilation alone is not an acceptance gate.
+The public CLI release matrix covers Linux/macOS only. The desktop has a first native macOS development build and Windows cross-build gate; native Windows/Linux runtime behavior remains unverified. Prefer native build runners for each platform; cross-compilation alone is not an acceptance gate.

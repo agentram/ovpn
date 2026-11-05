@@ -19,3 +19,5 @@ Checked in the browser:
 Static checks: JavaScript syntax, JSON example parsing, local document links and default-English source checks passed. Nine representative text/surface contrast pairs met 4.5:1; the lowest tested ratio was 5.17:1. This is not a complete accessibility certification.
 
 The existing CLI cross-built for Windows amd64 with CGO disabled. No Wails native application, installer, OS credential integration, real checker adapter or machine API was built by this proposal. Native three-platform, screen-reader, scaling, real SSH and client-app tests remain roadmap gates.
+
+Subsequent implementation is recorded separately in the [desktop development guide](../../desktop.md). The limitations above describe this static prototype review, not the later native build.

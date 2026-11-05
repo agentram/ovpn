@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"ovpn/internal/app"
 	"ovpn/internal/probe"
 )
 
@@ -33,18 +33,10 @@ func (a *App) newUserProbeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			config, err := clientConfigForUser(*srv, *user, profile, userLinkOptions{})
-			if err != nil {
-				return err
+			result, checkErr := app.CheckClient(a.ctx, *srv, *user, profile, opts)
+			if checkErr != nil && result.ErrorCode == "" {
+				return checkErr
 			}
-			ctx, cancel := context.WithTimeout(a.ctx, opts.Timeout)
-			defer cancel()
-			tunnel, err := probe.Open(ctx, config)
-			if err != nil {
-				return err
-			}
-			defer tunnel.Close()
-			result, checkErr := probe.Check(ctx, opts, tunnel.DialContext)
 			if jsonOutput {
 				if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 					return err

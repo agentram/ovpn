@@ -1,6 +1,6 @@
 # OVPN Desk — desktop design proposal
 
-Status: **proposal and interactive prototype**, not a shipped desktop application. The prototype uses synthetic data, performs no network operations against VPN servers, and cannot modify control state.
+Status: **design proposal and interactive prototype**, with a separate [first desktop development build](../../desktop.md). This is not a public desktop release. The prototype uses synthetic data, performs no network operations against VPN servers, and cannot modify control state.
 
 OVPN Desk is an operator application for Linux, macOS and Windows: connect a server, deliver access, verify traffic and recover from a change. The initial product manages servers; a system-wide VPN/TUN client is a separate scope.
 
@@ -42,8 +42,8 @@ The visual work here is original, based on OVPN's existing graphite/silver brand
 | Inventory, users, deployment, backups, doctor | Implemented in Go; orchestration is coupled to Cobra handlers | Extract shared use cases and redacted DTOs; keep CLI behavior compatible. |
 | Native HTTPS probe and checker JSON export | Implemented | Source/freshness model, scoped monitoring identity and checker adapter. |
 | Stable subscription snapshots and token lifecycle | Implemented | Guided publish/rotate/revoke UI; remote delivery placement; optional publish-after-change workflow. |
-| Desktop UI, machine API, durable operation execution | Not implemented | Core prerequisites before real write actions. |
+| Desktop UI and machine API | First read-only Wails/React slice, protocol handshake, inventory and explicit native check implemented | Durable operation execution is required before real write actions. |
 | Plan fingerprints, per-host cross-process locks, isolated staging and recovery reconciliation | Not a complete shared workflow | Implement and test before safe desktop deployment. |
 | Node assignments, encrypted restore drill, client import matrix | Proposed extensions | Separate milestones and compatibility evidence. |
 
-A Windows amd64 CLI cross-build passed during this design review. That demonstrates compilation, not Windows SSH, installer or desktop compatibility. Wails, native desktop packaging and GUI application imports have not been built or certified by this prototype.
+The separate development slice has a macOS native launch and local-inventory check. Windows x64 has a cross-build gate. This does not certify native Windows/Linux, installers, SSH integration or GUI-client imports. The static prototype remains a design-only artifact.
