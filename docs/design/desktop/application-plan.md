@@ -44,6 +44,8 @@ A user has independent facets:
 
 A dedicated probe identity proves the selected node/profile path, not every customer's credentials. Do not mark every user online or individually verified from a single probe. Quota resets, suspensions and identity rotations have distinct effects and verification criteria. Existing sessions may survive credential revocation; do not promise immediate termination without a demonstrated runtime mechanism.
 
+Revocation verification needs a separate use case: the normal probe rejects locally disabled/removed users before attempting traffic. Preserve a narrowly scoped pre-change client reference in protected operation storage, test a fresh connection with the old credential, and compare with a positive control on the same node/profile plus runtime reconciliation. A local policy rejection or generic network failure alone is not evidence that the remote credential was revoked. Expire and erase the prepared credential after verification/recovery.
+
 ## Application architecture
 
 ```mermaid
