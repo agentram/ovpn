@@ -69,6 +69,8 @@ On an existing installation, `user add` provisions the user across all enabled s
 `doctor` checks the server runtime; a successful request through the client confirms the client path. If it fails, keep the default REALITY profile and follow the [REALITY troubleshooting steps](docs/transports.md#xray-version-and-reality-failures) before changing transports.
 Use `--qr=false` for link-only output in scripts.
 
+For an optional HTTPS check from the operator machine, run `./ovpn user probe --server <server> --username <user>`. See [traffic probes and Xray Checker](docs/probes.md) for JSON results and continuous monitoring.
+
 ## Fast navigation
 
 - [Project site](https://agentram.github.io/ovpn/)
@@ -83,6 +85,7 @@ Use `--qr=false` for link-only output in scripts.
 - [CLI guide](docs/cli.md)
 - [Transport profiles](docs/transports.md)
 - [Monitoring](#7-optional-monitoring)
+- [Traffic probes and Xray Checker](docs/probes.md)
 - [Documentation map](#documentation-map)
 
 ## Production model
@@ -167,6 +170,7 @@ flowchart LR
 - User lifecycle commands and VLESS link generation
 - Global-by-default user provisioning across enabled servers
 - Profile-aware VLESS link, QR, and export commands
+- HTTPS traffic probes and private Xray Checker configuration exports
 - Optional self-SNI HTTPS camouflage profile with an internal static fallback site
 - Rolling `30d` traffic quota enforcement
 - Lightweight per-user connection diagnostics and short targeted debug windows (`basic` mode is on by default; see `docs/cli.md`)
@@ -176,7 +180,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.11.3`
+- Current pinned version: `1.12.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`

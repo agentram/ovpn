@@ -6,7 +6,11 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
-## 1.11.3
+## 1.12.0
+
+### Added
+- Export private, profile-aware Xray JSON files for Xray Checker with `user export --format xray-checker`.
+- Check HTTPS traffic over TCP/REALITY or TCP/TLS from the operator machine with `user probe`, using the pinned Xray client core and credential-free JSON results. Probes enforce TLS verification, time and response-size limits, and the expected HTTP status without redirects or a direct fallback.
 
 ### Fixed
 - Complete the project site's first-server example with user creation and remove the redundant deploy after `server init`.

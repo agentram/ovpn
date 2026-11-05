@@ -19,7 +19,9 @@ test-cover:
 	go tool cover -func=coverage.out
 
 test-race:
-	go test -race ./...
+	# Vision uses upstream reflect-based TLS access; retain race instrumentation
+	# while disabling checkptr only for the VLESS implementation.
+	go test -race -gcflags='github.com/xtls/xray-core/proxy/vless/...=-d=checkptr=0' ./...
 
 lint:
 	golangci-lint run --timeout=5m

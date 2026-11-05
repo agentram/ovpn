@@ -20,9 +20,11 @@ import (
 	"testing"
 	"time"
 
+	"ovpn/internal/clientcfg"
 	"ovpn/internal/defaults"
 	"ovpn/internal/deploy"
 	"ovpn/internal/model"
+	"ovpn/internal/probe"
 	"ovpn/internal/xraycfg"
 )
 
@@ -140,7 +142,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 		writeCompatibilityFile(t, configPath, raw)
 	}
 	renderServer("default", true)
-	startCompatibilityContainer(t, serverContainer, network, []string{"--network-alias", srv.Domain, "--user", "0:0", "-v", configPath + ":/etc/xray/config.json:ro", "-v", certDir + ":/etc/xray/certs:ro", images["xray"], "run", "-config", "/etc/xray/config.json"})
+	startCompatibilityContainer(t, serverContainer, network, []string{"--network-alias", srv.Domain, "--user", "0:0", "-p", "127.0.0.1::443", "-v", configPath + ":/etc/xray/config.json:ro", "-v", certDir + ":/etc/xray/certs:ro", images["xray"], "run", "-config", "/etc/xray/config.json"})
 	check := func(t *testing.T, core, fingerprint string, wantPass bool) {
 		t.Helper()
 		time.Sleep(300 * time.Millisecond)
@@ -155,6 +157,34 @@ func TestClientCoreCompatibility(t *testing.T) {
 		link, err := buildUserProfileLink(*current, user, current.NormalizedPrimaryProfile(), userLinkOptions{fingerprint: fingerprint})
 		if err != nil {
 			t.Fatal(err)
+		}
+		if core == "native" {
+			parsed, err := url.Parse(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed.Host = strings.TrimSpace(mustCompatibilityDocker(t, "port", serverContainer, "443"))
+			cfg, err := clientcfg.FromLink(parsed.String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if parsed.Query().Get("security") == "tls" {
+				tlsSettings := cfg.Outbounds[0]["streamSettings"].(map[string]any)["tlsSettings"].(map[string]any)
+				tlsSettings["certificates"] = []any{map[string]any{"usage": "verify", "certificateFile": filepath.Join(certDir, "fullchain.pem")}}
+			}
+			tunnel, err := probe.Open(context.Background(), cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tunnel.Close()
+			result, checkErr := probe.Check(context.Background(), probe.Options{
+				URL: "https://" + fixtureIP + "/", ExpectedStatus: 200, Timeout: 8 * time.Second,
+				MaxBodyBytes: 1024, RootCAs: roots, ServerName: "ovpn-validation.invalid",
+			}, tunnel.DialContext)
+			if result.Success != wantPass {
+				t.Fatalf("native/%s traffic passed=%v, want %v: %v", fingerprint, result.Success, wantPass, checkErr)
+			}
+			return
 		}
 		config, command := compatibilityClientConfig(t, core, link)
 		file := filepath.Join(t.TempDir(), "client.json")
@@ -229,10 +259,11 @@ func TestClientCoreCompatibility(t *testing.T) {
 		}
 	}
 	t.Run("xray-default-policy", func(t *testing.T) { check(t, "xray", "chrome", true) })
+	t.Run("native-default-policy", func(t *testing.T) { check(t, "native", "firefox", true) })
 	t.Run("sing-box-default-policy-refused", func(t *testing.T) { check(t, "sing-box", "chrome", false) })
 	renderServer("1.0.0", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
-	for _, core := range []string{"xray", "sing-box", "mihomo"} {
+	for _, core := range []string{"xray", "sing-box", "mihomo", "native"} {
 		for _, fingerprint := range []string{"chrome", "firefox"} {
 			t.Run(core+"/"+fingerprint, func(t *testing.T) { check(t, core, fingerprint, true) })
 		}
@@ -240,6 +271,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 	renderServer("1.0.0", false)
 	mustCompatibilityDocker(t, "restart", serverContainer)
 	t.Run("disabled-user-refused", func(t *testing.T) { check(t, "xray", "chrome", false) })
+	t.Run("native-disabled-user-refused", func(t *testing.T) { check(t, "native", "firefox", false) })
 	renderServer("default", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
 	t.Run("reset-restores-default-policy", func(t *testing.T) { check(t, "sing-box", "chrome", false) })
@@ -250,7 +282,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 	}
 	renderServer("default", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
-	for _, core := range []string{"xray", "sing-box", "mihomo"} {
+	for _, core := range []string{"xray", "sing-box", "mihomo", "native"} {
 		for _, fingerprint := range []string{"chrome", "firefox"} {
 			t.Run("tls-self-sni/"+core+"/"+fingerprint, func(t *testing.T) { check(t, core, fingerprint, true) })
 		}

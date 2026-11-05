@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"ovpn/internal/clientcfg"
 	"ovpn/internal/model"
 	"ovpn/internal/xraycfg"
 )
@@ -356,10 +357,11 @@ func (a *App) newUserExportCmd() *cobra.Command {
 		spiderX       string
 		noSpiderX     bool
 		legacyReality bool
+		format        string
 	}
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "Export user links and QR codes",
+		Short: "Export user links, QR codes, or Xray Checker configurations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			server, err := requiredFlagValue("--server", export.server)
@@ -381,6 +383,9 @@ func (a *App) newUserExportCmd() *cobra.Command {
 			u, err := a.store.GetUser(a.ctx, srv.ID, username)
 			if err != nil {
 				return err
+			}
+			if export.format != "links" && export.format != "xray-checker" {
+				return fmt.Errorf("--format must be links or xray-checker")
 			}
 			info, err := os.Stat(out)
 			if err != nil {
@@ -435,6 +440,25 @@ func (a *App) newUserExportCmd() *cobra.Command {
 					if includeFingerprintInName {
 						base += "-fp-" + xraycfg.NormalizeClientFingerprint(fp)
 					}
+					if export.format == "xray-checker" {
+						if err := validateClientCheckUser(*srv, *u); err != nil {
+							return err
+						}
+						config, err := clientcfg.FromLink(vless)
+						if err != nil {
+							return err
+						}
+						data, err := config.JSON()
+						if err != nil {
+							return err
+						}
+						path := filepath.Join(out, base+".json")
+						if err := writePrivateClientConfig(path, data); err != nil {
+							return err
+						}
+						fmt.Printf("exported %s\n", filepath.Clean(path))
+						continue
+					}
 					linkPath := filepath.Join(out, base+".txt")
 					if err := os.WriteFile(linkPath, []byte(vless+"\n"), 0o600); err != nil {
 						return err
@@ -452,6 +476,7 @@ func (a *App) newUserExportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&export.server, "server", "", "Server name")
 	cmd.Flags().StringVar(&export.username, "username", "", "Username")
 	cmd.Flags().StringVar(&export.out, "out", "", "Output directory")
+	cmd.Flags().StringVar(&export.format, "format", "links", "Export format: links|xray-checker")
 	cmd.Flags().BoolVar(&export.allProfiles, "all-profiles", false, "Export every enabled server profile")
 	cmd.Flags().StringVar(&export.profile, "profile", "", "Export one profile (default: server primary profile)")
 	cmd.Flags().StringVar(&export.fingerprint, "fingerprint", "", "Client TLS fingerprint for REALITY/TLS links (default: "+xraycfg.DefaultClientFingerprint+")")

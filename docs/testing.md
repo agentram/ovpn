@@ -28,7 +28,7 @@ These are validated by runtime commands during operator workflows.
 go test ./...
 go test -covermode=atomic -coverprofile=coverage.out ./...
 go tool cover -func=coverage.out
-go test -race ./...
+make test-race
 ```
 
 Makefile shortcuts:
@@ -38,6 +38,8 @@ make test
 make test-cover
 make test-race
 ```
+
+The race target disables `checkptr` only for the pinned Xray VLESS package, whose Vision implementation inspects TLS connections through reflect-based pointer access. Race instrumentation remains enabled, including the native client traffic tests. Built-in probes reject XHTTP; its pinned client implementation has an upstream race in the stream reader. XHTTP client configurations can still be exported for a separate checker process.
 
 ## CI expectations
 
