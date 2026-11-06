@@ -19,7 +19,9 @@ func (a *App) machineCmd() *cobra.Command {
 			if !stdio || requestedProtocol != protocol.Version || a.dryRun {
 				return fmt.Errorf("machine requires --stdio --protocol %d and does not support --dry-run", protocol.Version)
 			}
-			return machine.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout(), app.ReadService{DataDir: a.dataDir})
+			backend := app.NewDesktopService(cmd.Context(), a.dataDir)
+			defer backend.Close()
+			return machine.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout(), backend)
 		}}
 	cmd.Flags().BoolVar(&stdio, "stdio", false, "Use bounded JSON lines on stdin/stdout")
 	cmd.Flags().IntVar(&requestedProtocol, "protocol", 0, "Required machine protocol version")

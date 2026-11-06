@@ -9,8 +9,9 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Add opt-in native/Checker schedules, persisted observation history and incidents, pinned Checker/Knife installation and finite Knife diagnostics in Desktop and `observe` CLI. Reserve daily check attempts, reject duplicate schedules, separate observer errors from traffic failures, and expire evidence after source/configuration changes.
 - Preview create/enable/disable user intent through a shared, read-only planner in Desktop and `user plan`. Show current/proposed policy for every enabled node and reject a changed local snapshot with `--expect-digest`; live execution still requires the operation journal and locking milestone.
-- Expose paged desktop user-policy inventory without client credentials, add clearer green/red/amber status styling and expand the application plan with monitoring, Checker/Knife integration and change/recovery workflow previews. Live writes and scheduled third-party checks remain planned.
+- Expose paged desktop user-policy inventory without client credentials, add clearer green/red/amber status styling and expand the application plan with monitoring, Checker/Knife integration and change/recovery workflow previews. Live server/user writes remain planned.
 - Add the first OVPN Desk development build: English/Russian React UI, a Wails host with a verified bundled worker, read-only inventory and explicit native HTTPS checks. Add protocol 1 via `ovpn machine --stdio --protocol 1`; server write workflows and public desktop installers remain future work.
 - Document the OVPN Desk architecture and visual direction, with an interactive desktop prototype using sample data. This is a design proposal, not a native desktop release.
 - Export per-user multi-server subscriptions and publish stable URLs with token rotation, revocation and per-profile expiry filtering. An optional read-only delivery service consumes prepared bundles without the control database or SSH keys, and requires TLS outside loopback.

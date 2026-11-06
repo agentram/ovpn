@@ -1,6 +1,6 @@
 # Monitoring and integration design
 
-Status: proposed architecture. The current native app provides manual native checks and a clearly labelled monitoring simulation. Neither live automatic probes nor third-party tool execution is enabled by the preview controls.
+Status: target architecture with an initial implementation. [Automatic observation](../../observation.md) now implements opt-in native/Checker schedules, finite Knife jobs, pinned installation, separate local history, attempt reservations, freshness and source/traffic incidents. The remaining proposals below include remote collectors/history, automatically scoped service identities, wire-byte budgets, rollups and broader diagnostics. Current execution is serial and uses explicit existing identities; it does not provision identities or expose speed tests.
 
 ## What to automate
 

@@ -40,6 +40,9 @@ func (s *DeskService) ServiceShutdown() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.worker != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = s.worker.ObserverAction(ctx, "stop", "")
+		cancel()
 		s.worker.Close()
 	}
 	return nil
@@ -115,6 +118,70 @@ func (s *DeskService) PlanUser(ctx context.Context, request dto.UserPlanRequest)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	return w.PlanUser(ctx, request)
+}
+
+func (s *DeskService) ObserverStatus(ctx context.Context) (dto.ObserverSnapshot, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObserverSnapshot{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.ObserverStatus(ctx)
+}
+func (s *DeskService) ObserverConfigure(ctx context.Context, p dto.ObservationPolicy) (dto.ObservationPolicy, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObservationPolicy{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.ObserverConfigure(ctx, p)
+}
+func (s *DeskService) ObserverAction(ctx context.Context, action, id string) error {
+	w, err := s.connect()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.ObserverAction(ctx, action, id)
+}
+func (s *DeskService) ObserverRun(ctx context.Context, p dto.PolicyRunRequest) (dto.ObservationJob, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObservationJob{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.ObserverRun(ctx, p)
+}
+func (s *DeskService) DiagnosticStart(ctx context.Context, p dto.DiagnosticRequest) (dto.ObservationJob, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObservationJob{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.DiagnosticStart(ctx, p)
+}
+func (s *DeskService) IntegrationInstall(ctx context.Context, engine string) (dto.ObservationJob, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObservationJob{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.IntegrationInstall(ctx, engine)
+}
+func (s *DeskService) IntegrationSetup(ctx context.Context, p dto.ToolSetup) (dto.ObservationTool, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.ObservationTool{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.IntegrationSetup(ctx, p)
 }
 
 func main() {

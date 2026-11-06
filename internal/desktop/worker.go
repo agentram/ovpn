@@ -26,15 +26,16 @@ var errWorker = errors.New("WORKER_UNAVAILABLE")
 type Config struct{ Path, SHA256, DataDir string }
 
 type Worker struct {
-	cmd      *exec.Cmd
-	stdin    io.WriteCloser
-	stdout   *bufio.Scanner
-	gate     chan struct{}
-	done     chan struct{}
-	closed   atomic.Bool
-	sequence atomic.Uint64
-	once     sync.Once
-	Hello    protocol.Hello
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	stdout    *bufio.Scanner
+	gate      chan struct{}
+	done      chan struct{}
+	closed    atomic.Bool
+	sequence  atomic.Uint64
+	once      sync.Once
+	terminate func()
+	Hello     protocol.Hello
 }
 
 func Launch(ctx context.Context, cfg Config) (*Worker, error) {
@@ -43,6 +44,7 @@ func Launch(ctx context.Context, cfg Config) (*Worker, error) {
 	}
 	cmd := exec.CommandContext(ctx, cfg.Path, "--data-dir", cfg.DataDir, "machine", "--stdio", "--protocol", "1") // #nosec G204 -- absolute bundled executable verified against the host's embedded digest.
 	cmd.Stderr = io.Discard
+	prepareOwnedProcess(cmd)
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, errWorker
@@ -57,9 +59,17 @@ func Launch(ctx context.Context, cfg Config) (*Worker, error) {
 		_ = out.Close()
 		return nil, errWorker
 	}
-	w := &Worker{cmd: cmd, stdin: in, stdout: bufio.NewScanner(out), gate: make(chan struct{}, 1), done: make(chan struct{})}
+	terminate, err := ownProcess(cmd)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = in.Close()
+		_ = out.Close()
+		return nil, errWorker
+	}
+	w := &Worker{cmd: cmd, stdin: in, stdout: bufio.NewScanner(out), gate: make(chan struct{}, 1), done: make(chan struct{}), terminate: terminate}
 	w.stdout.Buffer(make([]byte, 4096), protocol.MaxMessageBytes)
-	go func() { _ = cmd.Wait(); w.closed.Store(true); close(w.done) }()
+	go func() { _ = cmd.Wait(); terminate(); w.closed.Store(true); close(w.done) }()
 	handshake, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if err := w.call(handshake, "engine.hello", struct {
@@ -105,7 +115,16 @@ func verifyWorker(cfg Config) error {
 func (w *Worker) Alive() bool { return !w.closed.Load() }
 
 func (w *Worker) Close() {
-	w.once.Do(func() { w.closed.Store(true); _ = w.stdin.Close(); _ = w.cmd.Process.Kill(); <-w.done })
+	w.once.Do(func() {
+		w.closed.Store(true)
+		_ = w.stdin.Close()
+		if w.terminate != nil {
+			w.terminate()
+		} else {
+			_ = w.cmd.Process.Kill()
+		}
+		<-w.done
+	})
 }
 
 func (w *Worker) call(ctx context.Context, method string, params, target any) error {
@@ -213,4 +232,52 @@ func (w *Worker) PlanUser(ctx context.Context, request dto.UserPlanRequest) (dto
 	}
 	err := w.call(ctx, "users.plan", request, &result)
 	return result, err
+}
+
+func (w *Worker) ObserverStatus(ctx context.Context) (dto.ObserverSnapshot, error) {
+	var v dto.ObserverSnapshot
+	e := w.call(ctx, "observer.status", struct{}{}, &v)
+	return v, e
+}
+func (w *Worker) ObserverConfigure(ctx context.Context, p dto.ObservationPolicy) (dto.ObservationPolicy, error) {
+	var v dto.ObservationPolicy
+	e := w.call(ctx, "observer.configure", p, &v)
+	return v, e
+}
+func (w *Worker) ObserverAction(ctx context.Context, action, id string) error {
+	var ack struct {
+		Accepted bool `json:"accepted"`
+	}
+	switch action {
+	case "start", "stop":
+		return w.call(ctx, "observer."+action, struct{}{}, &ack)
+	case "remove", "cancel":
+		return w.call(ctx, "observer."+action, struct {
+			ID string `json:"id"`
+		}{id}, &ack)
+	default:
+		return errors.New("INVALID_PARAMS")
+	}
+}
+func (w *Worker) ObserverRun(ctx context.Context, p dto.PolicyRunRequest) (dto.ObservationJob, error) {
+	var v dto.ObservationJob
+	e := w.call(ctx, "observer.run", p, &v)
+	return v, e
+}
+func (w *Worker) DiagnosticStart(ctx context.Context, p dto.DiagnosticRequest) (dto.ObservationJob, error) {
+	var v dto.ObservationJob
+	e := w.call(ctx, "diagnostics.start", p, &v)
+	return v, e
+}
+func (w *Worker) IntegrationInstall(ctx context.Context, engine string) (dto.ObservationJob, error) {
+	var v dto.ObservationJob
+	e := w.call(ctx, "integrations.install", struct {
+		Engine string `json:"engine"`
+	}{engine}, &v)
+	return v, e
+}
+func (w *Worker) IntegrationSetup(ctx context.Context, p dto.ToolSetup) (dto.ObservationTool, error) {
+	var v dto.ObservationTool
+	e := w.call(ctx, "integrations.setup", p, &v)
+	return v, e
 }

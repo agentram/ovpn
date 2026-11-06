@@ -261,3 +261,30 @@ dialog::backdrop { background:#0009; }
 .plan-dialog[open] { display:flex; flex-direction:column; overflow:hidden; }
 .plan-dialog .dialog-head,.plan-dialog .dialog-foot { flex-shrink:0; }
 .plan-dialog .dialog-body { overflow:auto; min-height:0; }
+
+.observer-workspace { display:grid; grid-template-columns:minmax(0,1fr); gap:22px; min-width:0; }
+.observer-workspace>* { min-width:0; }
+.observer-workspace .notice { margin:0; }
+.observer-form { padding:25px; }
+.observer-form .panel-title { padding:0 0 22px; }
+.observer-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-bottom:20px; }
+.observer-fields:has(.observer-estimate) { grid-template-columns:1fr 1.7fr .8fr; }
+.observer-fields label,.observer-target-builder label { min-width:0; }
+.observer-target-builder { display:grid; grid-template-columns:1fr 1.6fr 1.1fr auto; align-items:end; gap:14px; }
+.observer-target-builder select { max-width:100%; text-overflow:ellipsis; }
+.observer-target-builder .button { margin-bottom:0; }
+.target-chips { display:flex; flex-wrap:wrap; gap:12px; margin:20px 0; }
+.target-chip { display:block; position:relative; padding:12px 45px 12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--raised); font-size:12px; }
+.target-chip small { display:block; color:var(--secondary); font-size:10px; margin-top:6px; }
+.target-chip .icon-button { position:absolute; right:6px; top:6px; }
+.observer-estimate { display:flex; flex-direction:column; justify-content:center; gap:10px; font-size:11px; color:var(--secondary); }
+.observer-estimate strong { font-size:26px; color:var(--text); }
+.consent { margin:22px 0; line-height:1.6; }
+.consent input { flex-shrink:0; }
+.observer-actions,.row-actions { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.panel-help { padding:0 25px 22px; }
+.small-time { font-size:10px; white-space:nowrap; }
+.observer-workspace .monitor-toolbar { gap:12px; }
+.observer-workspace .monitor-toolbar>div { flex-basis:100%; }
+.observer-workspace .monitor-toolbar .badge { margin-right:auto; }
+@media(max-width:1100px) { .observer-target-builder { grid-template-columns:1fr 1fr; } .observer-fields:has(.observer-estimate) { grid-template-columns:1fr 1.5fr; } .observer-estimate { grid-column:1 / -1; flex-direction:row; justify-content:flex-start; align-items:center; } }

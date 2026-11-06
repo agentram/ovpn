@@ -62,4 +62,4 @@ Use a short reproducible demo and a disposable lab to recruit pilot users. A Hab
 
 The current design work is included as a proposal under the existing PR. It does not turn the 1.12.0 CLI work into a claim that desktop binaries have shipped.
 
-The [complete application plan](application-plan.md) refines the next increments: reviewed user lifecycle first, then scheduled observation/Checker, Knife diagnostics, fleet assignments and recovery. Monitoring and integration screens are explicit design previews until their backend gates pass.
+The [complete application plan](application-plan.md) refines the next increments: reviewed user lifecycle first, then scheduled observation/Checker, Knife diagnostics, fleet assignments and recovery. An initial automatic observation and integration slice is now implemented; see [its operating limits](../../observation.md). Remote collectors, scoped identity provisioning and the larger diagnostic laboratory remain future increments.

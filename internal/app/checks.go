@@ -17,12 +17,5 @@ func CheckClient(ctx context.Context, srv model.Server, user model.User, profile
 	if err != nil {
 		return probe.Result{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
-	defer cancel()
-	tunnel, err := probe.Open(ctx, config)
-	if err != nil {
-		return probe.Result{}, err
-	}
-	defer tunnel.Close()
-	return probe.Check(ctx, opts, tunnel.DialContext)
+	return probe.CheckConfig(ctx, config, opts)
 }

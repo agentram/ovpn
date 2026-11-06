@@ -89,3 +89,31 @@ export async function demoUserPlan(request: UserPlanRequest, users: User[]): Pro
    return {serverId:server.id,name:server.name,role:server.role,profiles:server.profiles,before,after,issues};
   })};
 }
+
+export interface ObservationTarget {serverId:string;username:string;profile:string}
+export interface ObservationPolicy {id:string;name:string;engine:string;targets:ObservationTarget[];intervalSeconds:number;maxChecksPerDay:number;enabled:boolean;trafficConfirmed:boolean}
+export interface Observation {id:number;jobId:string;target:ObservationTarget;source:string;engineVersion:string;revision:string;outcome:string;failureClass?:string;code?:string;statusCode?:number;durationMs:number;ttfbMs:number;bytes:number;measuredAt:string;sessionId:string;fresh:boolean;freshForSeconds:number;unverified:string[]}
+export interface ObservationJob {id:string;kind:string;engine:string;policyId?:string;state:string;code?:string;total:number;completed:number;startedAt:string;finishedAt?:string}
+export interface ObservationIncident {revision:string;target:ObservationTarget;source:string;class:string;state:string;failures:number;successes:number;firstSeen:string;lastSeen:string}
+export interface ObservationTool {engine:string;version:string;configured:boolean}
+export interface ObserverSnapshot {running:boolean;owner:string;sessionId:string;heartbeat?:string;previousHeartbeat?:string;policies:ObservationPolicy[];tools:ObservationTool[];jobs:ObservationJob[];latest:Observation[];history:Observation[];incidents:ObservationIncident[];retainedSamples:number;historyLimit:number}
+export const observerBackend={
+ status:()=>invoke<ObserverSnapshot>('ObserverStatus'),
+ configure:(p:ObservationPolicy)=>invoke<ObservationPolicy>('ObserverConfigure',p),
+ action:(action:string,id='')=>invoke<void>('ObserverAction',action,id),
+ run:(policyId:string)=>invoke<ObservationJob>('ObserverRun',{policyId,trafficConfirmed:true}),
+ diagnose:(engine:string,targets:ObservationTarget[])=>invoke<ObservationJob>('DiagnosticStart',{engine,targets,trafficConfirmed:true}),
+ install:(engine:string)=>invoke<ObservationJob>('IntegrationInstall',engine),
+};
+export function emptyObserver():ObserverSnapshot{return {running:false,owner:'stopped',sessionId:'',policies:[],tools:[],jobs:[],latest:[],history:[],incidents:[],retainedSamples:0,historyLimit:5000};}
+export function observationFresh(sample:Observation,online:boolean,receiptMono:number,receiptWall:number,nowMono:number,nowWall:number):boolean {
+ const age=nowWall-Date.parse(sample.measuredAt),mono=nowMono-receiptMono,wall=nowWall-receiptWall;
+ return online&&sample.fresh&&age>=0&&age<sample.freshForSeconds*1000&&mono>=0&&mono<10000&&wall>=0&&wall<10000&&Math.abs(wall-mono)<2000;
+}
+export function observationTone(sample:Observation):string{return !sample.fresh?'warn':sample.outcome==='passed'?'ok':sample.outcome==='failed'?'danger':'warn';}
+export function observationError(error:unknown):string {
+ if(!(error instanceof Error))return 'OBSERVATION_UNAVAILABLE';
+ const codes=['OBSERVER_IN_USE','JOB_BUSY','TRAFFIC_CONFIRMATION_REQUIRED','TARGET_UNAVAILABLE','TOOL_UNAVAILABLE','TOOL_DOWNLOAD_FAILED','TOOL_ARCHIVE_HASH_MISMATCH','TOOL_VERSION_UNSUPPORTED','DUPLICATE_SCHEDULE','INVALID_PARAMS','NO_ENABLED_POLICIES'];
+ return codes.find(code=>error.message.includes(code))??'OBSERVATION_UNAVAILABLE';
+}
+export function observationTargetKey(target:ObservationTarget):string{return JSON.stringify([target.serverId,target.username,target.profile]);}

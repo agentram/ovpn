@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 
 	"ovpn/internal/app"
 	"ovpn/internal/app/dto"
@@ -22,6 +23,19 @@ type Backend interface {
 
 type userPlanner interface {
 	PlanUser(context.Context, dto.UserPlanRequest) (dto.UserPlan, error)
+}
+
+type observerBackend interface {
+	ObserverStatus(context.Context) (dto.ObserverSnapshot, error)
+	ObserverConfigure(context.Context, dto.ObservationPolicy) (dto.ObservationPolicy, error)
+	ObserverStart(context.Context) error
+	ObserverStop(context.Context) error
+	ObserverRemove(context.Context, string) error
+	ObserverRun(context.Context, dto.PolicyRunRequest) (dto.ObservationJob, error)
+	ObserverCancel(context.Context, string) error
+	DiagnosticStart(context.Context, dto.DiagnosticRequest) (dto.ObservationJob, error)
+	IntegrationInstall(context.Context, string) (dto.ObservationJob, error)
+	IntegrationSetup(context.Context, dto.ToolSetup) (dto.ObservationTool, error)
 }
 
 // Serve handles one bounded request at a time. EOF or process termination ends the session.
@@ -58,6 +72,9 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 				if _, ok := backend.(userPlanner); ok {
 					capabilities = append(capabilities, "users.plan.read")
 				}
+				if _, ok := backend.(observerBackend); ok {
+					capabilities = append(capabilities, "observer.read", "observer.configure", "observer.run", "integrations.install", "diagnostics.run")
+				}
 				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: capabilities}
 			}
 		} else if !ready {
@@ -93,6 +110,12 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 
 func dispatch(ctx context.Context, backend Backend, request protocol.Request) (any, error) {
 	bad := &app.Error{Code: "INVALID_PARAMS"}
+	if strings.HasPrefix(request.Method, "observer.") || strings.HasPrefix(request.Method, "integrations.") || strings.HasPrefix(request.Method, "diagnostics.") {
+		if control, ok := backend.(observerBackend); ok {
+			return dispatchObserver(ctx, control, request)
+		}
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
+	}
 	switch request.Method {
 	case "workspace.summary":
 		if protocol.Decode(request.Params, &struct{}{}) != nil {
@@ -132,6 +155,73 @@ func dispatch(ctx context.Context, backend Backend, request protocol.Request) (a
 			return planner.PlanUser(ctx, params)
 		}
 		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
+	default:
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
+	}
+}
+
+func dispatchObserver(ctx context.Context, backend observerBackend, request protocol.Request) (any, error) {
+	bad := &app.Error{Code: "INVALID_PARAMS"}
+	ack := func(err error) (any, error) {
+		return struct {
+			Accepted bool `json:"accepted"`
+		}{err == nil}, err
+	}
+	switch request.Method {
+	case "observer.status", "observer.start", "observer.stop":
+		if protocol.Decode(request.Params, &struct{}{}) != nil {
+			return nil, bad
+		}
+		if request.Method == "observer.status" {
+			return backend.ObserverStatus(ctx)
+		}
+		if request.Method == "observer.start" {
+			return ack(backend.ObserverStart(ctx))
+		}
+		return ack(backend.ObserverStop(ctx))
+	case "observer.configure":
+		var p dto.ObservationPolicy
+		if protocol.Decode(request.Params, &p) != nil {
+			return nil, bad
+		}
+		return backend.ObserverConfigure(ctx, p)
+	case "observer.remove", "observer.cancel":
+		var p struct {
+			ID string `json:"id"`
+		}
+		if protocol.Decode(request.Params, &p) != nil || len(p.ID) != 32 {
+			return nil, bad
+		}
+		if request.Method == "observer.remove" {
+			return ack(backend.ObserverRemove(ctx, p.ID))
+		}
+		return ack(backend.ObserverCancel(ctx, p.ID))
+	case "observer.run":
+		var p dto.PolicyRunRequest
+		if protocol.Decode(request.Params, &p) != nil {
+			return nil, bad
+		}
+		return backend.ObserverRun(ctx, p)
+	case "diagnostics.start":
+		var p dto.DiagnosticRequest
+		if protocol.Decode(request.Params, &p) != nil {
+			return nil, bad
+		}
+		return backend.DiagnosticStart(ctx, p)
+	case "integrations.install":
+		var p struct {
+			Engine string `json:"engine"`
+		}
+		if protocol.Decode(request.Params, &p) != nil {
+			return nil, bad
+		}
+		return backend.IntegrationInstall(ctx, p.Engine)
+	case "integrations.setup":
+		var p dto.ToolSetup
+		if protocol.Decode(request.Params, &p) != nil {
+			return nil, bad
+		}
+		return backend.IntegrationSetup(ctx, p)
 	default:
 		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
 	}

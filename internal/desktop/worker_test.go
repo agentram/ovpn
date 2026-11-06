@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -30,6 +32,25 @@ func (helperBackend) Check(ctx context.Context, _ dto.CheckRequest) (dto.Check, 
 
 func TestMain(m *testing.M) {
 	if helper := os.Getenv("OVPN_DESKTOP_WORKER_TEST"); helper != "" {
+		if helper == "child" {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil || os.WriteFile(os.Getenv("OVPN_DESKTOP_CHILD_STATE"), []byte(listener.Addr().String()), 0o600) != nil {
+				os.Exit(1)
+			}
+			_, _ = listener.Accept()
+			return
+		}
+		if helper == "with-child" {
+			path, err := os.Executable()
+			if err != nil {
+				os.Exit(1)
+			}
+			child := exec.Command(path)
+			child.Env = append(os.Environ(), "OVPN_DESKTOP_WORKER_TEST=child")
+			if child.Start() != nil {
+				os.Exit(1)
+			}
+		}
 		if helper == "noise" {
 			_, _ = os.Stdout.WriteString("private-noise\n")
 			return

@@ -81,3 +81,25 @@ test('quota display distinguishes inherited defaults, unmetered nodes and mixed 
   assert.equal(userQuotaKind({...user,unmeteredNodes:1}),'mixed');
   assert.equal(userQuotaKind({...user,enabledNodes:0}),'unknown');
 });
+
+test('observation translations cover the complete enabled workflow',async()=>{
+ const {observationEn,observationRu}=await import('./observation-i18n.ts');
+ assert.deepEqual(Object.keys(observationEn).sort(),Object.keys(observationRu).sort());
+ for(const value of Object.values(observationRu))assert.ok(value.length>0);
+});
+test('automatic evidence expires on source loss, cached queries, sleep and clock uncertainty',async()=>{
+ const {observationFresh,observationError}=await import('./api.ts');
+ const sample={fresh:true,measuredAt:new Date(100000).toISOString(),freshForSeconds:600};
+ assert.equal(observationFresh(sample as any,true,100,100000,200,100100),true);
+ assert.equal(observationFresh(sample as any,false,100,100000,200,100100),false);
+ assert.equal(observationFresh(sample as any,true,100,100000,10200,110100),false);
+ assert.equal(observationFresh(sample as any,true,100,100000,200,106000),false);
+ assert.equal(observationFresh(sample as any,true,100,100000,90,99990),false);
+ assert.equal(observationError(new Error('private-host token detail')),'OBSERVATION_UNAVAILABLE');
+ assert.equal(observationError(new Error('The request failed (OBSERVER_IN_USE)')),'OBSERVER_IN_USE');
+});
+test('target identity is stable across JSON property order and keeps credential references distinct',async()=>{
+ const {observationTargetKey}=await import('./api.ts');
+ assert.equal(observationTargetKey({serverId:'node-1',username:'monitor',profile:'tcp'}),observationTargetKey({profile:'tcp',username:'monitor',serverId:'node-1'}));
+ assert.notEqual(observationTargetKey({serverId:'node-1',username:'a',profile:'tcp'}),observationTargetKey({serverId:'node-1',username:'b',profile:'tcp'}));
+});

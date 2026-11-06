@@ -2,19 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import { catalog } from './i18n';
 import type { Language } from './i18n';
 import { userPolicy, userQuotaKind, demoSetUserEnabled } from './api';
-import type { User, UserObservation, UserPlanRequest } from './api';
+import type { User, UserObservation, UserPlanRequest, Observation } from './api';
 import { UserPlanReview } from './plan-review';
+import {observationEn,observationRu} from './observation-i18n';
 
 export function policyTone(user: User, enabled: number) {
  const state=userPolicy(user,enabled);
  return ['conflict','blocked'].includes(state)?'danger':['partial','expired'].includes(state)?'warn':state==='allowed'?'ok':'';
 }
 
-export function UsersPanel({language,mode,users,observations,enabled,busy,more,onMore,onCheck,onDemoChange,onPlanning}: {
- language: Language; mode: string; users: User[]; observations: Record<string,UserObservation>; enabled: number; busy: boolean; more: boolean;
+export function UsersPanel({language,mode,users,observations,automatic,enabled,busy,more,onMore,onCheck,onDemoChange,onPlanning}: {
+ language: Language; mode: string; users: User[]; observations: Record<string,UserObservation>; automatic: Observation[]; enabled: number; busy: boolean; more: boolean;
  onMore: ()=>void; onCheck: (username: string)=>void; onDemoChange: (users: User[])=>void; onPlanning: (busy: boolean)=>void;
 }) {
  const t=catalog(language);
+ const ot=language==='ru'?observationRu:observationEn;
+ const autoFor=(name:string)=>automatic.filter(s=>s.target.username===name);
+ const autoLabel=(name:string)=>{const rows=autoFor(name);if(!rows.length)return ot.noAuto;return `${rows.filter(s=>s.fresh&&s.outcome==='passed').length} / ${rows.length}`;};
+ const autoTone=(name:string)=>{const rows=autoFor(name);return !rows.length?'':rows.some(s=>s.fresh&&s.outcome==='failed')?'danger':rows.every(s=>s.fresh&&s.outcome==='passed')?'ok':'warn';};
  const [query,setQuery]=useState('');
  const [selected,setSelected]=useState<User|null>(null);
  const [request,setRequest]=useState<UserPlanRequest|null>(null);
@@ -60,7 +65,7 @@ export function UsersPanel({language,mode,users,observations,enabled,busy,more,o
   <section className="panel table-panel users-table">
    <div className="panel-title"><h2>{t.allUsers}<small>{users.length}</small></h2><span className="badge blue">{t.quotaServer}</span></div>
    <div className="table-scroll"><table>
-    <thead><tr><th>{t.username}</th><th>{t.policy}</th><th>{t.assignments}</th><th>{t.quotaServer}</th><th>{t.expiry}</th><th>{t.connectivity}</th><th>{t.actions}</th></tr></thead>
+    <thead><tr><th>{t.username}</th><th>{t.policy}</th><th>{t.assignments}</th><th>{t.quotaServer}</th><th>{t.expiry}</th><th>{t.connectivity}</th><th>{ot.automated}</th><th>{t.actions}</th></tr></thead>
     <tbody>{filtered.map(user=><tr key={user.username}>
      <td><button className="person-button" aria-label={user.username} onClick={()=>setSelected(user)}><span className={`person-avatar ${policyTone(user,enabled)}`}>{user.username.slice(0,1).toUpperCase()}</span><strong>{user.username}</strong></button></td>
      <td><span className={`badge ${policyTone(user,enabled)}`}><i/>{labels[userPolicy(user,enabled)]}</span></td>
@@ -68,6 +73,7 @@ export function UsersPanel({language,mode,users,observations,enabled,busy,more,o
      <td className="mono">{quotaText(user)}</td>
      <td>{user.earliestExpiry?user.earliestExpiry.slice(0,10):t.noExpiry}</td>
      <td><span className={`badge ${checkTone(user.username)}`}>{lastCheck(user.username)}</span>{observations[user.username]&&<small className="scope-hint">{t.singlePath}</small>}</td>
+     <td><span className={`badge ${autoTone(user.username)}`}>{autoLabel(user.username)}</span></td>
      <td><button className="text-button" aria-label={`${t.inspectUser} ${user.username}`} onClick={()=>setSelected(user)}>{t.inspectUser} →</button></td>
     </tr>)}</tbody>
    </table></div>
@@ -90,7 +96,7 @@ export function UsersPanel({language,mode,users,observations,enabled,busy,more,o
      <dl><dt>{t.configuredRecords}</dt><dd>{selected.configuredNodes}</dd><dt>{t.eligibleRecords}</dt><dd>{selected.eligibleNodes} / {enabled}</dd><dt>{t.disabledPolicy}</dt><dd>{selected.disabledNodes}</dd><dt>{t.blockedRecords}</dt><dd>{selected.blockedNodes}</dd><dt>{t.expiredRecords}</dt><dd>{selected.expiredNodes}</dd><dt>{t.defaultQuotaCount}</dt><dd>{selected.defaultQuotaNodes??0}</dd><dt>{t.unmeteredCount}</dt><dd>{selected.unmeteredNodes??0}</dd></dl>
      {selected.identityConflict&&<div className="notice danger-notice">{t.identityProblem}</div>}
      <div className="notice">{observations[selected.username]?<><strong>{t.connectivity}: {lastCheck(selected.username)}</strong><p>{observations[selected.username].server} · {observations[selected.username].profile} · {t.singlePath}</p></>:t.noTrafficEvidence}</div>
-     <p className="plan-note">{t.policyOnly}</p>
+     <div className="notice"><strong>{ot.automated}: {autoLabel(selected.username)}</strong>{autoFor(selected.username).map(sample=><p key={sample.source+sample.target.serverId+sample.target.profile}><span className={`badge ${sample.fresh&&sample.outcome==='passed'?'ok':sample.fresh&&sample.outcome==='failed'?'danger':'warn'}`}>{!sample.fresh?ot.stale:sample.outcome==='passed'?ot.pass:sample.outcome==='failed'?ot.fail:ot.issues}</span> {sample.target.serverId} · {sample.target.profile} · {sample.source}</p>)}</div><p className="plan-note">{t.policyOnly}</p>
     </div>
     <div className="dialog-foot"><button className="button" onClick={()=>{const username=selected.username;close();onCheck(username);}}>{t.checkUser}</button><button className="button primary" disabled={busy} onClick={()=>setRequest({action:selected.disabledNodes===selected.enabledNodes?'enable':'disable',username:selected.username})}>{t.manageUser}</button></div>
    </>}

@@ -1,6 +1,6 @@
 # OVPN Desk development build
 
-The development build reads existing server/user inventory and runs explicit native HTTPS checks. Users shows configured assignments, policy differences, quota limits and expiry without exposing credentials. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
+The development build reads existing server/user inventory, runs explicit native HTTPS checks and supports opt-in automatic observation and Checker/Knife jobs. Users shows configured assignments, policy differences, quota limits and expiry without exposing credentials. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
 
 English is the default. Settings offers Russian and dark/light themes; only these preferences are persisted in WebView storage. The application starts with a clearly labelled demo workspace. Select **Local workspace** to read real inventory. No database is created or migrated by desktop queries.
 
@@ -44,7 +44,7 @@ npm --prefix apps/desktop/frontend run dev
 
 Open `http://127.0.0.1:8940/`. This serves the demo UI; the native bridge requires the desktop application. Production assets are bundled locally and cannot be replaced by an inherited frontend-devserver setting.
 
-## Users and product workflow previews
+## Users and observation
 
 Open **Users** in Local workspace to inspect configured access. Policy states are local evidence: Allowed does not establish runtime distribution or user connectivity. The last manual check is linked to its selected user and one server/profile; it expires and does not certify every assignment. Quotas remain per-server rolling 30-day policies. Agent-default, explicit and disabled quotas are displayed separately; an inherited default is not an unlimited allowance. The displayed assignment count refers to configured records on enabled nodes. Search filters the loaded page; load additional pages explicitly.
 
@@ -59,13 +59,13 @@ ovpn user plan --action disable --username example-user
 ovpn user plan --action disable --username example-user --expect-digest <digest>
 ```
 
-Demo workspace offers simulated user creation/suspension. **Monitoring**, **Integrations** and **Changes & recovery** show the planned product workflows. The demo scheduler generates fixture measurements only; it does not start network traffic. Production scheduling, Checker/Knife execution and live user writes are not enabled by these screens. See the [complete application plan](design/desktop/application-plan.md) and [monitoring/integration design](design/desktop/monitoring-and-integrations.md).
+Demo workspace simulates user and observation actions. In Local workspace, **Monitoring** now configures native/Checker schedules and shows history/incidents; **Integrations** installs pinned tools and starts finite Knife diagnostics. See [automatic observation](observation.md) for the exact scope, daily attempt limits and lifecycle. **Changes & recovery** and live user writes remain planned.
 
 ## Check traffic
 
 Open **Checks**, select an enabled server and a TCP/REALITY or TCP/TLS profile, enter an existing active monitoring username and press **Run HTTPS check**. The request uses the pinned native Xray client and verifies `https://example.com/`, HTTP 200 and its certificate, with a 20-second timeout and a 1 MiB body limit. It does not create users or deploy configuration. Existing encryption keys are resolved as in the CLI; OS-vault migration is not implemented yet.
 
-Runtime health remains **Not checked** when inventory has been read. A successful traffic sample expires after five minutes and does not certify UDP, DNS, IPv6 or GUI-client import. XHTTP checks and continuous checker supervision remain separate work; the desktop does not install or manage Xray Checker in this build.
+Runtime health remains **Not checked** when inventory has been read. A successful traffic sample expires after five minutes and does not certify UDP, DNS, IPv6 or GUI-client import. For XHTTP, use the owned Checker or Knife/Xray adapters in Integrations. Automatic observations have a separate lifetime and history; their green results cover only the explicitly selected identities and paths.
 
 ## Machine protocol 1
 
@@ -81,7 +81,7 @@ Send one JSON object per line. Start every session with:
 {"id":"servers-1","method":"servers.list","params":{"limit":50}}
 ```
 
-Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The remaining capabilities are `inventory.read`, `users.read` and `checks.run`. Proposed execution methods in the [architecture](design/desktop/architecture.md) are not implemented or advertised.
+Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The remaining capabilities are `inventory.read`, `users.read` and `checks.run`. Additional implemented observation methods are `observer.status/configure/start/stop/remove/run/cancel`, `integrations.install/setup` and `diagnostics.start`. They advertise observation/integration capabilities separately from server/user writes. Proposed server execution methods in the [architecture](design/desktop/architecture.md) remain unavailable.
 
 The worker processes requests sequentially, rejects unknown fields, bounds messages to 1 MiB and returns stable errors without raw database, path or tunnel diagnostics. Its stdout carries protocol envelopes only. The host verifies the worker digest and exact engine/protocol versions, serializes calls and terminates the session on timeout or malformed output. An explicit later action may reconnect; a failed check is not automatically repeated.
 

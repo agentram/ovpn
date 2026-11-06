@@ -87,6 +87,7 @@ For an optional HTTPS check from the operator machine, run `./ovpn user probe --
 - [Monitoring](#7-optional-monitoring)
 - [Traffic probes and Xray Checker](docs/probes.md)
 - [Client subscriptions](docs/subscriptions.md)
+- [Automatic observation and Checker/Knife](docs/observation.md)
 - [Desktop development build](docs/desktop.md) · [Design proposal](docs/design/desktop/README.md)
 - [Documentation map](#documentation-map)
 

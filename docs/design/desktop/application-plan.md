@@ -1,6 +1,6 @@
 # OVPN Desk: complete application plan
 
-Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. Monitoring, integration setup and write execution remain planned. English remains the default; Russian is selected in Settings.
+Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. An initial native/Checker scheduler, pinned tool installation, Knife jobs and local observation history are implemented; remote collectors, broader observation classes and write execution remain planned. English remains the default; Russian is selected in Settings.
 
 ## Product boundary
 
@@ -79,9 +79,9 @@ Core modules and responsibilities:
 | --- | --- |
 | `internal/app` | Users, servers, delivery and diagnostic use cases; shared with CLI; typed errors. |
 | `internal/operations` (planned) | Stored plan/revision preconditions, stable target set, cross-process/remote host locks, snapshots, journal and uncertain-state reconciliation. |
-| `internal/observation` (planned) | Normalized samples, provenance, freshness, incident policy, retention and query projections. |
-| `internal/scheduler` (planned) | Bounded jobs, jitter, deadlines, cancellation, scope capture and traffic budgets. |
-| `internal/integrations` (planned) | First-party Native/Checker/Knife adapters, version/capability checks and private artifacts. |
+| `internal/observation` | Normalized samples, provenance, freshness, incident policy, retention and query projections. |
+| `internal/observer` | Bounded jobs, jitter, deadlines, cancellation, scope capture and traffic budgets. |
+| `internal/integrations` | First-party Native/Checker/Knife adapters, version/capability checks and private artifacts. |
 | Native host | Worker ownership, OS credentials, trusted paths, notifications and lifecycle. |
 | Frontend | Keyed localization, screens, interaction state and view models; no shell, SQL or secret storage. |
 
@@ -100,7 +100,7 @@ The current sequential protocol 1 gains additive read-only queries such as `user
 | 4. Fleet operations | Server setup/update/replacement, scoped groups and staged changes | Assignment migration, revision/digest preconditions, backup and per-node postconditions. |
 | 5. Recovery and distribution | Fresh-workspace restore drill and supported native releases | Independent recovery key, native OS/SSH/vault/accessibility tests, signing/notarization and updater rollback. |
 
-Deliver a usable vertical journey in each increment. The next implementation should make **create user → review all enabled nodes → apply → per-node outcome → publish delivery** real, before adding secondary transports or decorative controls.
+The initial observation subset is now implemented independently of server writes; see [automatic observation](../../observation.md) for its narrower identity, concurrency, attempt-budget and lifecycle limits. Deliver a usable vertical journey in each increment. The next implementation should make **create user → review all enabled nodes → apply → per-node outcome → publish delivery** real, before adding secondary transports or decorative controls.
 
 ## Release acceptance
 

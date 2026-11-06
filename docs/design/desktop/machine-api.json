@@ -19,7 +19,12 @@
           "inventory.read",
           "users.read",
           "checks.run",
-          "users.plan.read"
+          "users.plan.read",
+          "observer.read",
+          "observer.configure",
+          "observer.run",
+          "integrations.install",
+          "diagnostics.run"
         ]
       }
     }
@@ -115,7 +120,17 @@
     "servers.list",
     "users.list",
     "checks.run",
-    "users.plan"
+    "users.plan",
+    "observer.status",
+    "observer.configure",
+    "observer.start",
+    "observer.stop",
+    "observer.remove",
+    "observer.run",
+    "observer.cancel",
+    "integrations.install",
+    "integrations.setup",
+    "diagnostics.start"
   ],
   "userPlanReview": {
     "status": "implemented-read-only",
@@ -133,5 +148,21 @@
       "targets": 100
     },
     "remoteActions": false
+  },
+  "observation": {
+    "status": "implemented-opt-in",
+    "target": {
+      "serverId": "node-1",
+      "username": "monitor-user",
+      "profile": "vless-reality-tcp-vision"
+    },
+    "limits": {
+      "policies": 10,
+      "targetsPerPolicy": 10,
+      "parallelJobs": 1,
+      "retainedSamples": 5000
+    },
+    "lifecycle": "while-open-or-explicit-foreground-observer",
+    "serverWrites": false
   }
 }

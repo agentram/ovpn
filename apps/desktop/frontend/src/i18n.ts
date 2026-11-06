@@ -48,13 +48,13 @@ export const en = {
   scope:'Verified scope', unverified:'Still unverified', fresh:'Fresh for 5 minutes', noChecks:'No checks yet',
   noChecksText:'Choose a node and an existing monitoring identity. A running process alone does not establish working traffic.',
   disabled:'This server is disabled. Select an enabled node to check access.', unsupported:'Native checks support REALITY/TCP and TLS/TCP. Use Xray Checker for XHTTP.',
-  readOnly:'Read-only workspace', readOnlyHint:'Inventory reads never deploy, migrate state or change users. Checks send traffic only when you request them.',
-  welcome:'Local control, with evidence.', welcomeText:'This first build reads existing OVPN state and runs native HTTPS checks. Reviewed server changes and recovery come next.',
+  readOnly:'Control state: read-only', readOnlyHint:'Server and user changes use the CLI. Automatic checks run only under policies you enable.',
+  welcome:'Local control, with evidence.', welcomeText:'Inspect users and nodes, schedule HTTPS checks, and compare native, Checker and Knife observations.',
   localError:'Could not open the local workspace.', localErrorHint:'Check that the bundled worker is present and the workspace was initialized with a compatible OVPN CLI. No private diagnostics are displayed.',
   checkError:'Could not start the check.', checkErrorHint:'Verify the selected profile and active username in OVPN CLI. Encrypted client settings require the existing workspace key.',
   retry:'Try again', total:'in this workspace', noPassing:'No fresh passing check', version:'Engine version', protocol:'Worker protocol',
   preferences:'Preferences are stored on this device. Inventory, user identities and check results are not stored in browser storage.',
-  about:'OVPN Desk · development build', scopeNote:'This build has no server write actions. Local checks do not install or manage Xray Checker.',
+  about:'OVPN Desk · development build', scopeNote:'Observation is opt-in. Server and user changes remain in the CLI.',
   openChecks:'Check access', configured:'Configured only', failureReason:'Result code', tcp:'HTTPS over TCP',
 } as const;
 
@@ -107,13 +107,13 @@ export const ru: { [K in keyof typeof en]: typeof en[K] extends readonly string[
   scope:'Проверенная область', unverified:'Ещё не проверено', fresh:'Актуально 5 минут', noChecks:'Проверок пока нет',
   noChecksText:'Выберите узел и существующего пользователя мониторинга. Запущенный процесс ещё не подтверждает работу трафика.',
   disabled:'Сервер выключен. Для проверки выберите включённый узел.', unsupported:'Встроенные проверки поддерживают REALITY/TCP и TLS/TCP. Для XHTTP используйте Xray Checker.',
-  readOnly:'Рабочая область только для чтения', readOnlyHint:'Чтение инвентаря не разворачивает службы, не мигрирует базу и не меняет пользователей. Трафик отправляется только по вашему запросу.',
-  welcome:'Локальное управление с проверкой результата.', welcomeText:'Первая сборка читает состояние OVPN и проверяет HTTPS. Планы изменений серверов и восстановление появятся на следующих этапах.',
+  readOnly:'Управляющая база: только чтение', readOnlyHint:'Серверы и пользователи изменяются через CLI. Автоматические проверки выполняются только по включённым вами политикам.',
+  welcome:'Локальное управление с проверкой результата.', welcomeText:'Просматривайте пользователей и узлы, настраивайте HTTPS-проверки и сравнивайте результаты встроенного движка, Checker и Knife.',
   localError:'Не удалось открыть локальную рабочую область.', localErrorHint:'Проверьте наличие комплектного worker и совместимость базы с OVPN CLI. Приватная диагностика не отображается.',
   checkError:'Не удалось начать проверку.', checkErrorHint:'Проверьте профиль и активного пользователя через OVPN CLI. Для зашифрованных клиентских настроек нужен существующий ключ рабочей области.',
   retry:'Повторить', total:'в рабочей области', noPassing:'Нет свежей успешной проверки', version:'Версия движка', protocol:'Протокол worker',
   preferences:'Настройки сохраняются на этом устройстве. Инвентарь, имена пользователей и результаты проверок не записываются в хранилище браузера.',
-  about:'OVPN Desk · сборка для разработки', scopeNote:'В этой сборке нет действий записи на серверы. Локальные проверки не устанавливают и не управляют Xray Checker.',
+  about:'OVPN Desk · сборка для разработки', scopeNote:'Наблюдение включается явно. Изменения серверов и пользователей выполняются через CLI.',
   openChecks:'Проверить доступ', configured:'Только конфигурация', failureReason:'Код результата', tcp:'HTTPS через TCP',
 };
 export type Language = 'en' | 'ru';

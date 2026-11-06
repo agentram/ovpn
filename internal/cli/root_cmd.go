@@ -100,5 +100,6 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(app.restartCmd())
 	cmd.AddCommand(app.versionCmd())
 	cmd.AddCommand(app.machineCmd())
+	cmd.AddCommand(app.observeCmd())
 	return cmd
 }
