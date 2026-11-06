@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Preview create/enable/disable user intent through a shared, read-only planner in Desktop and `user plan`. Show current/proposed policy for every enabled node and reject a changed local snapshot with `--expect-digest`; live execution still requires the operation journal and locking milestone.
 - Expose paged desktop user-policy inventory without client credentials, add clearer green/red/amber status styling and expand the application plan with monitoring, Checker/Knife integration and change/recovery workflow previews. Live writes and scheduled third-party checks remain planned.
 - Add the first OVPN Desk development build: English/Russian React UI, a Wails host with a verified bundled worker, read-only inventory and explicit native HTTPS checks. Add protocol 1 via `ovpn machine --stdio --protocol 1`; server write workflows and public desktop installers remain future work.
 - Document the OVPN Desk architecture and visual direction, with an interactive desktop prototype using sample data. This is a design proposal, not a native desktop release.
@@ -17,6 +18,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Check HTTPS traffic over TCP/REALITY or TCP/TLS from the operator machine with `user probe`, using the pinned Xray client core and credential-free JSON results. Probes enforce TLS verification, time and response-size limits, and the expected HTTP status without redirects or a direct fallback.
 
 ### Fixed
+- Distinguish agent-default, explicit and disabled quotas in desktop user inventory instead of presenting inherited defaults as unlimited.
 - Wait for the verified HTTPS fixture and server listener in client compatibility tests instead of relying on a fixed startup delay.
 - Complete the project site's first-server example with user creation and remove the redundant deploy after `server init`.
 - Put release downloads and the first-connection workflow near the start of the README and project site, with SSH prerequisites and client verification steps.

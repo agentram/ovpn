@@ -20,6 +20,10 @@ type Backend interface {
 	Check(context.Context, dto.CheckRequest) (dto.Check, error)
 }
 
+type userPlanner interface {
+	PlanUser(context.Context, dto.UserPlanRequest) (dto.UserPlan, error)
+}
+
 // Serve handles one bounded request at a time. EOF or process termination ends the session.
 func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) error {
 	scanner := bufio.NewScanner(in)
@@ -50,7 +54,11 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 				err = &app.Error{Code: "PROTOCOL_MISMATCH"}
 			} else {
 				ready = true
-				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: []string{"inventory.read", "users.read", "checks.run"}}
+				capabilities := []string{"inventory.read", "users.read", "checks.run"}
+				if _, ok := backend.(userPlanner); ok {
+					capabilities = append(capabilities, "users.plan.read")
+				}
+				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: capabilities}
 			}
 		} else if !ready {
 			err = &app.Error{Code: "HANDSHAKE_REQUIRED"}
@@ -115,6 +123,15 @@ func dispatch(ctx context.Context, backend Backend, request protocol.Request) (a
 			return nil, bad
 		}
 		return backend.Check(ctx, params)
+	case "users.plan":
+		var params dto.UserPlanRequest
+		if protocol.Decode(request.Params, &params) != nil {
+			return nil, bad
+		}
+		if planner, ok := backend.(userPlanner); ok {
+			return planner.PlanUser(ctx, params)
+		}
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
 	default:
 		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
 	}

@@ -85,3 +85,53 @@ func TestUsersInventoryGroupsPoliciesWithoutCredentials(t *testing.T) {
 		t.Fatal("missing workspace did not produce empty users")
 	}
 }
+
+func TestUserInventoryDistinguishesAgentDefaultFromUnmeteredAndExplicitQuotas(t *testing.T) {
+	ctx := context.Background()
+	svc, st, servers := planFixture(t, 2)
+	for i, srv := range servers {
+		for _, name := range []string{"default", "explicit", "mixed", "unmetered", "zero-default"} {
+			u := model.User{ServerID: srv.ID, Username: name, UUID: "11111111-1111-1111-1111-111111111111", Email: name + "@global", Enabled: true, QuotaEnabled: true}
+			if name == "explicit" || name == "mixed" && i == 0 {
+				limit := int64(100)
+				u.TrafficLimitByte = &limit
+			} else if name == "zero-default" {
+				zero := int64(0)
+				u.TrafficLimitByte = &zero
+			}
+			if err := st.AddUser(ctx, &u); err != nil {
+				t.Fatal(err)
+			}
+			if name == "unmetered" {
+				u.QuotaEnabled = false
+				if err := st.UpdateUser(ctx, &u); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+	page, err := svc.Users(ctx, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, user := range page.Items {
+		switch user.Username {
+		case "default", "zero-default":
+			if user.DefaultQuotaNodes != 2 || user.UnmeteredNodes != 0 || user.PolicyDiff {
+				t.Fatal("agent default treated as unlimited or mixed")
+			}
+		case "unmetered":
+			if user.UnmeteredNodes != 2 || user.DefaultQuotaNodes != 0 || user.PolicyDiff {
+				t.Fatal("disabled quota treated as default")
+			}
+		case "explicit":
+			if user.DefaultQuotaNodes != 0 || user.UnmeteredNodes != 0 || user.QuotaMinBytes != 100 || user.QuotaMaxBytes != 100 {
+				t.Fatal("explicit quota changed")
+			}
+		case "mixed":
+			if user.DefaultQuotaNodes != 1 || user.QuotaMinBytes != 100 || user.QuotaMaxBytes != 100 || !user.PolicyDiff {
+				t.Fatal("mixed default/explicit quota hidden")
+			}
+		}
+	}
+}

@@ -1,4 +1,13 @@
 export const en = {
+  defaultQuota:'Agent default', mixedQuota:'Mixed quota policies', defaultQuotaCount:'Nodes using agent quota', unmeteredCount:'Nodes without quota',
+  localPlan:'LOCAL CHANGE PLAN', planNotApplied:'Review only · nothing applied', planReadOnly:'This plan reads one local database snapshot. It does not connect to servers, create identities or publish a subscription.',
+  planLoading:'Building the local plan…', planStale:'Local state or the requested change has changed. Rebuild the plan to review its new scope.', planError:'Could not build the plan. Check the compatible CLI and the selected workspace.',
+  planUnchanged:'Local snapshot unchanged. Remote preflight and execution are still pending.', planRemoteUnknown:'Remote state unverified', planBefore:'Current policy', planAfter:'Proposed policy',
+  planNoRecord:'No configured record', planMissing:'This user is missing on this server.', planNoNodes:'There are no enabled servers to target.', planInvalidExpiry:'The stored expiry is invalid and needs repair.', planIssue:'This target needs review.',
+  planDigest:'Snapshot digest', planSnapshotOnly:'Identifies local intent and state; not an execution token', planNext:'Apply changes with OVPN CLI',
+  planExecutionSteps:'Desktop can review and recheck this plan. Applying access changes and publishing delivery still use the CLI in this build.',
+  planRecheck:'Recheck snapshot', planRebuild:'Rebuild plan', planDefaultQuota:'Agent default · not read remotely', planExclusive:'exclusive cutoff', planCreate:'Preview new user', planQuota:'Rolling 30d quota per server (GB)', planExpiry:'Access valid through (UTC date)',
+
   monitoring:'Monitoring', integrations:'Integrations', operations:'Changes & recovery',
   usersTitle:'People first. Access in one place.', usersSubtitle:'Configured access, per-server quotas and policy differences. Connectivity is measured separately.',
   policy:'Access policy', assignments:'Configured nodes', quotaServer:'Quota per server', expiry:'Earliest expiry', connectivity:'Last manual check', actions:'Actions',
@@ -7,7 +16,7 @@ export const en = {
   usersEmpty:'No users in this workspace', usersEmptyHint:'Existing users appear here after refresh. Create users through the CLI until reviewed desktop write operations are implemented.',
   singlePath:'One server/profile only',
   policyOnly:'Policy is read from local state. Allowed does not mean online or traffic verified.',
-  manageUser:'Review access change', createUser:'Create demo user', userDetail:'Access details', nextAction:'Next action',
+  manageUser:'Review access change', createUser:'Create user', userDetail:'Access details', nextAction:'Next action',
   userScope:'User operations currently apply to every enabled server. Node groups require a new assignment model.',
   managementPlanned:'Desktop writes are the next implementation milestone. This view shows the intended scope; it executes no CLI command.',
   disableUser:'Disable access', enableUser:'Enable access', reviewPlan:'Review plan', applyDemo:'Apply in demo', cancel:'Cancel',
@@ -50,6 +59,15 @@ export const en = {
 } as const;
 
 export const ru: { [K in keyof typeof en]: typeof en[K] extends readonly string[] ? readonly string[] : string } = {
+  defaultQuota:'Квота агента', mixedQuota:'Разные политики квот', defaultQuotaCount:'Узлы с квотой агента', unmeteredCount:'Узлы без квоты',
+  localPlan:'ЛОКАЛЬНЫЙ ПЛАН ИЗМЕНЕНИЯ', planNotApplied:'Только просмотр · изменения не применены', planReadOnly:'План читает единый снимок локальной базы. Он не подключается к серверам, не создаёт идентичности и не публикует подписку.',
+  planLoading:'Формируем локальный план…', planStale:'Локальные данные или действие изменились. Сформируйте план заново и проверьте новую область изменения.', planError:'Не удалось сформировать план. Проверьте совместимость CLI и выбранную рабочую область.',
+  planUnchanged:'Локальный снимок не изменился. Проверка серверов и выполнение ещё не проводились.', planRemoteUnknown:'Состояние серверов не проверено', planBefore:'Текущая политика', planAfter:'Предлагаемая политика',
+  planNoRecord:'Нет настроенной записи', planMissing:'Пользователь отсутствует на этом сервере.', planNoNodes:'Нет включённых серверов для изменения.', planInvalidExpiry:'Сохранённый срок доступа некорректен и требует исправления.', planIssue:'Этот узел требует проверки.',
+  planDigest:'Хеш снимка', planSnapshotOnly:'Определяет локальные данные и действие; не разрешает выполнение', planNext:'Применение изменений через OVPN CLI',
+  planExecutionSteps:'В приложении можно просмотреть и перепроверить план. Изменения доступа и публикация подписки в этой сборке выполняются через CLI.',
+  planRecheck:'Перепроверить снимок', planRebuild:'Сформировать заново', planDefaultQuota:'Настройка агента · сервер не опрошен', planExclusive:'момент прекращения доступа', planCreate:'План нового пользователя', planQuota:'Скользящая квота 30 дней на сервер (ГБ)', planExpiry:'Доступ включительно по (дата UTC)',
+
   monitoring:'Мониторинг', integrations:'Интеграции', operations:'Изменения и восстановление',
   usersTitle:'Пользователи и доступ в одном месте.', usersSubtitle:'Настройки доступа, квоты на сервер и различия политик. Работоспособность соединения проверяется отдельно.',
   policy:'Политика доступа', assignments:'Настроенные узлы', quotaServer:'Квота на сервер', expiry:'Ближайшее истечение', connectivity:'Последняя ручная проверка', actions:'Действия',
@@ -58,7 +76,7 @@ export const ru: { [K in keyof typeof en]: typeof en[K] extends readonly string[
   usersEmpty:'В рабочей области нет пользователей', usersEmptyHint:'После обновления здесь появятся существующие пользователи. Создание пока доступно через CLI, до реализации проверяемых операций записи в приложении.',
   singlePath:'Только один сервер/профиль',
   policyOnly:'Политика читается из локальной базы. Разрешённый доступ ещё не означает подключение или проверенный трафик.',
-  manageUser:'План изменения доступа', createUser:'Создать демо-пользователя', userDetail:'Настройки доступа', nextAction:'Следующее действие',
+  manageUser:'План изменения доступа', createUser:'Создать пользователя', userDetail:'Настройки доступа', nextAction:'Следующее действие',
   userScope:'Сейчас операции с пользователями применяются ко всем включённым серверам. Группы узлов требуют новой модели назначений.',
   managementPlanned:'Запись из приложения — следующий этап реализации. Здесь показана область изменения; команды CLI не выполняются.',
   disableUser:'Отключить доступ', enableUser:'Включить доступ', reviewPlan:'Показать план', applyDemo:'Применить в демо', cancel:'Отмена',

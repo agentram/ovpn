@@ -18,7 +18,8 @@
         "capabilities": [
           "inventory.read",
           "users.read",
-          "checks.run"
+          "checks.run",
+          "users.plan.read"
         ]
       }
     }
@@ -113,6 +114,24 @@
     "workspace.summary",
     "servers.list",
     "users.list",
-    "checks.run"
-  ]
+    "checks.run",
+    "users.plan"
+  ],
+  "userPlanReview": {
+    "status": "implemented-read-only",
+    "request": {
+      "id": "plan-user-1",
+      "method": "users.plan",
+      "params": {
+        "action": "disable",
+        "username": "example-user"
+      }
+    },
+    "recheck": "Repeat the same request with expectedDigest equal to the full returned digest. STALE_PLAN rejects changed local intent or state.",
+    "executionAvailable": false,
+    "limits": {
+      "targets": 100
+    },
+    "remoteActions": false
+  }
 }

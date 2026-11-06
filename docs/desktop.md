@@ -46,7 +46,18 @@ Open `http://127.0.0.1:8940/`. This serves the demo UI; the native bridge requir
 
 ## Users and product workflow previews
 
-Open **Users** in Local workspace to inspect configured access. Policy states are local evidence: Allowed does not establish runtime distribution or user connectivity. The last manual check is linked to its selected user and one server/profile; it expires and does not certify every assignment. Quotas remain per-server rolling 30-day policies. The displayed assignment count refers to configured records on enabled nodes. Search filters the loaded page; load additional pages explicitly.
+Open **Users** in Local workspace to inspect configured access. Policy states are local evidence: Allowed does not establish runtime distribution or user connectivity. The last manual check is linked to its selected user and one server/profile; it expires and does not certify every assignment. Quotas remain per-server rolling 30-day policies. Agent-default, explicit and disabled quotas are displayed separately; an inherited default is not an unlimited allowance. The displayed assignment count refers to configured records on enabled nodes. Search filters the loaded page; load additional pages explicitly.
+
+**Preview new user** and **Review access change** now query the shared local planner for create/enable/disable intent. The plan lists every enabled server, current/proposed policy, missing/duplicate records and identity conflicts. It preserves quota blocks and expiry when changing the enabled flag. **Recheck snapshot** rejects a changed local snapshot or request; **Rebuild plan** requires reviewing the resulting scope again. Plans are limited to 100 targets and are not stored execution authorizations. No remote preflight, backup, write or publication is performed. CLI access changes remain separate operations until the journal/locking milestone is implemented.
+
+The same review is available without the desktop:
+
+```bash
+ovpn user plan --action create --username example-user --quota-bytes 107374182400
+ovpn user plan --action disable --username example-user
+# Repeat the same intent with its full returned digest to reject changed local state:
+ovpn user plan --action disable --username example-user --expect-digest <digest>
+```
 
 Demo workspace offers simulated user creation/suspension. **Monitoring**, **Integrations** and **Changes & recovery** show the planned product workflows. The demo scheduler generates fixture measurements only; it does not start network traffic. Production scheduling, Checker/Knife execution and live user writes are not enabled by these screens. See the [complete application plan](design/desktop/application-plan.md) and [monitoring/integration design](design/desktop/monitoring-and-integrations.md).
 
@@ -70,7 +81,7 @@ Send one JSON object per line. Start every session with:
 {"id":"servers-1","method":"servers.list","params":{"limit":50}}
 ```
 
-Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The handshake advertises only `inventory.read`, `users.read` and `checks.run`. Proposed operation methods in the [architecture](design/desktop/architecture.md) are not implemented or advertised.
+Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The remaining capabilities are `inventory.read`, `users.read` and `checks.run`. Proposed execution methods in the [architecture](design/desktop/architecture.md) are not implemented or advertised.
 
 The worker processes requests sequentially, rejects unknown fields, bounds messages to 1 MiB and returns stable errors without raw database, path or tunnel diagnostics. Its stdout carries protocol envelopes only. The host verifies the worker digest and exact engine/protocol versions, serializes calls and terminates the session on timeout or malformed output. An explicit later action may reconnect; a failed check is not automatically repeated.
 

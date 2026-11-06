@@ -1,12 +1,14 @@
 # OVPN Desk: complete application plan
 
-Status: target product and architecture. The current build has live read-only server/user inventory and manual native HTTPS checks. Monitoring, integration setup and reviewed writes shown in the new screens are design previews. English remains the default; Russian is selected in Settings.
+Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. Monitoring, integration setup and write execution remain planned. English remains the default; Russian is selected in Settings.
 
 ## Product boundary
 
 OVPN Desk is a desktop operations console for a self-hosted Xray fleet: users, access delivery, server lifecycle, observation and recovery belong to one workspace. Start with one operator, then add explicitly scoped collaboration. Keep control state local and management over SSH; a public management panel is not a prerequisite. A device-wide VPN client, privileged TUN routing and commercial billing are separate products/milestones.
 
 The first development slice exposed only summary/server/check queries. Its missing user list was an implementation gap: the CLI already creates, disables, removes, expires and quotas users. The desktop now exposes policy inventory and the latest explicitly requested per-user/path observation, but writing through those Cobra handlers would bypass the proposed operation journal and still produce human-oriented, potentially sensitive errors. Extract the use cases before enabling live buttons.
+
+The shared `internal/app` planner now previews create/enable/disable using one read-only SQLite transaction. It captures all enabled targets, current/proposed policy and local conflicts, and binds the request to a digest. CLI `user plan` and protocol `users.plan` use this same service. Rechecking with an expected digest returns `STALE_PLAN` after a changed intent or local snapshot. This is not a stored plan, a remote preflight or a lock: the digest must not be accepted as execution authorization by a future writer. Runtime state and transport/policy parity still require the operation engine's preflight.
 
 ## Primary workspaces
 

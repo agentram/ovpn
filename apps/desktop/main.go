@@ -107,6 +107,16 @@ func (s *DeskService) Check(ctx context.Context, request dto.CheckRequest) (dto.
 	return w.Check(ctx, request)
 }
 
+func (s *DeskService) PlanUser(ctx context.Context, request dto.UserPlanRequest) (dto.UserPlan, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.UserPlan{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.PlanUser(ctx, request)
+}
+
 func main() {
 	_ = os.Unsetenv("FRONTEND_DEVSERVER_URL")
 	dataDir := flag.String("data-dir", util.DefaultDataDir(), "Existing OVPN workspace")

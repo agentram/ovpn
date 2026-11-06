@@ -205,3 +205,12 @@ func (w *Worker) Users(ctx context.Context, cursor string) (dto.UserPage, error)
 	}{cursor, 50}, &result)
 	return result, err
 }
+
+func (w *Worker) PlanUser(ctx context.Context, request dto.UserPlanRequest) (dto.UserPlan, error) {
+	var result dto.UserPlan
+	if len(request.Username) > 128 || len(request.Action) > 16 || len(request.Expiry) > 10 || len(request.ExpectedDigest) > 64 {
+		return result, errors.New("INVALID_PARAMS")
+	}
+	err := w.call(ctx, "users.plan", request, &result)
+	return result, err
+}

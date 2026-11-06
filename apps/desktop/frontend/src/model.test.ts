@@ -45,3 +45,39 @@ test('demo suspension preserves expiry, quota and identity facets', async () => 
   assert.equal(enabled.eligibleNodes,0);
   assert.equal(userPolicy(enabled,2),'blocked');
 });
+
+test('plan review captures scope, preserves independent policy and detects a changed snapshot', async () => {
+  const {demoUsers,demoUserPlan}=await import('./api.ts');
+  const request={action:'enable' as const,username:'bob'};
+  const plan=await demoUserPlan(request,demoUsers);
+  assert.equal(plan.executionAvailable,false);
+  assert.deepEqual(plan.targets.map(t=>t.name),['edge-a','edge-b']);
+  assert.ok(plan.targets.every(t=>t.after?.quotaBlocked));
+  assert.equal(plan.targets[0].after?.quotaBytes,demoUsers[1].quotaMinBytes);
+  const checked=await demoUserPlan({...request,expectedDigest:plan.digest},demoUsers);
+  assert.equal(checked.digest,plan.digest);
+  await assert.rejects(demoUserPlan({...request,expectedDigest:plan.digest},demoUsers.slice(1)),/STALE_PLAN/);
+  await assert.rejects(demoUserPlan({...request,action:'disable',expectedDigest:plan.digest},demoUsers),/STALE_PLAN/);
+  const missing=await demoUserPlan({action:'disable',username:'support'},demoUsers);
+  assert.ok(missing.targets[1].issues.includes('USER_MISSING'));
+  const create=await demoUserPlan({action:'create',username:'new-user',expiry:'2030-01-01',quotaBytes:100},demoUsers);
+  assert.equal(create.targets[0].after?.expiresAt,'2030-01-02T00:00:00Z');
+});
+
+test('plan error messages expose a stale classification without forwarding diagnostics', async () => {
+  const {isStalePlanError}=await import('./api.ts');
+  assert.equal(isStalePlanError(new Error('The request could not be completed (STALE_PLAN).')),true);
+  assert.equal(isStalePlanError(new Error('private host or credential')),false);
+  assert.equal(isStalePlanError('STALE_PLAN'),false);
+});
+
+test('quota display distinguishes inherited defaults, unmetered nodes and mixed policy', async () => {
+  const {demoUsers,userQuotaKind}=await import('./api.ts');
+  const user=demoUsers[0];
+  assert.equal(userQuotaKind(user),'explicit');
+  assert.equal(userQuotaKind({...user,quotaMinBytes:0,quotaMaxBytes:0,defaultQuotaNodes:2}),'default');
+  assert.equal(userQuotaKind({...user,quotaMinBytes:0,quotaMaxBytes:0,unmeteredNodes:2}),'unmetered');
+  assert.equal(userQuotaKind({...user,defaultQuotaNodes:1}),'mixed');
+  assert.equal(userQuotaKind({...user,unmeteredNodes:1}),'mixed');
+  assert.equal(userQuotaKind({...user,enabledNodes:0}),'unknown');
+});

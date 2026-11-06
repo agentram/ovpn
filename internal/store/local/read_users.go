@@ -11,6 +11,7 @@ type UserInventory struct {
 	ConfiguredNodes, EnabledNodes, EligibleNodes, DisabledNodes, ExpiredNodes, BlockedNodes int
 	EarliestExpiry                                                                          string
 	QuotaMinBytes, QuotaMaxBytes                                                            int64
+	DefaultQuotaNodes, UnmeteredNodes                                                       int
 	PolicyDiff, IdentityConflict                                                            bool
 }
 
@@ -22,8 +23,10 @@ func (s *Store) ListUserInventory(ctx context.Context, after string, limit int, 
 		SUM(CASE WHEN s.enabled=1 AND u.expiry_date IS NOT NULL AND julianday(u.expiry_date)<=julianday(?) THEN 1 ELSE 0 END),
 		SUM(s.enabled=1 AND u.quota_blocked=1),
 		MIN(CASE WHEN s.enabled=1 THEN u.expiry_date END),
-		COALESCE(MIN(CASE WHEN s.enabled=1 THEN CASE WHEN u.quota_enabled=1 THEN COALESCE(u.traffic_limit_byte,0) ELSE 0 END END),0),
-		COALESCE(MAX(CASE WHEN s.enabled=1 THEN CASE WHEN u.quota_enabled=1 THEN COALESCE(u.traffic_limit_byte,0) ELSE 0 END END),0),
+		COALESCE(MIN(CASE WHEN s.enabled=1 AND u.quota_enabled=1 AND u.traffic_limit_byte>0 THEN u.traffic_limit_byte END),0),
+		COALESCE(MAX(CASE WHEN s.enabled=1 AND u.quota_enabled=1 AND u.traffic_limit_byte>0 THEN u.traffic_limit_byte END),0),
+		SUM(s.enabled=1 AND u.quota_enabled=1 AND COALESCE(u.traffic_limit_byte,0)<=0),
+		SUM(s.enabled=1 AND u.quota_enabled=0),
 		COUNT(DISTINCT CASE WHEN s.enabled=1 THEN u.enabled END)>1 OR
 		COUNT(DISTINCT CASE WHEN s.enabled=1 THEN COALESCE(u.expiry_date,'') END)>1 OR
  COUNT(DISTINCT CASE WHEN s.enabled=1 THEN u.quota_enabled END)>1 OR
@@ -41,11 +44,12 @@ func (s *Store) ListUserInventory(ctx context.Context, after string, limit int, 
 		var user UserInventory
 		var expiry sql.NullString
 		if err := rows.Scan(&user.Username, &user.ConfiguredNodes, &user.EnabledNodes, &user.EligibleNodes, &user.DisabledNodes,
-			&user.ExpiredNodes, &user.BlockedNodes, &expiry, &user.QuotaMinBytes, &user.QuotaMaxBytes, &user.PolicyDiff, &user.IdentityConflict); err != nil {
+			&user.ExpiredNodes, &user.BlockedNodes, &expiry, &user.QuotaMinBytes, &user.QuotaMaxBytes, &user.DefaultQuotaNodes, &user.UnmeteredNodes, &user.PolicyDiff, &user.IdentityConflict); err != nil {
 			return nil, err
 		}
 		user.EarliestExpiry = expiry.String
 		user.PolicyDiff = user.PolicyDiff || user.QuotaMinBytes != user.QuotaMaxBytes
+		user.PolicyDiff = user.PolicyDiff || user.DefaultQuotaNodes > 0 && user.DefaultQuotaNodes < user.EnabledNodes || user.UnmeteredNodes > 0 && user.UnmeteredNodes < user.EnabledNodes
 		items = append(items, user)
 	}
 	return items, rows.Err()

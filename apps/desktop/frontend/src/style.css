@@ -242,3 +242,22 @@ dialog::backdrop { background:#0009; }
 }
 
 .scope-hint { display:block; color:var(--secondary); font-size:10px; margin-top:6px; }
+
+.plan-dialog { width:min(760px,calc(100vw - 48px)); }
+.plan-review { display:grid; gap:18px; }
+.plan-review .notice { margin:0; }
+.plan-review h2 { overflow-wrap:anywhere; }
+.plan-scope,.plan-node { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+.plan-scope strong { font-size:13px; }
+.plan-targets { display:grid; gap:14px; }
+.plan-target { padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--raised); }
+.plan-target>p { font-size:11px; margin:12px 0 0; overflow-wrap:anywhere; }
+.policy-comparison { display:grid; grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr); gap:16px; margin-top:18px; align-items:start; }
+.policy-comparison h3 { color:var(--secondary); font-size:11px; font-weight:500; margin:0 0 10px; }
+.policy-comparison>span { color:var(--secondary); padding-top:30px; }
+.policy-summary { display:flex; align-items:flex-start; flex-direction:column; gap:9px; }
+.policy-summary small { color:var(--secondary); font-size:11px; line-height:1.6; }
+.plan-dialog .dialog-foot { flex-wrap:wrap; }
+.plan-dialog[open] { display:flex; flex-direction:column; overflow:hidden; }
+.plan-dialog .dialog-head,.plan-dialog .dialog-foot { flex-shrink:0; }
+.plan-dialog .dialog-body { overflow:auto; min-height:0; }

@@ -38,7 +38,7 @@ func (s ReadService) Users(ctx context.Context, cursor string, limit int) (dto.U
 	for _, u := range users {
 		result.Items = append(result.Items, dto.User{Username: u.Username, ConfiguredNodes: u.ConfiguredNodes, EnabledNodes: u.EnabledNodes,
 			EligibleNodes: u.EligibleNodes, DisabledNodes: u.DisabledNodes, ExpiredNodes: u.ExpiredNodes, BlockedNodes: u.BlockedNodes,
-			EarliestExpiry: u.EarliestExpiry, QuotaMinBytes: u.QuotaMinBytes, QuotaMaxBytes: u.QuotaMaxBytes, PolicyDiff: u.PolicyDiff, IdentityConflict: u.IdentityConflict})
+			EarliestExpiry: u.EarliestExpiry, QuotaMinBytes: u.QuotaMinBytes, QuotaMaxBytes: u.QuotaMaxBytes, DefaultQuotaNodes: u.DefaultQuotaNodes, UnmeteredNodes: u.UnmeteredNodes, PolicyDiff: u.PolicyDiff, IdentityConflict: u.IdentityConflict})
 	}
 	if more {
 		result.NextCursor = result.Items[len(result.Items)-1].Username

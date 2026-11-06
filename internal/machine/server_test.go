@@ -110,3 +110,33 @@ func (f *fakeBackend) Users(context.Context, string, int) (dto.UserPage, error) 
 	f.calls++
 	return dto.UserPage{Items: []dto.User{}}, nil
 }
+
+type fakePlanner struct{ fakeBackend }
+
+func (f *fakePlanner) PlanUser(context.Context, dto.UserPlanRequest) (dto.UserPlan, error) {
+	f.calls++
+	return dto.UserPlan{Scope: "all_enabled_servers", Targets: []dto.UserPlanTarget{}, Issues: []string{}}, nil
+}
+
+func TestUserPlansAdvertiseOnlySupportedReadCapabilityAndRejectWriteFields(t *testing.T) {
+	backend := &fakePlanner{}
+	responses := serveFixture(t, `{"id":"a","method":"engine.hello","params":{"protocolVersion":1}}
+{"id":"b","method":"users.plan","params":{"action":"create","username":"alice"}}
+{"id":"c","method":"users.plan","params":{"action":"create","username":"alice","apply":true}}
+{"id":"d","method":"operations.start","params":{}}
+`, backend)
+	var hello protocol.Hello
+	if err := json.Unmarshal(responses[0].Result, &hello); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(hello.Capabilities, ","), "users.plan.read") || backend.calls != 1 ||
+		responses[1].Error != nil || responses[2].Error.Code != "INVALID_PARAMS" || responses[3].Error.Code != "METHOD_NOT_FOUND" {
+		t.Fatal("plan capability or strict request boundary incorrect")
+	}
+	unsupported := serveFixture(t, `{"id":"a","method":"engine.hello","params":{"protocolVersion":1}}
+{"id":"b","method":"users.plan","params":{"action":"create","username":"alice"}}
+`, &fakeBackend{})
+	if unsupported[1].Error.Code != "METHOD_NOT_FOUND" || strings.Contains(string(unsupported[0].Result), "users.plan.read") {
+		t.Fatal("advertised an unsupported planner")
+	}
+}
