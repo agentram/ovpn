@@ -499,6 +499,8 @@ By default, cleanup removes remote runtime files and disables local server metad
 
 ## VPN clients
 
+[OVPN Tunnel](apps/android/README.md) is the native Android development build for TCP/TLS and TCP/REALITY profiles.
+
 End-user setup instructions cover iOS, Android, Windows, and macOS:
 
 - [`docs/clients.md`](docs/clients.md): English

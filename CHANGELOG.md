@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Add the OVPN Tunnel Android development build with QR, VLESS link and HTTPS subscription import, encrypted local profiles, and a foreground Xray TUN for TCP/TLS and TCP/REALITY Vision. Show HTTPS verification and reconnect to the same profile after a network change.
 - Open the configured OVPN workspace on Desktop startup and select eligible users per server for manual checks, schedules and Knife diagnostics. Remove simulated inventory and actions from the application.
 - Add opt-in native/Checker schedules, persisted observation history and incidents, pinned Checker/Knife installation and finite Knife diagnostics in Desktop and `observe` CLI. Reserve daily check attempts, reject duplicate schedules, separate observer errors from traffic failures, and expire evidence after source/configuration changes.
 - Preview create/enable/disable user intent through a shared, read-only planner in Desktop and `user plan`. Show current/proposed policy for every enabled node and reject a changed local snapshot with `--expect-digest`; live execution still requires the operation journal and locking milestone.
