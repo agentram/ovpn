@@ -29,7 +29,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # This image includes the Android SDK command-line tools.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -42,8 +43,9 @@ jobs:
           go-version-file: go.mod
       - name: Install Android SDK packages
         run: |
-          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
       - name: Test Go bridge and build both ABIs
         run: |
           go test ./mobile/androidbridge
