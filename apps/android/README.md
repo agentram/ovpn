@@ -6,7 +6,7 @@ On the operator machine, get a link or QR for an existing user:
 
 ```sh
 ovpn user link --server <server> --username <user>
-ovpn user qr --server <server> --username <user>
+ovpn user qr --server <server> --username <user> --out ./profile.png
 ```
 
 Use the private [subscription URL](../../docs/subscriptions.md) for multiple profiles. A failed refresh retains the saved snapshot. If a successful refresh changes or removes the selected profile, choose a profile again before connecting. The subscription URL and server-side access can be revoked separately.
