@@ -27,6 +27,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Put release downloads and the first-connection workflow near the start of the README and project site, with SSH prerequisites and client verification steps.
 
 ### Security
+- Update `golang.org/x/net` to `0.62.0` for GO-2026-6860 and GO-2026-6866.
 - Update `github.com/andybalholm/brotli` to `1.2.7` and `github.com/klauspost/compress` to `1.20.2` for GO-2026-6888 and GO-2026-6865.
 
 ## 1.11.2
