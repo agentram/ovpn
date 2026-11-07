@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun connect(id: String) {
         if (pendingProfile != null) return
+        model.dismiss()
         try {
             val request: Intent? = VpnService.prepare(this)
             if (request == null) {
