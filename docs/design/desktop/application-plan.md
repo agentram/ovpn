@@ -1,6 +1,6 @@
 # OVPN Desk: complete application plan
 
-Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. An initial native/Checker scheduler, pinned tool installation, Knife jobs and local observation history are implemented; remote collectors, broader observation classes and write execution remain planned. English remains the default; Russian is selected in Settings.
+Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. An initial native/Checker scheduler, pinned tool installation, Knife jobs and local observation history are implemented; remote collectors, broader observation classes and write execution remain planned. The desktop opens the existing local workspace on startup. Check targets use the selected server’s eligible users. English remains the default, with Russian in Settings.
 
 ## Product boundary
 

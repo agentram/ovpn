@@ -110,6 +110,16 @@ func (s *DeskService) Check(ctx context.Context, request dto.CheckRequest) (dto.
 	return w.Check(ctx, request)
 }
 
+func (s *DeskService) CheckUsers(ctx context.Context, serverID, cursor string) (dto.CheckUserPage, error) {
+	w, err := s.connect()
+	if err != nil {
+		return dto.CheckUserPage{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	return w.CheckUsers(ctx, serverID, cursor)
+}
+
 func (s *DeskService) PlanUser(ctx context.Context, request dto.UserPlanRequest) (dto.UserPlan, error) {
 	w, err := s.connect()
 	if err != nil {

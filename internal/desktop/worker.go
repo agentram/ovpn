@@ -234,6 +234,15 @@ func (w *Worker) PlanUser(ctx context.Context, request dto.UserPlanRequest) (dto
 	return result, err
 }
 
+func (w *Worker) CheckUsers(ctx context.Context, serverID, cursor string) (dto.CheckUserPage, error) {
+	var result dto.CheckUserPage
+	err := w.call(ctx, "checks.users", struct {
+		ServerID string `json:"serverId"`
+		Cursor   string `json:"cursor,omitempty"`
+	}{serverID, cursor}, &result)
+	return result, err
+}
+
 func (w *Worker) ObserverStatus(ctx context.Context) (dto.ObserverSnapshot, error) {
 	var v dto.ObserverSnapshot
 	e := w.call(ctx, "observer.status", struct{}{}, &v)

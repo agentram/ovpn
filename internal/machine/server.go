@@ -25,6 +25,10 @@ type userPlanner interface {
 	PlanUser(context.Context, dto.UserPlanRequest) (dto.UserPlan, error)
 }
 
+type checkUserLister interface {
+	CheckUsers(context.Context, string, string, int) (dto.CheckUserPage, error)
+}
+
 type observerBackend interface {
 	ObserverStatus(context.Context) (dto.ObserverSnapshot, error)
 	ObserverConfigure(context.Context, dto.ObservationPolicy) (dto.ObservationPolicy, error)
@@ -71,6 +75,9 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 				capabilities := []string{"inventory.read", "users.read", "checks.run"}
 				if _, ok := backend.(userPlanner); ok {
 					capabilities = append(capabilities, "users.plan.read")
+				}
+				if _, ok := backend.(checkUserLister); ok {
+					capabilities = append(capabilities, "checks.users.read")
 				}
 				if _, ok := backend.(observerBackend); ok {
 					capabilities = append(capabilities, "observer.read", "observer.configure", "observer.run", "integrations.install", "diagnostics.run")
@@ -146,6 +153,19 @@ func dispatch(ctx context.Context, backend Backend, request protocol.Request) (a
 			return nil, bad
 		}
 		return backend.Check(ctx, params)
+	case "checks.users":
+		var params struct {
+			ServerID string `json:"serverId"`
+			Cursor   string `json:"cursor,omitempty"`
+			Limit    int    `json:"limit,omitempty"`
+		}
+		if protocol.Decode(request.Params, &params) != nil {
+			return nil, bad
+		}
+		if users, ok := backend.(checkUserLister); ok {
+			return users.CheckUsers(ctx, params.ServerID, params.Cursor, params.Limit)
+		}
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
 	case "users.plan":
 		var params dto.UserPlanRequest
 		if protocol.Decode(request.Params, &params) != nil {

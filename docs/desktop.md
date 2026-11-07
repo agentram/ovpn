@@ -2,7 +2,7 @@
 
 The development build reads existing server/user inventory, runs explicit native HTTPS checks and supports opt-in automatic observation and Checker/Knife jobs. Users shows configured assignments, policy differences, quota limits and expiry without exposing credentials. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
 
-English is the default. Settings offers Russian and dark/light themes; only these preferences are persisted in WebView storage. The application starts with a clearly labelled demo workspace. Select **Local workspace** to read real inventory. No database is created or migrated by desktop queries.
+English is the default. Settings offers Russian and dark/light themes; only these preferences are persisted in WebView storage. The application opens the existing local workspace on startup. No database is created or migrated by desktop queries.
 
 ## Build and open
 
@@ -35,14 +35,7 @@ python3 scripts/build_desktop.py --target windows --arch amd64
 
 This produces an executable and matching worker, not an installer. Native Windows/WebView2, Linux/GTK, SSH-agent and credential-vault integration remain validation gates. A cross-build alone does not establish platform support. Keep the worker beside the application executable; its digest is pinned into the host at build time. Rebuild the host after changing the worker. Distribution signing must sign the worker **before** calculating its digest.
 
-For frontend-only design work:
-
-```bash
-npm --prefix apps/desktop/frontend ci --ignore-scripts
-npm --prefix apps/desktop/frontend run dev
-```
-
-Open `http://127.0.0.1:8940/`. This serves the demo UI; the native bridge requires the desktop application. Production assets are bundled locally and cannot be replaced by an inherited frontend-devserver setting.
+Use the native application to exercise the workspace and check controls. Production assets are bundled with the application.
 
 ## Users and observation
 
@@ -59,11 +52,11 @@ ovpn user plan --action disable --username example-user
 ovpn user plan --action disable --username example-user --expect-digest <digest>
 ```
 
-Demo workspace simulates user and observation actions. In Local workspace, **Monitoring** now configures native/Checker schedules and shows history/incidents; **Integrations** installs pinned tools and starts finite Knife diagnostics. See [automatic observation](observation.md) for the exact scope, daily attempt limits and lifecycle. **Changes & recovery** and live user writes remain planned.
+**Monitoring** configures Native and Checker schedules and shows history and incidents. **Integrations** installs pinned tools and starts finite Knife diagnostics. See [automatic observation](observation.md) for schedules, limits and lifecycle.
 
 ## Check traffic
 
-Open **Checks**, select an enabled server and a TCP/REALITY or TCP/TLS profile, enter an existing active monitoring username and press **Run HTTPS check**. The request uses the pinned native Xray client and verifies `https://example.com/`, HTTP 200 and its certificate, with a 20-second timeout and a 1 MiB body limit. It does not create users or deploy configuration. Existing encryption keys are resolved as in the CLI; OS-vault migration is not implemented yet.
+Open **Checks**, select an enabled server and a TCP/REALITY or TCP/TLS profile, choose an eligible user from the selected server’s list and press **Run HTTPS check**. The request uses the pinned native Xray client and verifies `https://example.com/`, HTTP 200 and its certificate, with a 20-second timeout and a 1 MiB body limit. It does not create users or deploy configuration. Existing encryption keys are resolved as in the CLI; OS-vault migration is not implemented yet.
 
 Runtime health remains **Not checked** when inventory has been read. A successful traffic sample expires after five minutes and does not certify UDP, DNS, IPv6 or GUI-client import. For XHTTP, use the owned Checker or Knife/Xray adapters in Integrations. Automatic observations have a separate lifetime and history; their green results cover only the explicitly selected identities and paths.
 
@@ -81,7 +74,7 @@ Send one JSON object per line. Start every session with:
 {"id":"servers-1","method":"servers.list","params":{"limit":50}}
 ```
 
-Implemented methods: `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. The remaining capabilities are `inventory.read`, `users.read` and `checks.run`. Additional implemented observation methods are `observer.status/configure/start/stop/remove/run/cancel`, `integrations.install/setup` and `diagnostics.start`. They advertise observation/integration capabilities separately from server/user writes. Proposed server execution methods in the [architecture](design/desktop/architecture.md) remain unavailable.
+Implemented methods include `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan`, `checks.users` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. `checks.users` returns paginated usernames for enabled, unexpired and non-quota-blocked assignments on the selected server. It advertises `checks.users.read`. Additional implemented observation methods are `observer.status/configure/start/stop/remove/run/cancel`, `integrations.install/setup` and `diagnostics.start`. They advertise observation/integration capabilities separately from server/user writes. Proposed server execution methods in the [architecture](design/desktop/architecture.md) remain unavailable.
 
 The worker processes requests sequentially, rejects unknown fields, bounds messages to 1 MiB and returns stable errors without raw database, path or tunnel diagnostics. Its stdout carries protocol envelopes only. The host verifies the worker digest and exact engine/protocol versions, serializes calls and terminates the session on timeout or malformed output. An explicit later action may reconnect; a failed check is not automatically repeated.
 
@@ -96,4 +89,4 @@ npm --prefix apps/desktop/frontend run build
 go -C apps/desktop vet ./...
 ```
 
-Native macOS launch, local inventory handshake and demo checks were exercised during implementation. Windows x64 has a cross-build gate; native three-platform support, screen-reader/scaling coverage and public installer signing remain outstanding. See the [implementation roadmap](design/desktop/roadmap.md) for subsequent stages.
+Native macOS launch and the local inventory handshake were exercised during implementation. Windows x64 has a cross-build gate; native three-platform support, screen-reader/scaling coverage and public installer signing remain outstanding. See the [implementation roadmap](design/desktop/roadmap.md) for subsequent stages.

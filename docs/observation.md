@@ -4,16 +4,15 @@ OVPN can schedule native and Xray Checker HTTPS checks and run finite Xray Knife
 
 ## Desktop
 
-1. Select **Local workspace**.
-2. In **Integrations**, install the pinned Checker or Knife version if needed. Native checks need no extra tool.
-3. In **Monitoring**, choose **New policy**, select Native or Checker, add the exact node/profile/username targets, review the cadence and daily attempt allowance, and enable the policy.
-4. Inspect latest samples, history, incidents and jobs. Users and Servers show automatic observations separately from manual checks.
+1. In **Integrations**, install the pinned Checker or Knife version if needed. Native checks need no extra tool.
+2. In **Monitoring**, choose **New policy**, select Native or Checker, add the exact server, profile and eligible user targets, review the cadence and daily attempt allowance, and enable the policy.
+3. Inspect latest samples, history, incidents and jobs. Users and Servers show automatic observations separately from manual checks.
 
 The default cadence is 300 seconds, with up to 10 explicit targets per policy and 10 policies. One workspace owner executes one job at a time; targets within a job run sequentially. Cycles do not overlap or catch up after sleep. Successful completion is followed by the configured interval plus up to 15 seconds of jitter. Enabling a duplicate source/target schedule is rejected.
 
-For Knife, select **Integrations**, choose Xray or sing-box, add targets and run the diagnostic. Native and sing-box selections are limited to the TCP profiles; use Checker or Knife/Xray for XHTTP. A tool's unsupported profile is an observer issue, not proof that a node is offline. Speed tests, IP lookup, direct prescan and extra failure diagnosis are disabled.
+For Knife, select **Integrations**, choose Xray or sing-box, add targets and run the diagnostic. Native and sing-box selections are limited to the TCP profiles; use Checker or Knife/Xray for XHTTP. Knife/Xray rejects plain VLESS/XHTTP to public IP addresses. Use Checker for that combination. The result appears as a tool compatibility issue. Speed tests, IP lookup, direct prescan and extra failure diagnosis are disabled.
 
-Checks run while the application is open. Switching to Demo stops work owned by that window; a separate foreground observer runs independently. Saved policies do not resume simply because the application starts: use **Resume enabled policies**. Demo actions are simulations and never start real tools or checks.
+Checks run while the application is open. A separate foreground observer runs independently. Saved policies do not resume simply because the application starts: use **Resume enabled policies**.
 
 ## CLI
 

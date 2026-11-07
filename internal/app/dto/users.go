@@ -1,5 +1,11 @@
 package dto
 
+// CheckUserPage contains only usernames eligible for a check on one server.
+type CheckUserPage struct {
+	Items      []string `json:"items"`
+	NextCursor string   `json:"nextCursor,omitempty"`
+}
+
 // User contains configured access policy, not a claim of runtime connectivity.
 type User struct {
 	Username          string `json:"username"`

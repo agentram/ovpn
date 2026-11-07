@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { backend, demoUserPlan, isStalePlanError } from './api';
-import type { User, UserPlan, UserPlanRequest, UserPolicy } from './api';
+import { backend, isStalePlanError } from './api';
+import type { UserPlan, UserPlanRequest, UserPolicy } from './api';
 import { catalog } from './i18n';
 import type { Language } from './i18n';
 
-export function UserPlanReview({request,language,mode,users,onBack,onBusy,onDemoApply}: {request: UserPlanRequest; language: Language; mode: string; users: User[]; onBack: ()=>void; onBusy: (busy: boolean)=>void; onDemoApply: ()=>void}) {
+export function UserPlanReview({request,language,onBack,onBusy}: {request: UserPlanRequest; language: Language; onBack: ()=>void; onBusy: (busy: boolean)=>void}) {
  const t=catalog(language);
  const [plan,setPlan]=useState<UserPlan|null>(null);
  const [busy,setBusy]=useState(true);
@@ -16,7 +16,7 @@ export function UserPlanReview({request,language,mode,users,onBack,onBusy,onDemo
   setBusy(true);onBusy(true);setError(null);setChecked(false);
   try {
    const params={...request,expectedDigest:recheck?plan?.digest:undefined};
-   const result=await (mode==='demo'?demoUserPlan(params,users):backend.planUser(params));
+   const result=await backend.planUser(params);
    if(token===generation.current){setPlan(result);setChecked(recheck);}
   } catch(e) {if(token===generation.current)setError(isStalePlanError(e)?'stale':'failed');}
   finally {if(token===generation.current){setBusy(false);onBusy(false);}}
@@ -30,8 +30,8 @@ export function UserPlanReview({request,language,mode,users,onBack,onBusy,onDemo
  }
  return <>
   <div className="dialog-body plan-review" aria-busy={busy}>
-   <div className="caption">{mode==='demo'?t.demoPlan:t.localPlan}</div><h2>{action} · {request.username}</h2>
-   <div className="notice preview-banner"><strong>{t.planNotApplied}</strong><p>{mode==='demo'?t.demoOnly:t.planReadOnly}</p></div>
+   <div className="caption">{t.localPlan}</div><h2>{action} · {request.username}</h2>
+   <div className="notice preview-banner"><strong>{t.planNotApplied}</strong><p>{t.planReadOnly}</p></div>
    {busy&&<p role="status">{t.planLoading}</p>}
    {error&&<div className="notice danger-notice" role="alert">{error==='stale'?t.planStale:t.planError}</div>}
    {checked&&<div className="notice" role="status">{t.planUnchanged}</div>}
@@ -42,6 +42,6 @@ export function UserPlanReview({request,language,mode,users,onBack,onBusy,onDemo
     <div className="notice"><strong>{t.planNext}</strong><p>{t.planExecutionSteps}</p></div>
    </>}
   </div>
-  <div className="dialog-foot"><button className="button" disabled={busy} onClick={onBack}>{t.cancel}</button>{plan&&!error&&<button className="button" disabled={busy} onClick={()=>void load(true)}>{t.planRecheck}</button>}{(!plan||error)&&<button className="button primary" disabled={busy} onClick={()=>void load(false)}>{t.planRebuild}</button>}{mode==='demo'&&plan&&!error&&<button className="button primary" disabled={busy||plan.issues.length>0||plan.targets.some(t=>t.issues.length>0)} onClick={onDemoApply}>{t.applyDemo}</button>}</div>
+  <div className="dialog-foot"><button className="button" disabled={busy} onClick={onBack}>{t.cancel}</button>{plan&&!error&&<button className="button" disabled={busy} onClick={()=>void load(true)}>{t.planRecheck}</button>}{(!plan||error)&&<button className="button primary" disabled={busy} onClick={()=>void load(false)}>{t.planRebuild}</button>}</div>
  </>;
 }

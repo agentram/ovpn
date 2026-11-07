@@ -4,6 +4,7 @@ export interface ServerPage { items: Server[]; nextCursor?: string }
 export interface User { username: string; configuredNodes: number; enabledNodes: number; eligibleNodes: number; disabledNodes: number; expiredNodes: number; blockedNodes: number; earliestExpiry?: string; quotaMinBytes: number; quotaMaxBytes: number; defaultQuotaNodes?: number; unmeteredNodes?: number; policyDiff: boolean; identityConflict: boolean }
 export interface UserObservation { outcome: string; server: string; profile: string; fresh: boolean }
 export interface UserPage { items: User[]; nextCursor?: string }
+export interface CheckUserPage { items: string[]; nextCursor?: string }
 export interface CheckRequest { serverId: string; username: string; profile: string }
 export interface Check { serverId: string; profile: string; source: string; kind: string; outcome: string; statusCode?: number; durationMs: number; ttfbMs: number; bytes: number; errorCode?: string; measuredAt: string; freshForSeconds: number; unverified: string[] }
 export interface UserPlanRequest { action: 'create'|'enable'|'disable'; username: string; expiry?: string; quotaBytes?: number; expectedDigest?: string }
@@ -21,6 +22,7 @@ export const backend = {
   servers: (cursor = '') => invoke<ServerPage>('Servers', cursor),
   users: (cursor = '') => invoke<UserPage>('Users', cursor),
   check: (request: CheckRequest) => invoke<Check>('Check', request),
+  checkUsers: (serverId: string, cursor = '') => invoke<CheckUserPage>('CheckUsers', serverId, cursor),
   planUser: (request: UserPlanRequest) => invoke<UserPlan>('PlanUser', request),
 };
 
@@ -33,24 +35,6 @@ export function isFresh(check: Check, receivedAt: number, now: number): boolean 
   return age >= 0 && age < check.freshForSeconds * 1000;
 }
 
-export const demoServers: Server[] = [
-  {id:'node-1',name:'edge-a',role:'vpn',enabled:true,primaryProfile:'vless-reality-tcp-vision',profiles:['vless-reality-tcp-vision'],xrayVersion:'26.3.27',runtime:'not_checked'},
-  {id:'node-2',name:'edge-b',role:'vpn',enabled:true,primaryProfile:'vless-tcp-tls-selfsni-web',profiles:['vless-tcp-tls-selfsni-web','vless-xhttp-plain'],xrayVersion:'26.3.27',runtime:'not_checked'},
-  {id:'node-3',name:'reserve-a',role:'vpn',enabled:false,primaryProfile:'vless-reality-tcp-vision',profiles:['vless-reality-tcp-vision'],xrayVersion:'26.3.27',runtime:'not_checked'},
-];
-
-export function demoCheck(request: CheckRequest): Check {
-  const failed = request.serverId === 'node-2';
-  return {serverId:request.serverId,profile:request.profile,source:'demo',kind:'https.tcp',outcome:failed?'failed':'passed',statusCode:failed?undefined:200,durationMs:failed?2000:142,ttfbMs:failed?0:124,bytes:failed?0:528,errorCode:failed?'request_failed':undefined,measuredAt:new Date().toISOString(),freshForSeconds:300,unverified:['udp','dns','ipv6','gui-import']};
-}
-
-export const demoUsers: User[] = [
- {username:'alice',configuredNodes:2,enabledNodes:2,eligibleNodes:2,disabledNodes:0,expiredNodes:0,blockedNodes:0,quotaMinBytes:107374182400,quotaMaxBytes:107374182400,policyDiff:false,identityConflict:false},
- {username:'bob',configuredNodes:2,enabledNodes:2,eligibleNodes:0,disabledNodes:0,expiredNodes:0,blockedNodes:2,quotaMinBytes:53687091200,quotaMaxBytes:53687091200,policyDiff:false,identityConflict:false},
- {username:'carol',configuredNodes:2,enabledNodes:2,eligibleNodes:0,disabledNodes:0,expiredNodes:2,blockedNodes:0,earliestExpiry:'2026-01-01T00:00:00Z',unmeteredNodes:2,quotaMinBytes:0,quotaMaxBytes:0,policyDiff:false,identityConflict:false},
- {username:'support',unmeteredNodes:1,configuredNodes:1,enabledNodes:1,eligibleNodes:1,disabledNodes:0,expiredNodes:0,blockedNodes:0,quotaMinBytes:0,quotaMaxBytes:0,policyDiff:false,identityConflict:false},
- {username:'standard',configuredNodes:2,enabledNodes:2,eligibleNodes:2,disabledNodes:0,expiredNodes:0,blockedNodes:0,defaultQuotaNodes:2,quotaMinBytes:0,quotaMaxBytes:0,policyDiff:false,identityConflict:false},
-];
 export type PolicyState = 'conflict' | 'unassigned' | 'blocked' | 'expired' | 'disabled' | 'partial' | 'allowed';
 export function userPolicy(user: User, enabledServers: number): PolicyState {
  if(user.identityConflict) return 'conflict';
@@ -61,10 +45,6 @@ export function userPolicy(user: User, enabledServers: number): PolicyState {
  return 'allowed';
 }
 
-export function demoSetUserEnabled(user: User, enabled: boolean): User {
- return {...user,disabledNodes:enabled?0:user.enabledNodes,eligibleNodes:enabled&&user.blockedNodes===0&&user.expiredNodes===0?user.enabledNodes:0};
-}
-
 export function userQuotaKind(user: User): 'explicit'|'default'|'unmetered'|'mixed'|'unknown' {
  if(user.enabledNodes===0)return 'unknown';
  const defaults=user.defaultQuotaNodes??0, unmetered=user.unmeteredNodes??0;
@@ -72,22 +52,6 @@ export function userQuotaKind(user: User): 'explicit'|'default'|'unmetered'|'mix
  if(unmetered>0&&unmetered===user.enabledNodes)return 'unmetered';
  if(defaults>0||unmetered>0)return 'mixed';
  return user.quotaMaxBytes>0?'explicit':'unmetered';
-}
-
-export async function demoUserPlan(request: UserPlanRequest, users: User[]): Promise<UserPlan> {
- const {expectedDigest,...intent}=request;
- const raw=new TextEncoder().encode(JSON.stringify({intent,users,servers:demoServers}));
- const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),b=>b.toString(16).padStart(2,'0')).join('');
- if(expectedDigest&&expectedDigest!==digest)throw new Error('STALE_PLAN');
- const user=users.find(u=>u.username===request.username);
- const expiresAt=request.expiry?new Date(Date.parse(`${request.expiry}T00:00:00Z`)+86400000).toISOString().replace('.000Z','Z'):undefined;
- return {action:request.action,username:request.username,scope:'all_enabled_servers',digest,generatedAt:new Date().toISOString(),executionAvailable:false,issues:user?.identityConflict?['IDENTITY_CONFLICT']:[],requiredSteps:[],
-  targets:demoServers.filter(s=>s.enabled).map((server,index)=>{
-   const before: UserPolicy|null=user&&index<user.enabledNodes?{enabled:user.disabledNodes===0,expiresAt:user.earliestExpiry,quotaBytes:index<(user.defaultQuotaNodes??0)?undefined:user.quotaMinBytes||undefined,quotaEnabled:index>=(user.unmeteredNodes??0),quotaBlocked:index<user.blockedNodes}:null;
-   const issues=request.action==='create'?(before?['USER_EXISTS']:[]):(!before?['USER_MISSING']:[]);
-   const after: UserPolicy|null=issues.length?null:request.action==='create'?{enabled:true,expiresAt,quotaBytes:request.quotaBytes,quotaEnabled:true,quotaBlocked:false}:before?{...before,enabled:request.action==='enable'}:null;
-   return {serverId:server.id,name:server.name,role:server.role,profiles:server.profiles,before,after,issues};
-  })};
 }
 
 export interface ObservationTarget {serverId:string;username:string;profile:string}

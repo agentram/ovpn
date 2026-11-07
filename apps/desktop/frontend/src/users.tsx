@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { catalog } from './i18n';
 import type { Language } from './i18n';
-import { userPolicy, userQuotaKind, demoSetUserEnabled } from './api';
+import { userPolicy, userQuotaKind } from './api';
 import type { User, UserObservation, UserPlanRequest, Observation } from './api';
 import { UserPlanReview } from './plan-review';
 import {observationEn,observationRu} from './observation-i18n';
@@ -11,9 +11,9 @@ export function policyTone(user: User, enabled: number) {
  return ['conflict','blocked'].includes(state)?'danger':['partial','expired'].includes(state)?'warn':state==='allowed'?'ok':'';
 }
 
-export function UsersPanel({language,mode,users,observations,automatic,enabled,busy,more,onMore,onCheck,onDemoChange,onPlanning}: {
- language: Language; mode: string; users: User[]; observations: Record<string,UserObservation>; automatic: Observation[]; enabled: number; busy: boolean; more: boolean;
- onMore: ()=>void; onCheck: (username: string)=>void; onDemoChange: (users: User[])=>void; onPlanning: (busy: boolean)=>void;
+export function UsersPanel({language,users,observations,automatic,enabled,busy,more,onMore,onCheck,onPlanning}: {
+ language: Language; users: User[]; observations: Record<string,UserObservation>; automatic: Observation[]; enabled: number; busy: boolean; more: boolean;
+ onMore: ()=>void; onCheck: (username: string)=>void; onPlanning: (busy: boolean)=>void;
 }) {
  const t=catalog(language);
  const ot=language==='ru'?observationRu:observationEn;
@@ -31,18 +31,6 @@ export function UsersPanel({language,mode,users,observations,automatic,enabled,b
  useEffect(()=>{if(open)modal.current?.showModal();else modal.current?.close();},[open]);
  const labels={allowed:t.allowed,blocked:t.blocked,expired:t.expired,disabled:t.disabledPolicy,partial:t.partial,conflict:t.conflict,unassigned:t.unassigned};
  function close(){setSelected(null);setCreate(false);setRequest(null);setName('');setQuotaGB('100');}
- function applyDemo(){
-  if(mode!=='demo'||!request)return;
-  if(request.action==='create'){
-   if(users.some(u=>u.username===request.username))return;
-   const expiresAt=request.expiry?new Date(Date.parse(`${request.expiry}T00:00:00Z`)+86400000).toISOString():undefined;
-   const expired=!!expiresAt&&Date.parse(expiresAt)<=Date.now();
-   onDemoChange([{username:request.username,configuredNodes:enabled,enabledNodes:enabled,eligibleNodes:expired?0:enabled,disabledNodes:0,expiredNodes:expired?enabled:0,blockedNodes:0,earliestExpiry:expiresAt,quotaMinBytes:request.quotaBytes??0,quotaMaxBytes:request.quotaBytes??0,policyDiff:false,identityConflict:false},...users]);
-  }else{
-   onDemoChange(users.map(u=>u.username===request.username?demoSetUserEnabled(u,request.action==='enable'):u));
-  }
-  close();
- }
  function add(event: React.FormEvent<HTMLFormElement>){
   event.preventDefault();
   const quota=Number(quotaGB);
@@ -58,8 +46,8 @@ export function UsersPanel({language,mode,users,observations,automatic,enabled,b
  return <>
   <div className="users-toolbar">
    <input aria-label={t.searchUsers} placeholder={t.searchUsers} value={query} onChange={e=>setQuery(e.target.value)}/>
-   <button className="button primary" disabled={busy} onClick={()=>setCreate(true)}>＋ {mode==='demo'?t.createUser:t.planCreate}</button>
-   <span className={`badge ${mode==='demo'?'blue':''}`}>{mode==='demo'?t.demoOnly:t.liveRead}</span>
+   <button className="button primary" disabled={busy} onClick={()=>setCreate(true)}>＋ {t.planCreate}</button>
+
   </div>
   <div className="notice"><strong>{t.policyOnly}</strong><p>{t.userScope}</p></div>
   <section className="panel table-panel users-table">
@@ -82,7 +70,7 @@ export function UsersPanel({language,mode,users,observations,automatic,enabled,b
   </section>
   <dialog ref={modal} onCancel={close} onClose={close} className={request?'plan-dialog':undefined}>
    <div className="dialog-head"><h2>{request?t.reviewPlan:create?t.createUser:t.userDetail}</h2><button className="icon-button" aria-label={t.close} onClick={close}>✕</button></div>
-   {request?<UserPlanReview request={request} language={language} mode={mode} users={users} onBack={()=>setRequest(null)} onBusy={onPlanning} onDemoApply={applyDemo}/>:create?<form onSubmit={add}>
+   {request?<UserPlanReview request={request} language={language} onBack={()=>setRequest(null)} onBusy={onPlanning}/>:create?<form onSubmit={add}>
     <div className="dialog-body">
      <label>{t.username}<input autoFocus required maxLength={128} value={name} onChange={e=>setName(e.target.value)} autoComplete="off"/></label>
      {users.some(u=>u.username===name.trim())&&<p className="danger-text">{t.duplicate}</p>}

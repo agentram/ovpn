@@ -465,6 +465,7 @@ func ParseKnife(raw []byte, link string) (dto.Observation, error) {
 	var value struct {
 		Link   string `json:"link"`
 		Status string `json:"status"`
+		Reason string `json:"reason"`
 		Code   int    `json:"code"`
 		TTFB   int64  `json:"ttfb"`
 	}
@@ -492,6 +493,9 @@ func ParseKnife(raw []byte, link string) (dto.Observation, error) {
 		result.Outcome = "observer_error"
 		result.FailureClass = "observer"
 		result.Code = "TOOL_PROFILE_UNAVAILABLE"
+		if value.Status == "broken" && strings.Contains(value.Reason, "vless without TLS or other encryption is prohibited unless the server address is a private IP or domain") {
+			result.Code = "TOOL_REQUIRES_ENCRYPTION"
+		}
 	}
 	return result, nil
 }

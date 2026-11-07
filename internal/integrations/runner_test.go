@@ -51,6 +51,13 @@ func TestKnifeProjectionDropsPrivateMetadataAndRequiresExactInput(t *testing.T) 
 	if err != nil || result.Outcome != "observer_error" || result.FailureClass != "observer" {
 		t.Fatal("unsupported tool profile labelled node failure")
 	}
+	publicEndpoint := bytes.Replace(broken, []byte(`"reason":"private-marker"`),
+		[]byte(`"reason":"infra/conf: vless without TLS or other encryption is prohibited unless the server address is a private IP or domain: private-marker"`), 1)
+	result, err = ParseKnife(publicEndpoint, link)
+	public, _ = json.Marshal(result)
+	if err != nil || result.Code != "TOOL_REQUIRES_ENCRYPTION" || result.FailureClass != "observer" || bytes.Contains(public, []byte("private-marker")) {
+		t.Fatal("public endpoint restriction did not produce a safe compatibility result")
+	}
 }
 
 func TestPinnedManifestAndArchiveExtractionCannotWritePaths(t *testing.T) {

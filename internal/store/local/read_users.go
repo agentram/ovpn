@@ -6,6 +6,26 @@ import (
 	"time"
 )
 
+func (s *Store) ListCheckUsernames(ctx context.Context, serverID int64, after string, limit int, now time.Time) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT u.username FROM users u JOIN servers s ON s.id=u.server_id
+		WHERE s.id=? AND s.enabled=1 AND u.enabled=1 AND u.quota_blocked=0 AND u.username>?
+		AND (u.expiry_date IS NULL OR julianday(u.expiry_date)>julianday(?))
+		ORDER BY u.username LIMIT ?`, serverID, after, now.UTC().Format(time.RFC3339Nano), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	names := make([]string, 0)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
 type UserInventory struct {
 	Username                                                                                string
 	ConfiguredNodes, EnabledNodes, EligibleNodes, DisabledNodes, ExpiredNodes, BlockedNodes int
