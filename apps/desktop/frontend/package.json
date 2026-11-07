@@ -1,0 +1,22 @@
+{
+  "name": "ovpn-desk",
+  "private": true,
+  "version": "1.12.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 8940 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "3.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
+  }
+}

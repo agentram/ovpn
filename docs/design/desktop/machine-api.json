@@ -1,0 +1,170 @@
+{
+  "status": "target-examples-operation-methods-not-implemented",
+  "protocolVersion": 1,
+  "transport": "bounded-json-lines-over-stdio",
+  "handshake": {
+    "request": {
+      "id": "req-1",
+      "method": "engine.hello",
+      "params": {
+        "protocolVersion": 1
+      }
+    },
+    "response": {
+      "id": "req-1",
+      "result": {
+        "protocolVersion": 1,
+        "engineVersion": "1.12.0",
+        "capabilities": [
+          "inventory.read",
+          "users.read",
+          "checks.run",
+          "checks.users.read",
+          "users.plan.read",
+          "observer.read",
+          "observer.configure",
+          "observer.run",
+          "integrations.install",
+          "diagnostics.run"
+        ]
+      }
+    }
+  },
+  "plan": {
+    "request": {
+      "id": "req-2",
+      "method": "operations.plan",
+      "params": {
+        "kind": "server.init",
+        "serverId": "node-demo",
+        "expectedRevision": "rev-demo"
+      }
+    },
+    "response": {
+      "id": "req-2",
+      "result": {
+        "planId": "plan-demo",
+        "digest": "example-digest",
+        "scope": {
+          "serverIds": [
+            "node-demo"
+          ],
+          "existingUsers": 0
+        },
+        "serviceRestarts": [
+          "new-runtime"
+        ],
+        "verification": [
+          "runtime.ready",
+          "https.tcp"
+        ],
+        "expiresInSeconds": 300
+      }
+    }
+  },
+  "start": {
+    "id": "req-3",
+    "method": "operations.start",
+    "params": {
+      "planId": "plan-demo",
+      "digest": "example-digest"
+    }
+  },
+  "event": {
+    "event": "operation.step",
+    "operationId": "op-demo",
+    "sequence": 4,
+    "data": {
+      "phase": "snapshot",
+      "state": "completed",
+      "evidence": {
+        "integrityVerified": true
+      }
+    }
+  },
+  "checkView": {
+    "serverId": "node-demo",
+    "profile": "vless-reality-tcp-vision",
+    "sourceId": "local-native",
+    "kind": "https.tcp",
+    "outcome": "passed",
+    "durationMs": 152,
+    "ttfbMs": 140,
+    "freshForSeconds": 300,
+    "scope": [
+      "https",
+      "tcp"
+    ],
+    "unverified": [
+      "udp",
+      "dns",
+      "gui-import"
+    ]
+  },
+  "error": {
+    "id": "req-3",
+    "error": {
+      "code": "PLAN_STALE",
+      "message": "The server revision changed. Prepare a new plan.",
+      "retryable": false
+    }
+  },
+  "notes": [
+    "IDs and digests are synthetic examples, not access tokens.",
+    "Use stable storage identifiers rather than human-readable labels as identity.",
+    "Production validation must reject unknown fields and enforce revision preconditions.",
+    "Messages must not contain raw model.Server records, private keys, bearer tokens or client links outside explicit one-time delivery."
+  ],
+  "implementedMethods": [
+    "engine.hello",
+    "workspace.summary",
+    "servers.list",
+    "users.list",
+    "checks.run",
+    "checks.users",
+    "users.plan",
+    "observer.status",
+    "observer.configure",
+    "observer.start",
+    "observer.stop",
+    "observer.remove",
+    "observer.run",
+    "observer.cancel",
+    "integrations.install",
+    "integrations.setup",
+    "diagnostics.start"
+  ],
+  "userPlanReview": {
+    "status": "implemented-read-only",
+    "request": {
+      "id": "plan-user-1",
+      "method": "users.plan",
+      "params": {
+        "action": "disable",
+        "username": "example-user"
+      }
+    },
+    "recheck": "Repeat the same request with expectedDigest equal to the full returned digest. STALE_PLAN rejects changed local intent or state.",
+    "executionAvailable": false,
+    "limits": {
+      "targets": 100
+    },
+    "remoteActions": false
+  },
+  "observation": {
+    "status": "implemented-opt-in",
+    "target": {
+      "serverId": "node-1",
+      "username": "monitor-user",
+      "profile": "vless-reality-tcp-vision"
+    },
+    "limits": {
+      "policies": 10,
+      "targetsPerPolicy": 10,
+      "parallelJobs": 1,
+      "retainedSamples": 5000
+    },
+    "lifecycle": "while-open-or-explicit-foreground-observer",
+    "serverWrites": false
+  }
+}
