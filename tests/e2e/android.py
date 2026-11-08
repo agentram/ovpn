@@ -155,7 +155,13 @@ def android(lab):
                 emulator.tap("Manage access")
                 emulator.tap("Update list")
                 emulator.find("The list is unavailable. Your saved profiles are still here.")
+                # Reload persisted access and verify it where the user connects,
+                # independently of scrolling on the access management screen.
+                emulator.shell("am", "force-stop", PACKAGE)
+                emulator.launch()
                 emulator.find("Primary")
+                emulator.tap("Change profile")
+                emulator.find("Backup")
                 print("PASS revoked subscription keeps the last usable profile snapshot", flush=True)
         finally:
             emulator.shell("am", "force-stop", PACKAGE)
