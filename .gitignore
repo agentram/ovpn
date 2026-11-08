@@ -56,3 +56,8 @@ build/
 *.tgz
 backups/
 backup-artifact/
+
+# Local end-to-end test output
+/apps/desktop/frontend/test-results/
+/apps/desktop/frontend/playwright-report/
+__pycache__/

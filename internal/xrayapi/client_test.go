@@ -53,7 +53,7 @@ func TestAccountForInboundPreservesTransportFlow(t *testing.T) {
 		{"vless-tcp-tls-selfsni-web", defaultVLESSFlow},
 		{" VLESS-TCP-TLS-SELFSNI-WEB ", defaultVLESSFlow},
 		{"vless-xhttp-plain", ""},
-		{"vless-xhttp-vlessenc", ""},
+		{"vless-xhttp-vlessenc", defaultVLESSFlow},
 	} {
 		t.Run(tc.tag, func(t *testing.T) {
 			acc := accountForInbound(tc.tag, "test-uuid")

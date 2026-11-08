@@ -103,9 +103,9 @@ func (c *Client) AddUser(ctx context.Context, inboundTag, email, uuid string) er
 // accountForInbound builds the VLESS account (with the appropriate flow) for an inbound.
 func accountForInbound(inboundTag, uuid string) *vless.Account {
 	acc := &vless.Account{Id: uuid}
-	// Keep runtime adds aligned with rendered config for REALITY/VLESS inbounds.
+	// Keep runtime adds aligned with the rendered profiles that use Vision.
 	switch strings.ToLower(strings.TrimSpace(inboundTag)) {
-	case "", "vless-reality", "vless-tcp-tls-selfsni-web":
+	case "", "vless-reality", "vless-tcp-tls-selfsni-web", "vless-xhttp-vlessenc":
 		acc.Flow = defaultVLESSFlow
 	}
 	return acc

@@ -12,17 +12,22 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"ovpn/internal/clientcfg"
 	"ovpn/internal/defaults"
 	"ovpn/internal/deploy"
 	"ovpn/internal/model"
+	"ovpn/internal/probe"
+	"ovpn/internal/subscription"
 	"ovpn/internal/xraycfg"
 )
 
@@ -62,6 +67,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 	fixture := network + "-fixture"
 	startCompatibilityContainer(t, fixture, network, []string{
 		"--network-alias", "ovpn-target.invalid", "--user", "0:0",
+		"-p", "127.0.0.1::443",
 		"-v", certDir + ":/fixture:ro", "-v", filepath.Join(certDir, "nginx.conf") + ":/etc/nginx/conf.d/default.conf:ro",
 		defaults.DefaultWebImage,
 	})
@@ -73,6 +79,10 @@ func TestClientCoreCompatibility(t *testing.T) {
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(certificate) {
 		t.Fatal("invalid fixture certificate")
+	}
+	fixturePort := strings.TrimSpace(mustCompatibilityDocker(t, "port", fixture, "443"))
+	if err := waitCompatibilityFixture(fixturePort, roots, "ovpn-validation.invalid"); err != nil {
+		t.Fatal(err)
 	}
 	key, err := ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
@@ -140,13 +150,16 @@ func TestClientCoreCompatibility(t *testing.T) {
 		writeCompatibilityFile(t, configPath, raw)
 	}
 	renderServer("default", true)
-	startCompatibilityContainer(t, serverContainer, network, []string{"--network-alias", srv.Domain, "--user", "0:0", "-v", configPath + ":/etc/xray/config.json:ro", "-v", certDir + ":/etc/xray/certs:ro", images["xray"], "run", "-config", "/etc/xray/config.json"})
+	startCompatibilityContainer(t, serverContainer, network, []string{"--network-alias", srv.Domain, "--user", "0:0", "-p", "127.0.0.1::443", "-v", configPath + ":/etc/xray/config.json:ro", "-v", certDir + ":/etc/xray/certs:ro", images["xray"], "run", "-config", "/etc/xray/config.json"})
 	check := func(t *testing.T, core, fingerprint string, wantPass bool) {
 		t.Helper()
-		time.Sleep(300 * time.Millisecond)
 		if strings.TrimSpace(mustCompatibilityDocker(t, "inspect", "--format", "{{.State.Running}}", serverContainer)) != "true" {
 			logs, _ := compatibilityDocker("logs", serverContainer)
 			t.Fatalf("server did not start: %s", logs)
+		}
+		serverPort := strings.TrimSpace(mustCompatibilityDocker(t, "port", serverContainer, "443"))
+		if err := waitCompatibilityTCP(serverPort); err != nil {
+			t.Fatal(err)
 		}
 		current, err := app.store.GetServerByName(app.ctx, "main")
 		if err != nil {
@@ -155,6 +168,37 @@ func TestClientCoreCompatibility(t *testing.T) {
 		link, err := buildUserProfileLink(*current, user, current.NormalizedPrimaryProfile(), userLinkOptions{fingerprint: fingerprint})
 		if err != nil {
 			t.Fatal(err)
+		}
+		if core == "native-subscription" {
+			link = compatibilitySubscriptionLink(t, app, current.Name, user.Username)
+		}
+		if core == "native" || core == "native-subscription" {
+			parsed, err := url.Parse(link)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parsed.Host = strings.TrimSpace(mustCompatibilityDocker(t, "port", serverContainer, "443"))
+			cfg, err := clientcfg.FromLink(parsed.String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if parsed.Query().Get("security") == "tls" {
+				tlsSettings := cfg.Outbounds[0]["streamSettings"].(map[string]any)["tlsSettings"].(map[string]any)
+				tlsSettings["certificates"] = []any{map[string]any{"usage": "verify", "certificateFile": filepath.Join(certDir, "fullchain.pem")}}
+			}
+			tunnel, err := probe.Open(context.Background(), cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tunnel.Close()
+			result, checkErr := probe.Check(context.Background(), probe.Options{
+				URL: "https://" + fixtureIP + "/", ExpectedStatus: 200, Timeout: 8 * time.Second,
+				MaxBodyBytes: 1024, RootCAs: roots, ServerName: "ovpn-validation.invalid",
+			}, tunnel.DialContext)
+			if result.Success != wantPass {
+				t.Fatalf("native/%s traffic passed=%v, want %v: %v", fingerprint, result.Success, wantPass, checkErr)
+			}
+			return
 		}
 		config, command := compatibilityClientConfig(t, core, link)
 		file := filepath.Join(t.TempDir(), "client.json")
@@ -229,10 +273,12 @@ func TestClientCoreCompatibility(t *testing.T) {
 		}
 	}
 	t.Run("xray-default-policy", func(t *testing.T) { check(t, "xray", "chrome", true) })
+	t.Run("native-default-policy", func(t *testing.T) { check(t, "native", "firefox", true) })
+	t.Run("subscription-default-policy", func(t *testing.T) { check(t, "native-subscription", "firefox", true) })
 	t.Run("sing-box-default-policy-refused", func(t *testing.T) { check(t, "sing-box", "chrome", false) })
 	renderServer("1.0.0", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
-	for _, core := range []string{"xray", "sing-box", "mihomo"} {
+	for _, core := range []string{"xray", "sing-box", "mihomo", "native"} {
 		for _, fingerprint := range []string{"chrome", "firefox"} {
 			t.Run(core+"/"+fingerprint, func(t *testing.T) { check(t, core, fingerprint, true) })
 		}
@@ -240,6 +286,7 @@ func TestClientCoreCompatibility(t *testing.T) {
 	renderServer("1.0.0", false)
 	mustCompatibilityDocker(t, "restart", serverContainer)
 	t.Run("disabled-user-refused", func(t *testing.T) { check(t, "xray", "chrome", false) })
+	t.Run("native-disabled-user-refused", func(t *testing.T) { check(t, "native", "firefox", false) })
 	renderServer("default", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
 	t.Run("reset-restores-default-policy", func(t *testing.T) { check(t, "sing-box", "chrome", false) })
@@ -250,11 +297,115 @@ func TestClientCoreCompatibility(t *testing.T) {
 	}
 	renderServer("default", true)
 	mustCompatibilityDocker(t, "restart", serverContainer)
-	for _, core := range []string{"xray", "sing-box", "mihomo"} {
+	for _, core := range []string{"xray", "sing-box", "mihomo", "native"} {
 		for _, fingerprint := range []string{"chrome", "firefox"} {
 			t.Run("tls-self-sni/"+core+"/"+fingerprint, func(t *testing.T) { check(t, core, fingerprint, true) })
 		}
 	}
+	t.Run("tls-self-sni/subscription", func(t *testing.T) { check(t, "native-subscription", "firefox", true) })
+}
+
+// Only fixture setup uses this direct request; all client assertions still cross the VPN.
+func waitCompatibilityFixture(address string, roots *x509.CertPool, serverName string) error {
+	transport := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: serverName, MinVersion: tls.VersionTLS13}, DisableKeepAlives: true}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: time.Second}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		response, err := client.Get("https://" + address + "/")
+		if err == nil {
+			body, readErr := io.ReadAll(io.LimitReader(response.Body, 1024))
+			_ = response.Body.Close()
+			if readErr == nil && response.StatusCode == http.StatusOK && string(body) == "ovpn-client-compatibility\n" {
+				return nil
+			}
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("HTTPS fixture did not become ready")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func TestCompatibilityFixtureWaitsForExpectedHTTPSResponse(t *testing.T) {
+	t.Parallel()
+	var attempts atomic.Int64
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch attempts.Add(1) {
+		case 1:
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case 2:
+			_, _ = io.WriteString(w, "wrong fixture")
+		default:
+			_, _ = io.WriteString(w, "ovpn-client-compatibility\n")
+		}
+	}))
+	defer server.Close()
+	roots := x509.NewCertPool()
+	roots.AddCert(server.Certificate())
+	if err := waitCompatibilityFixture(strings.TrimPrefix(server.URL, "https://"), roots, ""); err != nil {
+		t.Fatal(err)
+	}
+	if attempts.Load() != 3 {
+		t.Fatalf("fixture marked ready after %d attempts", attempts.Load())
+	}
+}
+
+func waitCompatibilityTCP(address string) error {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		conn, err := net.DialTimeout("tcp", address, 250*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("server listener did not become ready")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func compatibilitySubscriptionLink(t *testing.T, app *App, server, username string) string {
+	t.Helper()
+	entries, err := app.subscriptionEntries(subscriptionSelection{username: username, server: server})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	store, err := subscription.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	id, token, err := store.Publish("", username, "", entries, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := subscription.NewHandler(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handler.Close()
+	delivery := httptest.NewTLSServer(handler)
+	defer delivery.Close()
+	client := delivery.Client()
+	client.Timeout = 3 * time.Second
+	response, err := client.Get(delivery.URL + "/sub/" + id + "/" + token)
+	if err != nil {
+		t.Fatal("subscription HTTPS download failed")
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil || response.StatusCode != http.StatusOK {
+		t.Fatal("subscription HTTP response failed")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(string(body))
+	links := strings.Fields(string(decoded))
+	if err != nil || len(links) != 1 {
+		t.Fatal("subscription should deliver exactly one primary-profile link")
+	}
+	return links[0]
 }
 
 func compatibilityClientConfig(t *testing.T, core, link string) ([]byte, []string) {

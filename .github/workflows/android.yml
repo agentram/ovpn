@@ -1,0 +1,67 @@
+name: Android
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/android/**'
+      - 'mobile/androidbridge/**'
+      - 'internal/clientcfg/**'
+      - 'internal/subscription/**'
+      - 'internal/xraycfg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'LICENSE'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/android/**'
+      - 'mobile/androidbridge/**'
+      - 'internal/clientcfg/**'
+      - 'internal/subscription/**'
+      - 'internal/xraycfg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'LICENSE'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # This image includes the Android SDK command-line tools.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - name: Install Android SDK packages
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+      - name: Test Go bridge and build both ABIs
+        run: |
+          go test ./mobile/androidbridge
+          apps/android/build-core.sh
+      - name: Test and package Android
+        working-directory: apps/android
+        run: |
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:bundleRelease
+          ./check-alignment.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload development artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ovpn-tunnel-android
+          path: |
+            apps/android/app/build/outputs/apk/debug/app-debug.apk
+            apps/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

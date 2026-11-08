@@ -52,6 +52,8 @@ Ask the administrator for:
 - your personal VPN link in `vless://...` format
 - a QR code for the same link for quick mobile import
 
+The administrator can instead provide a personal HTTPS subscription URL containing several nodes. Add it as a subscription and refresh it after the administrator updates the nodes. Treat this URL as a secret credential too. See [client subscriptions](subscriptions.md) for the operator workflow and tested scope.
+
 Important:
 
 - treat the link and QR code as a secret credential

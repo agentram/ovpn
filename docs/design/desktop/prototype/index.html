@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>OVPN Desk — concept</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="i18n.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+<svg class="symbols" aria-hidden="true"><defs>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01M12 7h5M12 17h5"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M19 21v-3a6 6 0 0 0-2-4"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M2 12h5l3-8 4 16 3-8h5"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 4v6h6M3 10a9 9 0 1 1 0 7M12 7v5l3 2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3h.01"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5"/><path d="m11.5 11.5 9 9m-4-4 3-3m-6 0 3-3"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3m6 0h5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="m9 15 6-6m-7 3-3 3a4 4 0 0 0 6 6l3-3m2-6 3-3a4 4 0 0 0-6-6l-3 3"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m8 4 8 8-8 8"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+</defs></svg>
+<div class="shell">
+  <aside class="sidebar" aria-label="Main navigation">
+    <a class="brand" href="#overview" aria-label="OVPN Desk, overview"><span class="brand-mark"></span><span>ovpn<span class="desk">DESK</span></span></a>
+    <button class="workspace" data-act="workspace" aria-label="Choose a demo scenario"><span class="workspace-dot"></span><span><strong>Personal fleet</strong><small>Local management</small></span><span class="tiny">⌄</span></button>
+    <div class="nav-caption">WORKSPACE</div>
+    <nav id="navigation"></nav>
+    <div class="sidebar-bottom">
+      <div class="local-note"><span class="small-symbol">◉</span><span>Your keys.<br><strong>Your control.</strong></span></div>
+      <button class="theme-button" data-act="settings" aria-label="Settings"><svg class="icon"><use href="#i-grid"/></svg><span>Settings</span></button>
+      <button class="theme-button" data-act="theme" aria-label="Switch theme"><svg class="icon"><use href="#i-sun"/></svg><span id="theme-label">Light theme</span><kbd>◐</kbd></button>
+      <div class="version">Design concept <span>01</span></div>
+    </div>
+  </aside>
+  <div class="body">
+    <header class="topbar">
+      <div class="breadcrumb"><span>Personal fleet</span><span class="slash">/</span><strong id="page-label">Overview</strong></div>
+      <div class="header-actions"><button class="search-trigger" data-act="command"><svg class="icon"><use href="#i-search"/></svg><span>Search or run an action…</span><kbd>Ctrl / ⌘ K</kbd></button><span class="demo-tag">DEMO</span><span class="avatar" aria-label="Operator">OP</span></div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="statusbar"><span><i class="dot ok"></i> Local workspace</span><span>Interactive prototype · sample data only · no commands are executed</span></footer>
+  </div>
+</div>
+<dialog id="modal" aria-labelledby="modal-title"></dialog>
+<dialog id="drawer" class="drawer" aria-labelledby="drawer-title"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # Monitoring operations
 
+For client-path HTTPS checks alongside runtime metrics, see [traffic probes and Xray Checker](probes.md).
+
 Monitoring is optional and managed by `ovpn`.
 Recommended host model is clean ovpn-only.
 

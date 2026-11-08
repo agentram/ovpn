@@ -19,7 +19,9 @@ test-cover:
 	go tool cover -func=coverage.out
 
 test-race:
-	go test -race ./...
+	# Vision uses upstream reflect-based TLS access; retain race instrumentation
+	# while disabling checkptr only for the VLESS implementation.
+	go test -race -gcflags='github.com/xtls/xray-core/proxy/vless/...=-d=checkptr=0' ./...
 
 lint:
 	golangci-lint run --timeout=5m
@@ -62,3 +64,19 @@ docs-pdf:
 
 ci-local: repo-hygiene templates-validate fmt-check vet test docker-validate ansible-lint ansible-syntax
 	@echo "Local CI checks passed"
+
+.PHONY: e2e-cli e2e-tools e2e-desktop e2e-android-build e2e-android
+e2e-cli:
+	python3 -B tests/e2e/run.py cli
+
+e2e-tools:
+	python3 -B tests/e2e/run.py cli --tools
+
+e2e-desktop:
+	python3 -B tests/e2e/run.py desktop
+
+e2e-android-build:
+	python3 -B tests/e2e/run.py android-build
+
+e2e-android:
+	python3 -B tests/e2e/run.py android

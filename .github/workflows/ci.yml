@@ -3,6 +3,7 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
@@ -15,8 +16,27 @@ permissions:
   contents: read
 
 jobs:
+  e2e:
+    uses: ./.github/workflows/e2e.yml
+
   go-quality:
+    # Keep the required check name stable for all PRs, including docs-only PRs.
     name: Go Quality
+    needs: [go-checks, e2e]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require Go checks and E2E result
+        env:
+          GO_CHECKS: ${{ needs.go-checks.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          printf 'Go checks: %s\nEnd-to-end: %s\n' "$GO_CHECKS" "$E2E"
+          [[ "$GO_CHECKS" == success && "$E2E" == success ]]
+
+  go-checks:
+    name: Go Checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -316,3 +336,45 @@ jobs:
             echo "- ${syntax_status} playbook syntax checks"
             echo "- Playbooks checked: bootstrap, deploy, security"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  desktop-spike:
+    name: Desktop Development Build
+    runs-on: macos-15
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        # actions/setup-go v7.0.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/desktop/go.sum
+      - name: Setup Node
+        # actions/setup-node v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/desktop/frontend/package-lock.json
+      - name: Frontend checks
+        working-directory: apps/desktop/frontend
+        run: |
+          npm ci --ignore-scripts --no-fund --no-audit
+          npm test
+          npm run build
+      - name: Native macOS development bundle
+        run: python3 scripts/build_desktop.py --skip-frontend
+      - name: Desktop host checks
+        run: |
+          go -C apps/desktop vet ./...
+          go -C apps/desktop test ./...
+      - name: Windows x64 cross-build
+        run: python3 scripts/build_desktop.py --target windows --arch amd64 --skip-frontend
