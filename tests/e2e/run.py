@@ -232,9 +232,13 @@ def desktop(lab):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=("cli", "desktop", "android"))
+    parser.add_argument("suite", choices=("cli", "desktop", "android", "android-build"))
     parser.add_argument("--tools", action="store_true", help="install and exercise real pinned Checker and Knife binaries")
     args = parser.parse_args()
+    if args.suite == "android-build":
+        from android import build_android
+        build_android()
+        return
     with tempfile.TemporaryDirectory(prefix="ovpn-e2e-") as directory:
         lab = Lab(Path(directory))
         if args.suite == "cli":

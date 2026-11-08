@@ -101,18 +101,25 @@ class Emulator:
         self.tap(profile)
 
 
-def android(lab):
-    emulator = Emulator()
-    directory = lab.directory / "android"
-    directory.mkdir(mode=0o700)
-    (directory / "bundles").mkdir(mode=0o700)
-    (directory / "invites").mkdir(mode=0o700)
+def build_android():
     android_dir = ROOT / "apps/android"
     command(android_dir / "build-core.sh", timeout=360)
     subprocess.run(("./gradlew", "--no-daemon", ":app:testDebugUnitTest", ":app:assembleDebug"),
                    cwd=android_dir, check=True, timeout=360)
     apk = android_dir / "app/build/outputs/apk/debug/app-debug.apk"
     command(android_dir / "check-alignment.sh", apk, timeout=45)
+    return apk
+
+
+def android(lab):
+    apk_env = os.environ.get("OVPN_E2E_ANDROID_APK")
+    apk = Path(apk_env).resolve() if apk_env else build_android()
+    check(apk.is_file(), "The Android test APK has not been built")
+    emulator = Emulator()
+    directory = lab.directory / "android"
+    directory.mkdir(mode=0o700)
+    (directory / "bundles").mkdir(mode=0o700)
+    (directory / "invites").mkdir(mode=0o700)
     with background(lab.fixture, "android", directory) as fixture:
         ready = directory / "ready"
         def available():
