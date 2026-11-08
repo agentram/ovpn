@@ -6,6 +6,32 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.12.0
+
+### Added
+- Gate merges on CLI, Desk and Android release journeys selected by the changed code, with disposable workspaces and real pinned Checker/Knife probes.
+- Add O Tunnel for Android with one-time setup codes, camera and saved QR import, and English, Russian and Simplified Chinese. Switch TCP/TLS or TCP/REALITY profiles from the home screen and preview a local connection report before sharing.
+- Open the configured OVPN workspace on Desktop startup and select eligible users per server for manual checks, schedules and Knife diagnostics. Remove simulated inventory and actions from the application.
+- Add opt-in native/Checker schedules, persisted observation history and incidents, pinned Checker/Knife installation and finite Knife diagnostics in Desktop and `observe` CLI. Reserve daily check attempts, reject duplicate schedules, separate observer errors from traffic failures, and expire evidence after source/configuration changes.
+- Preview create/enable/disable user intent through a shared, read-only planner in Desktop and `user plan`. Show current/proposed policy for every enabled node and reject a changed local snapshot with `--expect-digest`; live execution still requires the operation journal and locking milestone.
+- Expose paged desktop user-policy inventory without client credentials, add clearer green/red/amber status styling and expand the application plan with monitoring, Checker/Knife integration and change/recovery workflow previews. Live server/user writes remain planned.
+- Add the first OVPN Desk development build: English/Russian React UI, a Wails host with a verified bundled worker, read-only inventory and explicit native HTTPS checks. Add protocol 1 via `ovpn machine --stdio --protocol 1`; server write workflows and public desktop installers remain future work.
+- Document the OVPN Desk architecture and visual direction, with an interactive desktop prototype using sample data. This is a design proposal, not a native desktop release.
+- Export per-user multi-server subscriptions and publish stable URLs with token rotation, revocation and per-profile expiry filtering. An optional read-only delivery service consumes prepared bundles without the control database or SSH keys, and requires TLS outside loopback.
+- Export private, profile-aware Xray JSON files for Xray Checker with `user export --format xray-checker`.
+- Check HTTPS traffic over TCP/REALITY or TCP/TLS from the operator machine with `user probe`, using the pinned Xray client core and credential-free JSON results. Probes enforce TLS verification, time and response-size limits, and the expected HTTP status without redirects or a direct fallback.
+
+### Fixed
+- Preserve Vision flow when adding users at runtime to the VLESS Encryption/XHTTP inbound. Show an explicit compatibility result when Knife rejects unencrypted VLESS for a public IP.
+- Distinguish agent-default, explicit and disabled quotas in desktop user inventory instead of presenting inherited defaults as unlimited.
+- Wait for the verified HTTPS fixture and server listener in client compatibility tests instead of relying on a fixed startup delay.
+- Complete the project site's first-server example with user creation and remove the redundant deploy after `server init`.
+- Put release downloads and the first-connection workflow near the start of the README and project site, with SSH prerequisites and client verification steps.
+
+### Security
+- Update `golang.org/x/net` to `0.62.0` for GO-2026-6860 and GO-2026-6866.
+- Update `github.com/andybalholm/brotli` to `1.2.7` and `github.com/klauspost/compress` to `1.20.2` for GO-2026-6888 and GO-2026-6865.
+
 ## 1.11.2
 
 ### Fixed

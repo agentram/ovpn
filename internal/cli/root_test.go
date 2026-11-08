@@ -22,7 +22,7 @@ func TestNewRootCmdRegistersTopLevelCommands(t *testing.T) {
 		names = append(names, c.Name())
 	}
 
-	for _, want := range []string{"server", "doctor", "user", "stats", "config", "deploy", "restart", "version"} {
+	for _, want := range []string{"server", "doctor", "user", "subscription", "stats", "config", "deploy", "restart", "version", "machine"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("expected top-level command %q, got %v", want, names)
 		}
