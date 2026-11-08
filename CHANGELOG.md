@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.12.0
 
 ### Added
+- Gate merges on CLI, Desk and Android release journeys selected by the changed code, with disposable workspaces and real pinned Checker/Knife probes.
 - Add O Tunnel for Android with one-time setup codes, camera and saved QR import, and English, Russian and Simplified Chinese. Switch TCP/TLS or TCP/REALITY profiles from the home screen and preview a local connection report before sharing.
 - Open the configured OVPN workspace on Desktop startup and select eligible users per server for manual checks, schedules and Knife diagnostics. Remove simulated inventory and actions from the application.
 - Add opt-in native/Checker schedules, persisted observation history and incidents, pinned Checker/Knife installation and finite Knife diagnostics in Desktop and `observe` CLI. Reserve daily check attempts, reject duplicate schedules, separate observer errors from traffic failures, and expire evidence after source/configuration changes.

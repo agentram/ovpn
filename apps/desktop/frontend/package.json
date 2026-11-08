@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8940 --strictPort",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test src/*.test.ts"
+    "test": "node --test src/*.test.ts",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@wailsio/runtime": "3.1.0",
@@ -14,6 +15,7 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "typescript": "7.0.2",
