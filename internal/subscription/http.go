@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,8 +18,9 @@ import (
 )
 
 type Handler struct {
-	store *Store
-	now   func() time.Time
+	store   *Store
+	invites *Invites
+	now     func() time.Time
 }
 
 func NewHandler(dir string) (*Handler, error) {
@@ -29,13 +31,22 @@ func NewHandler(dir string) (*Handler, error) {
 	return &Handler{store: store, now: time.Now}, nil
 }
 
-func (h *Handler) Close() error { return h.store.Close() }
+func (h *Handler) Close() error {
+	if h.invites != nil {
+		return errors.Join(h.invites.Close(), h.store.Close())
+	}
+	return h.store.Close()
+}
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, private")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if r.URL.Path == "/activate" && h.invites != nil {
+		h.activate(w, r)
+		return
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -48,18 +59,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/sub/"), "/")
-	if !strings.HasPrefix(r.URL.Path, "/sub/") || len(parts) != 2 || !validID(parts[0]) {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	token, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil || len(token) != 32 || base64.RawURLEncoding.EncodeToString(token) != parts[1] {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	bundle, err := h.store.Read(parts[0])
-	if err != nil || subtle.ConstantTimeCompare([]byte(bundle.TokenHash), []byte(tokenHash(parts[1]))) != 1 {
+	bundle, err := h.lookup(r.URL.Path)
+	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -76,8 +77,55 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) lookup(path string) (Bundle, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) != 4 || parts[0] != "" {
+		return Bundle{}, ErrNotFound
+	}
+	switch parts[1] {
+	case "device":
+		if h.invites != nil {
+			return h.invites.deviceBundle(h.store, parts[2], parts[3])
+		}
+	case "sub":
+		if !validToken(parts[3]) {
+			return Bundle{}, ErrNotFound
+		}
+		bundle, err := h.store.Read(parts[2])
+		if err == nil && subtle.ConstantTimeCompare([]byte(bundle.TokenHash), []byte(tokenHash(parts[3]))) == 1 {
+			return bundle, nil
+		}
+	}
+	return Bundle{}, ErrNotFound
+}
+
+func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var request struct {
+		Code    string `json:"code"`
+		Session string `json:"session"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 512))
+	if decoder.Decode(&request) != nil || decoder.Decode(new(any)) != io.EOF {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	switch err := h.invites.redeem(h.store, request.Code, request.Session, h.now()); {
+	case errors.Is(err, ErrNotFound):
+		w.WriteHeader(http.StatusNotFound)
+	case err != nil:
+		w.WriteHeader(http.StatusServiceUnavailable)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 type ServeOptions struct {
-	Dir, Listen, CertFile, KeyFile string
+	Dir, InviteDir, Listen, CertFile, KeyFile string
 }
 
 func (o ServeOptions) Validate() error {
@@ -108,8 +156,14 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return err
 	}
 	defer handler.Close()
+	if opts.InviteDir != "" {
+		handler.invites, err = OpenInvites(opts.InviteDir)
+		if err != nil {
+			return err
+		}
+	}
 	server := &http.Server{
-		Handler: handler, ReadHeaderTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second,
+		Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second,
 		IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192,
 		ErrorLog: log.New(io.Discard, "", 0),
 	}

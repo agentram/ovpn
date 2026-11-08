@@ -1,6 +1,8 @@
 package io.github.agentram.ovpn.tunnel
 
+import android.os.Build
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,8 +25,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -62,10 +62,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 
-private enum class Page(val label: Int, val eyebrow: Int, val symbol: String) {
-    Home(R.string.home, R.string.eyebrow_home, "⌂"),
-    Profiles(R.string.profiles, R.string.eyebrow_profiles, "≡"),
-    Settings(R.string.settings, R.string.eyebrow_settings, "⚙"),
+private enum class Page(val label: Int) {
+    Home(R.string.app_name), Profiles(R.string.choose_profile), Settings(R.string.settings), Access(R.string.manage_access),
 }
 
 @Composable
@@ -79,6 +77,8 @@ internal fun TunnelScreen(
     disconnect: () -> Unit,
     retry: () -> Unit,
     scan: () -> Unit,
+    chooseImage: () -> Unit,
+    shareReport: (String) -> Unit,
 ) {
     val library by model.library.collectAsStateWithLifecycle()
     val tunnel by model.tunnel.collectAsStateWithLifecycle()
@@ -87,19 +87,11 @@ internal fun TunnelScreen(
     var paste by remember { mutableStateOf(false) }
     var removal by remember { mutableStateOf<Pair<String, () -> Unit>?>(null) }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                Page.entries.forEach { target ->
-                    NavigationBarItem(
-                        selected = page == target, onClick = { page = target },
-                        icon = { Text(target.symbol, Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.titleLarge) },
-                        label = { Text(stringResource(target.label)) },
-                    )
-                }
-            }
-        },
-    ) { insets ->
+    var qr by remember { mutableStateOf(false) }
+    var report by remember { mutableStateOf<String?>(null) }
+    BackHandler(page != Page.Home) { page = if (page == Page.Access) Page.Settings else Page.Home }
+
+    Scaffold { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp),
@@ -107,10 +99,18 @@ internal fun TunnelScreen(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 20.dp),
             ) {
                 item {
-                    Text(stringResource(page.eyebrow), color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge)
-                    Text(stringResource(if (page == Page.Home) R.string.app_name else page.label),
-                        style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(page.label), Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = {
+                            page = when (page) {
+                                Page.Home -> Page.Settings
+                                Page.Access -> Page.Settings
+                                else -> Page.Home
+                            }
+                        }) { Text(stringResource(if (page == Page.Home) R.string.settings else R.string.back)) }
+                    }
                 }
                 if (work.working) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 work.issue?.let { issue -> item {
@@ -123,25 +123,34 @@ internal fun TunnelScreen(
                     if (work.issue == null) item { Text(stringResource(R.string.loading)) }
                 } else when (page) {
                     Page.Home -> if (data != null) item {
-                        Home(data, tunnel, work.working, connect, disconnect, retry) { page = Page.Profiles }
+                        Home(data, tunnel, work.working, connect, disconnect, retry,
+                            enterCode = { paste = true }, scan = { qr = true }, resume = model::retrySetup,
+                            showProfiles = { page = Page.Profiles },
+                            showReport = {
+                                report = connectionReport(BuildConfig.VERSION_NAME, Androidbridge.coreVersion(),
+                                    Build.VERSION.SDK_INT, TunnelRuntime.events.value)
+                            })
                     }
                     Page.Profiles -> if (data != null) {
+                        items(data.profiles, key = { it.id }) { profile ->
+                            ProfileCard(profile, data.selected, !work.working,
+                                select = { model.select(profile.id); page = Page.Home }, remove = null, working = work.working)
+                        }
+                    }
+                    Page.Access -> if (data != null) {
                         item {
                             Panel {
-                                SectionTitle(if (data.profiles.isEmpty()) R.string.empty_title else R.string.import_title)
+                                SectionTitle(R.string.empty_title)
                                 Text(stringResource(R.string.empty_body))
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(onClick = scan, enabled = !work.working) { Text(stringResource(R.string.scan_qr)) }
-                                    OutlinedButton(onClick = { paste = true }, enabled = !work.working) {
-                                        Text(stringResource(R.string.paste_link))
-                                    }
+                                if (data.pending != null) {
+                                    Button(onClick = model::retrySetup, enabled = !work.working) { Text(stringResource(R.string.resume_setup)) }
                                 }
+                                SetupButtons(work.working, { paste = true }, { qr = true })
                             }
                         }
-                        if (tunnel.profileId != null) item { Text(stringResource(R.string.change_requires_disconnect)) }
                         if (data.manual.isNotEmpty()) item { SectionTitle(R.string.manual_profiles) }
                         items(data.manual, key = { it.id }) { profile ->
-                            ProfileCard(profile, data.selected, tunnel.profileId == null && !work.working,
+                            ProfileCard(profile, data.selected, !work.working,
                                 select = { model.select(profile.id) }, remove = {
                                     removal = profile.name to { model.removeProfile(profile.id) }
                                 }, working = work.working)
@@ -162,12 +171,14 @@ internal fun TunnelScreen(
                                 }
                             }
                             items(source.profiles, key = { it.id }) { profile ->
-                                ProfileCard(profile, data.selected, tunnel.profileId == null && !work.working,
+                                ProfileCard(profile, data.selected, !work.working,
                                     select = { model.select(profile.id) }, remove = null, working = work.working)
                             }
                         }
                     }
-                    Page.Settings -> item { Settings(theme, setTheme, language, setLanguage) }
+                    Page.Settings -> item {
+                        Settings(theme, setTheme, language, setLanguage) { page = Page.Access }
+                    }
                 }
             }
         }
@@ -176,6 +187,29 @@ internal fun TunnelScreen(
         paste = false
         model.preview(it)
     })
+    if (qr) {
+        AlertDialog(
+            onDismissRequest = { qr = false },
+            title = { Text(stringResource(R.string.scan_qr)) },
+            text = { Text(stringResource(R.string.qr_options)) },
+            confirmButton = { TextButton(onClick = { qr = false; scan() }) { Text(stringResource(R.string.use_camera)) } },
+            dismissButton = { TextButton(onClick = { qr = false; chooseImage() }) { Text(stringResource(R.string.choose_image)) } },
+        )
+    }
+    report?.let { text ->
+        AlertDialog(
+            onDismissRequest = { report = null },
+            title = { Text(stringResource(R.string.report_title)) },
+            text = {
+                LazyColumn(Modifier.heightIn(max = 280.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item { Text(stringResource(R.string.report_body)) }
+                    items(text.lines()) { line -> Text(line, style = MaterialTheme.typography.bodySmall) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { shareReport(text) }) { Text(stringResource(R.string.share_report)) } },
+            dismissButton = { TextButton(onClick = { report = null }) { Text(stringResource(R.string.close)) } },
+        )
+    }
     work.preview?.let { PreviewDialog(it, model::dismiss, model::save) }
     removal?.let { (name, remove) ->
         AlertDialog(
@@ -191,7 +225,9 @@ internal fun TunnelScreen(
 @Composable
 private fun Home(
     library: Library, tunnel: TunnelState, working: Boolean,
-    connect: (String) -> Unit, disconnect: () -> Unit, retry: () -> Unit, showProfiles: () -> Unit,
+    connect: (String) -> Unit, disconnect: () -> Unit, retry: () -> Unit,
+    enterCode: () -> Unit, scan: () -> Unit, resume: () -> Unit,
+    showProfiles: () -> Unit, showReport: () -> Unit,
 ) {
     val selected = library.active
     val engaged = tunnel.profileId != null
@@ -205,57 +241,60 @@ private fun Home(
             now = SystemClock.elapsedRealtime()
         }
     }
-    val phase = if (tunnel.phase == Phase.Connected &&
-        now - (tunnel.checkedAt ?: 0L) >= TunnelRuntime.CHECK_INTERVAL) Phase.Unverified else tunnel.phase
+    val phase = when {
+        engaged && selected != null && tunnel.profileId != selected.id -> Phase.Switching
+        tunnel.phase == Phase.Connected && now - (tunnel.checkedAt ?: 0L) >= TunnelRuntime.CHECK_INTERVAL -> Phase.Unverified
+        else -> tunnel.phase
+    }
     val (icon, color) = when (phase) {
         Phase.Idle -> "○" to MaterialTheme.colorScheme.onSurfaceVariant
         Phase.Connected -> "✓" to signals.verified
         Phase.Error -> "!" to signals.failure
         else -> "◷" to signals.pending
     }
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Panel {
-            Signal(stringResource(phase.label), icon, color)
-            if (selected != null) {
-                Text(stringResource(R.string.selected_profile), style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(selected.name, style = MaterialTheme.typography.headlineSmall)
-                ProfileDetail(selected)
-                Button(
-                    onClick = { if (engaged) disconnect() else connect(selected.id) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                    enabled = engaged || !working,
-                ) { Text(stringResource(if (engaged) R.string.disconnect else R.string.connect)) }
+            if (library.profiles.isEmpty() && !engaged) {
+                SectionTitle(R.string.empty_title)
+                Text(stringResource(R.string.empty_body))
+                if (library.pending != null) {
+                    Button(onClick = resume, enabled = !working) { Text(stringResource(R.string.resume_setup)) }
+                }
+                SetupButtons(working, enterCode, scan)
             } else {
-                SectionTitle(if (library.profiles.isEmpty()) R.string.empty_title else R.string.choose_profile)
-                Text(stringResource(if (library.profiles.isEmpty()) R.string.empty_body else R.string.choose_body))
-                Button(onClick = if (engaged) disconnect else showProfiles, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(if (engaged) R.string.disconnect else if (library.profiles.isEmpty()) R.string.import_title else R.string.choose_profile))
+                Signal(stringResource(phase.label), icon, color)
+                selected?.let { Text(it.name, style = MaterialTheme.typography.headlineSmall) }
+                if (engaged || selected != null) {
+                    Button(
+                        onClick = { if (engaged) disconnect() else selected?.let { connect(it.id) } },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                        enabled = engaged || !working,
+                    ) { Text(stringResource(if (engaged) R.string.disconnect else R.string.connect)) }
                 }
-            }
-            tunnel.issue?.let { Signal(stringResource(issueLabel(it)), "!", if (tunnel.phase == Phase.Error) signals.failure else signals.pending) }
-            if (engaged && (tunnel.phase == Phase.Reconnecting || tunnel.phase == Phase.Error)) {
-                Text(stringResource(R.string.detail_blocked), style = MaterialTheme.typography.bodySmall)
-            }
-            if ((phase == Phase.Error || phase == Phase.Unverified) && selected != null) {
-                OutlinedButton(onClick = { if (engaged) retry() else connect(selected.id) }, enabled = !working) {
-                    Text(stringResource(R.string.retry))
+                if (library.profiles.isNotEmpty()) {
+                    OutlinedButton(onClick = showProfiles, enabled = !working, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(if (selected == null) R.string.choose_profile else R.string.change_profile))
+                    }
+                }
+                tunnel.issue?.let { Text(stringResource(issueLabel(it)), style = MaterialTheme.typography.bodyMedium) }
+                if ((phase == Phase.Error || phase == Phase.Unverified) && selected != null) {
+                    TextButton(onClick = { if (engaged) retry() else connect(selected.id) }, enabled = !working) {
+                        Text(stringResource(R.string.retry))
+                    }
                 }
             }
         }
-        Panel {
-            SectionTitle(R.string.health_title)
-            when {
-                tunnel.checkedProfile != selected?.id -> Text(stringResource(R.string.health_none))
-                phase == Phase.Connected && tunnel.checkPassed == true -> Signal(stringResource(R.string.health_ok), "✓", signals.verified)
-                tunnel.checkPassed == false && engaged -> Signal(
-                    stringResource(R.string.health_failed), "!",
-                    if (tunnel.phase == Phase.Error) signals.failure else signals.pending,
-                )
-                tunnel.checkedAt != null -> Signal(stringResource(R.string.health_stale), "◷", signals.pending)
-                else -> Text(stringResource(R.string.health_none))
-            }
-        }
+        TextButton(onClick = showReport) { Text(stringResource(R.string.report_title)) }
+    }
+}
+
+@Composable
+private fun SetupButtons(working: Boolean, enterCode: () -> Unit, scan: () -> Unit) {
+    Button(onClick = enterCode, enabled = !working, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.enter_code))
+    }
+    OutlinedButton(onClick = scan, enabled = !working, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.scan_qr))
     }
 }
 
@@ -270,17 +309,10 @@ private fun ProfileCard(profile: Profile, selected: String?, canSelect: Boolean,
             RadioButton(selected = selected == profile.id, enabled = canSelect, onClick = null)
             Column(Modifier.weight(1f)) {
                 Text(profile.name, style = MaterialTheme.typography.titleMedium)
-                ProfileDetail(profile)
             }
         }
         if (remove != null) TextButton(onClick = remove, enabled = !working) { Text(stringResource(R.string.remove)) }
     }
-}
-
-@Composable
-private fun ProfileDetail(profile: Profile) {
-    Text(profile.host, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Text(stringResource(transportLabel(profile.transport)), style = MaterialTheme.typography.labelLarge)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -292,7 +324,7 @@ private fun PasteDialog(close: () -> Unit, review: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = close,
         properties = DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
-        title = { Text(stringResource(R.string.import_title)) },
+        title = { Text(stringResource(R.string.enter_code)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -328,8 +360,6 @@ private fun PreviewDialog(preview: ImportPreview, close: () -> Unit, save: () ->
                     items(preview.rows) { row ->
                         Column {
                             Text(row.name, style = MaterialTheme.typography.titleMedium)
-                            Text(row.host)
-                            Text(stringResource(transportLabel(row.transport)), style = MaterialTheme.typography.labelLarge)
                             row.issue?.let { Text(stringResource(issueLabel(it)), color = LocalSignals.current.pending) }
                         }
                     }
@@ -342,12 +372,17 @@ private fun PreviewDialog(preview: ImportPreview, close: () -> Unit, save: () ->
 }
 
 @Composable
-private fun Settings(theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit) {
+private fun Settings(
+    theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
+    manageAccess: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        OutlinedButton(onClick = manageAccess, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manage_access)) }
         Panel {
             SectionTitle(R.string.language)
             Choice(R.string.language_en, language == "en") { setLanguage("en") }
             Choice(R.string.language_ru, language == "ru") { setLanguage("ru") }
+            Choice(R.string.language_zh, language.startsWith("zh")) { setLanguage("zh-CN") }
         }
         Panel {
             SectionTitle(R.string.theme)

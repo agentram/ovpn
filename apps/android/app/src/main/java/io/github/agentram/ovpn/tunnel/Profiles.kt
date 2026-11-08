@@ -30,10 +30,13 @@ internal data class Subscription(val id: String, val url: String, val profiles: 
     val host: String get() = java.net.URI(url).host
 }
 
+internal data class PendingActivation(val code: String, val session: String)
+
 internal data class Library(
     val manual: List<Profile> = emptyList(),
     val subscriptions: List<Subscription> = emptyList(),
     val selected: String? = null,
+    val pending: PendingActivation? = null,
 ) {
     val profiles: List<Profile> get() = manual + subscriptions.flatMap { it.profiles }
     val active: Profile? get() = profiles.firstOrNull { it.id == selected }
@@ -91,6 +94,7 @@ internal fun decodePreview(json: String, source: String?): ImportPreview {
 internal fun Library.encode(): ByteArray = JSONObject()
     .put("schema", 1)
     .put("selected", selected ?: JSONObject.NULL)
+    .put("activation", pending?.let { JSONObject().put("code", it.code).put("session", it.session) } ?: JSONObject.NULL)
     .put("manual", manual.toJson())
     .put("subscriptions", JSONArray(subscriptions.map {
         JSONObject().put("id", it.id).put("url", it.url).put("profiles", it.profiles.toJson())
@@ -105,6 +109,7 @@ internal fun decodeLibrary(raw: ByteArray): Library {
             Subscription(it.getString("id"), it.getString("url"), it.getJSONArray("profiles").profiles())
         },
         selected = if (data.isNull("selected")) null else data.getString("selected"),
+        pending = data.optJSONObject("activation")?.let { PendingActivation(it.getString("code"), it.getString("session")) },
     )
 }
 

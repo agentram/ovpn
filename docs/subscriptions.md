@@ -49,9 +49,23 @@ The default listener is `127.0.0.1:8088`, suitable for a local TLS reverse proxy
   --listen 0.0.0.0:8443 --tls-cert <fullchain.pem> --tls-key <private-key.pem>
 ```
 
-Use a base URL matching the public HTTPS origin and port. Plain HTTP is permitted only on literal loopback addresses, including a base URL such as `http://127.0.0.1:8088` for local testing. The service accepts `GET` and `HEAD`, exposes `/health`, and requires no local control database, inventory or SSH keys. Mount only the bundle directory read-only when isolating it in a container; publish or synchronize individual files in that directory. Requests are not logged by the service. Configure any reverse proxy to suppress `/sub/` URLs in access logs and tracing: the URL is a credential.
+Use a base URL matching the public HTTPS origin and port. Plain HTTP is permitted only on literal loopback addresses, including a base URL such as `http://127.0.0.1:8088` for local testing. The default service accepts `GET` and `HEAD`, exposes `/health`, and requires no local control database, inventory or SSH keys. Mount only the bundle directory read-only when isolating it in a container; publish or synchronize individual files in that directory. Requests are not logged by the service. Configure any reverse proxy to suppress `/sub/` URLs in access logs and tracing: the URL is a credential.
 
 Unexpired profiles are selected at request time. Other state changes require republishing or revocation; the service has no connection to the control database. Responses disable caching and advertise a six-hour refresh interval; client behavior can differ. No combined quota or traffic header is advertised because quotas are per server.
+
+## Activate O Tunnel
+
+To issue a one-time code for a published subscription, create a separate private invitation directory and pass it to `subscription serve --invite-dir ./invites` in addition to the bundle directory. The service needs write access to the invitation directory and read access to the bundles.
+
+```sh
+mkdir -m 700 invites
+ovpn subscription invite --bundle-dir ./subscription-bundles --invite-dir ./invites \
+  --id <subscription-id> --base-url https://subscriptions.example.net
+```
+
+Give the code to the intended user for **Enter code**. Add `--out ./invite.png` to issue a new code as a QR image. A code expires after 30 minutes by default and activates one app installation. The app can retry the same activation after an interrupted request. Preserve the `/activate` and `/device/` paths at the HTTPS reverse proxy. Exclude activation request bodies and secret URLs from logs.
+
+The installation follows the same published profile list. Rotating or revoking the parent subscription stops updates for its activated installations. Server-side access uses the underlying VPN user's credentials.
 
 ## Rotate or revoke delivery
 

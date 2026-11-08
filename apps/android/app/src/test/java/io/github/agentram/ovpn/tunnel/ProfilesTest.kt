@@ -1,5 +1,6 @@
 package io.github.agentram.ovpn.tunnel
 
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -33,6 +34,14 @@ class ProfilesTest {
         val removed = withSource.removeSubscription(source.id)
         assertThrows(TunnelIssue::class.java) { removed.replace(source, listOf(reality)) }
         assertEquals(manual, removed)
+    }
+
+    @Test fun oldProfilesLoadAndAnInterruptedActivationKeepsItsReceipt() {
+        val saved = Library().import(ImportPreview(listOf(tls.row()), null))
+        val legacy = JSONObject(saved.encode().toString(Charsets.UTF_8)).apply { remove("activation") }
+        assertEquals(saved, decodeLibrary(legacy.toString().toByteArray(Charsets.UTF_8)))
+        val pending = saved.copy(pending = PendingActivation("fixture-code", "fixture-receipt"))
+        assertEquals(pending, decodeLibrary(pending.encode()))
     }
 
     private fun Profile.row() = PreviewRow(name, host, transport, null, this)

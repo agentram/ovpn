@@ -22,7 +22,6 @@ type dialTarget struct {
 	address   xnet.Destination
 	protector SocketProtector
 	ctx       context.Context
-	cancel    context.CancelFunc
 }
 
 type protectedDialer struct {

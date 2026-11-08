@@ -8,17 +8,14 @@ internal val Phase.label: Int
         Phase.Connected -> R.string.connected
         Phase.Unverified -> R.string.unverified
         Phase.Reconnecting -> R.string.reconnecting
+        Phase.Switching -> R.string.switching
         Phase.Error -> R.string.connection_error
     }
 
-internal fun transportLabel(code: String) = when (code) {
-    "tls" -> R.string.transport_tls
-    "reality" -> R.string.transport_reality
-    "xhttp" -> R.string.transport_xhttp
-    else -> R.string.transport_other
-}
-
 internal fun issueLabel(code: String) = when (code) {
+    "invalid_code" -> R.string.invalid_code
+    "code_unavailable" -> R.string.code_unavailable
+    "qr_unreadable" -> R.string.qr_unreadable
     "too_large" -> R.string.too_large
     "too_many" -> R.string.too_many
     "invalid_url" -> R.string.invalid_url

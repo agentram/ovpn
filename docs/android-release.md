@@ -1,12 +1,12 @@
-# OVPN Tunnel release
+# O Tunnel release
 
-OVPN Tunnel uses Android's `VpnService` to encrypt device traffic to the user's VPN endpoint. The Play build supports VLESS TCP/TLS and TCP/REALITY with Vision. XHTTP is excluded. See [Google Play's VPN policy](https://support.google.com/googleplay/android-developer/answer/12564964?hl=en).
+O Tunnel uses Android's `VpnService` to encrypt device traffic to the user's VPN endpoint. The Play build supports VLESS TCP/TLS and TCP/REALITY with Vision. XHTTP is excluded. See [Google Play's VPN policy](https://support.google.com/googleplay/android-developer/answer/12564964?hl=en).
 
 ## Device acceptance
 
 Use a dedicated OVPN deployment with disposable access. Verify HTTPS and DNS, TCP and UDP, and IPv4 and IPv6 from a separate app over both transports. Reject an incorrect REALITY key and an untrusted TLS certificate. Confirm Disconnect and permission revocation remove the TUN. Switch Wi-Fi and mobile data and verify the same profile recovers without direct traffic during the handover.
 
-Import an OVPN QR, a VLESS link and a mixed subscription. Refresh a subscription with a removed or replaced active profile, then try an unavailable URL and a malformed response. Check permission denial, sleep and resume, both languages and themes, large fonts and TalkBack. Record platform version, test result and sanitized failure stage. Use an ARM64 phone and check the 16 KiB build on a compatible device or emulator.
+Activate with a setup code and a QR image. Try the camera on a physical phone and verify that a second installation cannot use the same code. Import a VLESS link and a mixed subscription. Refresh a subscription with a removed or replaced active profile, then try an unavailable URL and a malformed response. Check profile switching, the report preview, permission denial, sleep and resume, all three languages, both themes, large fonts and TalkBack. Record platform version, test result and sanitized failure stage. Use an ARM64 phone and check the 16 KiB build on a compatible device or emulator.
 
 ## Upload bundle
 

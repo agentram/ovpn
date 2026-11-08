@@ -31,9 +31,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 
-internal enum class Phase { Idle, Connecting, Verifying, Connected, Unverified, Reconnecting, Error }
+internal enum class Phase { Idle, Connecting, Verifying, Connected, Unverified, Reconnecting, Switching, Error }
 
 internal data class TunnelState(
     val phase: Phase = Phase.Idle,
@@ -43,13 +44,21 @@ internal data class TunnelState(
     val checkedAt: Long? = null,
     val checkedProfile: String? = null,
     val vpnInterface: String = "",
+    val transport: ReportTransport = ReportTransport.Unknown,
+    val network: ConnectionNetwork = ConnectionNetwork.Unknown,
 )
 
 internal object TunnelRuntime {
     const val CHECK_INTERVAL = 120_000L
     private val mutable = MutableStateFlow(TunnelState())
     val state = mutable.asStateFlow()
-    fun publish(state: TunnelState) { mutable.value = state }
+    private val reports = MutableStateFlow<List<ReportEvent>>(emptyList())
+    val events = reports.asStateFlow()
+
+    fun publish(state: TunnelState) {
+        reports.value = reportEvents(reports.value, Instant.now(), state.phase, state.network, state.transport, state.issue)
+        mutable.value = state
+    }
 }
 
 class TunnelService : VpnService() {
@@ -97,12 +106,7 @@ class TunnelService : VpnService() {
                         is Command.Start -> connect(command.id)
                         is Command.Stop -> disconnect(command.issue)
                         is Command.Capabilities -> networkChanged(command)
-                        Command.LibraryChanged -> {
-                            val id = active?.id
-                            if (id != null && profiles.state.value?.profiles?.none { it.id == id } == true) {
-                                disconnect("profile_changed")
-                            }
-                        }
+                        Command.LibraryChanged -> libraryChanged()
                         Command.Retry -> if (active != null) restart(true)
                     }
                 } catch (e: CancellationException) {
@@ -174,6 +178,19 @@ class TunnelService : VpnService() {
         restart(false)
     }
 
+    private suspend fun libraryChanged() {
+        val running = active ?: return
+        val library = profiles.state.value ?: return
+        if (library.profiles.none { it.id == running.id }) {
+            disconnect("profile_changed")
+            return
+        }
+        val selected = library.active ?: return
+        if (selected.id == running.id) return
+        active = selected
+        restart(reconnecting = true, switching = true)
+    }
+
     private suspend fun networkChanged(change: Command.Capabilities) {
         if (active == null) return
         if (change.caps == null) networks.remove(change.network) else networks[change.network] = change.caps
@@ -190,8 +207,9 @@ class TunnelService : VpnService() {
         restart(reconnecting = TunnelRuntime.state.value.checkedAt != null)
     }
 
-    private suspend fun restart(reconnecting: Boolean) {
-        if (reconnecting) status(Phase.Reconnecting)
+    private suspend fun restart(reconnecting: Boolean, switching: Boolean = false) {
+        if (switching) status(Phase.Switching)
+        else if (reconnecting) status(Phase.Reconnecting)
         stopEngine()
         val profile = active ?: return
         val fd = tun?.fd ?: return
@@ -207,7 +225,7 @@ class TunnelService : VpnService() {
         }
         worker = scope.launch {
             try {
-                runTunnel(profile, fd, network, reconnecting)
+                runTunnel(profile, fd, network, reconnecting, switching)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -217,7 +235,7 @@ class TunnelService : VpnService() {
         }
     }
 
-    private suspend fun runTunnel(profile: Profile, fd: Int, network: Network, reconnecting: Boolean) {
+    private suspend fun runTunnel(profile: Profile, fd: Int, network: Network, reconnecting: Boolean, switching: Boolean) {
         val blocked = AtomicBoolean(false)
         val protector = SocketProtector { socket ->
             val allowed = runCatching {
@@ -232,7 +250,11 @@ class TunnelService : VpnService() {
 
         var issue: String? = null
         for ((attempt, pause) in RETRY_DELAYS.withIndex()) {
-            status(if (attempt == 0 && !reconnecting) Phase.Connecting else Phase.Reconnecting, issue)
+            status(when {
+                switching -> Phase.Switching
+                attempt == 0 && !reconnecting -> Phase.Connecting
+                else -> Phase.Reconnecting
+            }, issue)
             delay(pause)
             val endpoints = resolveEndpoint(network, profile.host)
             if (endpoints.isEmpty()) {
@@ -317,9 +339,25 @@ class TunnelService : VpnService() {
                 if (checked == null) before.checkedAt else SystemClock.elapsedRealtime(),
                 if (checked == null) before.checkedProfile else active?.id,
                 interfaceName,
+                when (active?.transport) {
+                    "tls" -> ReportTransport.Tls
+                    "reality" -> ReportTransport.Reality
+                    else -> ReportTransport.Unknown
+                },
+                connectionNetwork(),
             ),
         )
         if (foreground) notifications.notify(NOTIFICATION_ID, notification(phase.label))
+    }
+
+    private fun connectionNetwork(): ConnectionNetwork {
+        val caps = networks[selectedNetwork] ?: return ConnectionNetwork.Unknown
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> ConnectionNetwork.Wifi
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> ConnectionNetwork.Mobile
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> ConnectionNetwork.Wired
+            else -> ConnectionNetwork.Unknown
+        }
     }
 
     private fun notification(label: Int): Notification {

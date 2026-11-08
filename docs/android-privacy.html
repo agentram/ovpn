@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OVPN Tunnel privacy policy</title>
+  <title>O Tunnel privacy policy</title>
   <style>
     :root { color-scheme: light dark; }
     body { font: 1rem/1.65 system-ui, sans-serif; max-width: 44rem; padding: 1.5rem; margin: auto; }
@@ -12,10 +12,11 @@
 </head>
 <body>
   <main>
-    <h1>OVPN Tunnel privacy policy</h1>
-    <p>OVPN Tunnel connects your Android device to the VPN server you select. It includes no account service, ads, analytics or crash reporting.</p>
+    <h1>O Tunnel privacy policy</h1>
+    <p>O Tunnel connects your Android device to the VPN server you select. It includes no account service, ads, analytics or crash reporting.</p>
     <h2>On your device</h2>
-    <p>Profile credentials and subscription URLs are stored locally with Android Keystore encryption and excluded from backups. The camera reads QR codes on the device when you choose Scan QR. The app does not store camera images. Remove a profile or subscription in Profiles, or clear the app's data to remove all local settings and access details.</p>
+    <p>Profile credentials and subscription URLs are stored locally with Android Keystore encryption and excluded from backups. The app reads camera and selected QR images on the device. Activation sends the setup code to the subscription service. That service stores hashes of the activation and device credentials. Remove a profile or subscription in Manage access, or clear the app's data to remove all local settings and access details.</p>
+    <p>Connection reports contain app and engine versions, Android API level, recent connection stages and network type. You can preview the report and choose where to share it.</p>
     <h2>Network connections</h2>
     <p>With your permission, Android routes traffic through the selected VPN server. The server can see connection metadata and any traffic that lacks its own encryption. Your server operator controls what the server records. The app does not record packet contents or traffic history.</p>
     <p>The app resolves the VPN server's hostname using the selected physical network. While connected, the app directs system DNS to Cloudflare's 1.1.1.1 resolver through the VPN and checks connectivity using an HTTPS request to Google's www.gstatic.com. The check sends no VPN credentials. When you import or refresh an HTTPS subscription, the app sends the subscription URL to its host.</p>

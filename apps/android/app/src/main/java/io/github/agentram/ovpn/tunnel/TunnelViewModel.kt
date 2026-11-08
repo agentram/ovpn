@@ -35,6 +35,10 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
 
     fun preview(input: String) = operate("invalid_import") {
         val raw = input.trim()
+        if (raw.startsWith("OT1:")) {
+            activate(raw)
+            return@operate WorkState()
+        }
         val url = if (raw.startsWith("https:", ignoreCase = true)) {
             subscriptionUrl(raw) ?: throw TunnelIssue("invalid_url")
         } else {
@@ -43,6 +47,30 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
         }
         val data = if (url == null) raw else fetch(url)
         WorkState(preview = decodePreview(Androidbridge.inspect(data), url?.toString()))
+    }
+
+    fun retrySetup() = operate("storage_failed") {
+        val pending = store.load().pending ?: return@operate WorkState()
+        activate(pending.code)
+        WorkState()
+    }
+
+    private suspend fun activate(code: String) {
+        val invite = inviteCode(code) ?: throw TunnelIssue("invalid_code")
+        // Persist the request secret before exchange, so retries reuse the same receipt.
+        val pending = store.update {
+            if (it.pending?.code == code) it else it.copy(pending = PendingActivation(code, newSession()))
+        }.pending ?: error("missing activation")
+        val client = client()
+        try {
+            client.activate(invite, pending.session)
+        } catch (e: TunnelIssue) {
+            if (e.code == "code_unavailable") store.update { it.copy(pending = null) }
+            throw e
+        }
+        val url = invite.deviceUrl(pending.session)
+        val preview = decodePreview(Androidbridge.inspect(client.fetch(url)), url.toString())
+        store.update { it.import(preview).copy(pending = null) }
     }
 
     fun save() {
@@ -60,20 +88,20 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
         WorkState(refreshed = true)
     }
 
-    private suspend fun fetch(url: HttpUrl): String {
+    private suspend fun fetch(url: HttpUrl): String = client().fetch(url)
+
+    private suspend fun client(): SubscriptionClient {
         val state = tunnel.value
-        if (state.profileId == null) return subscriptions.fetch(url)
+        if (state.profileId == null) return subscriptions
         if (state.vpnInterface.isEmpty()) throw TunnelIssue("subscription_network")
         val vpn = vpnNetwork(connectivity, state.vpnInterface) ?: throw TunnelIssue("subscription_network")
-        return SubscriptionClient(vpnHttpBuilder(vpn).build()).fetch(url)
+        return SubscriptionClient(vpnHttpBuilder(vpn).build())
     }
 
     fun select(id: String) = operate("storage_failed") {
-        if (TunnelRuntime.state.value.profileId == null) {
-            store.update { library ->
-                if (library.profiles.none { it.id == id }) throw TunnelIssue("profile_changed")
-                library.copy(selected = id)
-            }
+        store.update { library ->
+            if (library.profiles.none { it.id == id }) throw TunnelIssue("profile_changed")
+            library.copy(selected = id)
         }
         WorkState()
     }

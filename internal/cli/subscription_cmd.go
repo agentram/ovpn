@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -13,7 +14,7 @@ import (
 
 func (a *App) subscriptionCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "subscription", Short: "Deliver and revoke prepared client subscriptions"}
-	cmd.AddCommand(a.subscriptionServeCmd(), a.subscriptionRevokeCmd())
+	cmd.AddCommand(a.subscriptionServeCmd(), a.subscriptionRevokeCmd(), a.subscriptionInviteCmd())
 	return cmd
 }
 
@@ -32,6 +33,7 @@ func (a *App) subscriptionServeCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.Dir, "bundle-dir", "", "Directory containing prepared subscription bundles only")
+	cmd.Flags().StringVar(&opts.InviteDir, "invite-dir", "", "Private writable invitation directory")
 	cmd.Flags().StringVar(&opts.Listen, "listen", "127.0.0.1:8088", "Subscription HTTP listen address; non-loopback requires TLS")
 	cmd.Flags().StringVar(&opts.CertFile, "tls-cert", "", "TLS certificate chain file")
 	cmd.Flags().StringVar(&opts.KeyFile, "tls-key", "", "TLS private key file")
@@ -64,5 +66,52 @@ func (a *App) subscriptionRevokeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&id, "id", "", "Subscription id")
 	_ = cmd.MarkFlagRequired("bundle-dir")
 	_ = cmd.MarkFlagRequired("id")
+	return cmd
+}
+
+func (a *App) subscriptionInviteCmd() *cobra.Command {
+	var dir, inviteDir, id, origin, out string
+	var ttl time.Duration
+	cmd := &cobra.Command{
+		Use: "invite", Short: "Create a one-time O Tunnel setup code", Args: cobra.NoArgs,
+		Annotations: map[string]string{"ovpn.local-state": "none"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if a.dryRun {
+				return fmt.Errorf("subscription invite writes credentials; --dry-run is not supported")
+			}
+			bundles, err := subscription.Open(dir)
+			if err != nil {
+				return err
+			}
+			defer bundles.Close()
+			bundle, err := bundles.Read(id)
+			if err != nil {
+				return err
+			}
+			invites, err := subscription.OpenInvites(inviteDir)
+			if err != nil {
+				return err
+			}
+			defer invites.Close()
+			code, err := invites.Issue(bundle, origin, time.Now(), ttl)
+			if err != nil {
+				return err
+			}
+			if out != "" {
+				return writeQRCodePNG(code, out)
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), code)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&dir, "bundle-dir", "", "Private directory for prepared delivery bundles")
+	cmd.Flags().StringVar(&inviteDir, "invite-dir", "", "Private writable invitation directory")
+	cmd.Flags().StringVar(&id, "id", "", "Published subscription ID")
+	cmd.Flags().StringVar(&origin, "base-url", "", "HTTPS origin of the subscription service")
+	cmd.Flags().StringVar(&out, "out", "", "Save a private QR PNG instead of printing the code")
+	cmd.Flags().DurationVar(&ttl, "ttl", 30*time.Minute, "Time allowed to activate the invitation")
+	for _, flag := range []string{"bundle-dir", "invite-dir", "id", "base-url"} {
+		_ = cmd.MarkFlagRequired(flag)
+	}
 	return cmd
 }

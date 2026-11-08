@@ -1,15 +1,10 @@
-# OVPN Tunnel
+# O Tunnel
 
-OVPN Tunnel is an Android client for an existing OVPN installation. Import a QR code, a VLESS link or an HTTPS subscription, save a compatible profile, and choose **Connect**. Approve Android's VPN request on first connection. The app supports TCP/TLS self-SNI Vision and TCP/REALITY Vision. Use OVPN Desk or the CLI to administer servers and users.
+O Tunnel is the Android client for an existing OVPN installation. On first launch, choose **Enter code** or **Scan QR code**. You can scan with the camera or open a saved QR image. Select **Connect** and approve the Android VPN prompt. The app supports English, Russian and Simplified Chinese in **Settings**.
 
-On the operator machine, get a link or QR for an existing user:
+Administrators can issue a [one-time setup code](../../docs/subscriptions.md#activate-o-tunnel) for a published user subscription. The app also accepts existing VLESS links and HTTPS subscriptions. Use **Settings → Manage access** to add or refresh profiles.
 
-```sh
-ovpn user link --server <server> --username <user>
-ovpn user qr --server <server> --username <user> --out ./profile.png
-```
-
-Use the private [subscription URL](../../docs/subscriptions.md) for multiple profiles. A failed refresh retains the saved snapshot. If a successful refresh changes or removes the selected profile, choose a profile again before connecting. The subscription URL and server-side access can be revoked separately.
+Choose **Change profile** on the home screen to try another TCP/TLS or TCP/REALITY profile. Open **Problem report** to review and optionally share the latest connection results. Reports are prepared on the phone without profile names, addresses, URLs or keys.
 
 ## Build and install
 
@@ -29,6 +24,6 @@ The app requires Android 10 or later. The build targets API 36 and includes ARM6
 
 Android routes IPv4 and IPv6 into the service's TUN. The only native outbound sockets outside that TUN are protected TCP connections to the resolved VPN endpoint on the selected physical network. Android resolves the endpoint hostname on that network. The VPN uses `1.1.1.1` for user DNS through the tunnel, and checks HTTPS against `www.gstatic.com/generate_204` on the VPN network.
 
-After a network change the service retains the TUN while it restarts Xray on the same profile. Disconnect or revoke VPN permission to release the TUN. A failed HTTPS check can indicate an unreachable check endpoint, tunnel failure or revoked server access. The app reports an unverified tunnel when Xray is running and the HTTPS check fails.
+The service keeps the TUN in place while reconnecting after a network change or switching profiles. Disconnect or revoke VPN permission to release the TUN. A failed HTTPS check can indicate an unreachable check endpoint, tunnel failure or revoked server access. The app reports an unverified tunnel when Xray is running and the HTTPS check fails.
 
 See [release preparation](../../docs/android-release.md) and [privacy policy](../../docs/android-privacy.html).

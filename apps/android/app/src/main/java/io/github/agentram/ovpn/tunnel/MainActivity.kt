@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -19,9 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.google.zxing.client.android.Intents
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private lateinit var model: TunnelViewModel
@@ -49,6 +54,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val qrImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) lifecycleScope.launch {
+            val code = withContext(Dispatchers.IO) { runCatching { readQrImage(contentResolver, uri) }.getOrNull() }
+            if (code == null) model.showIssue("qr_unreadable") else model.preview(code)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         model = ViewModelProvider(this)[TunnelViewModel::class.java]
@@ -66,12 +78,14 @@ class MainActivity : AppCompatActivity() {
                         settings.edit { putString("theme", it) }
                         theme = it
                     },
-                    language = AppCompatDelegate.getApplicationLocales()[0]?.language ?: "en",
+                    language = AppCompatDelegate.getApplicationLocales()[0]?.toLanguageTag() ?: "en",
                     setLanguage = ::changeLanguage,
                     connect = ::connect,
                     disconnect = { TunnelService.stop(this) },
                     retry = { TunnelService.retry(this) },
                     scan = ::scan,
+                    chooseImage = { qrImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    shareReport = ::shareReport,
                 )
             }
         }
@@ -115,6 +129,11 @@ class MainActivity : AppCompatActivity() {
             settings.edit { putBoolean("notification_prompted", true) }
             notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private fun shareReport(report: String) {
+        val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, report)
+        startActivity(Intent.createChooser(intent, getString(R.string.share_report)))
     }
 
     private fun scan() {

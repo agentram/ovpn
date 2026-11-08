@@ -27,10 +27,11 @@ import (
 const mtu = 1280
 
 var (
-	tunnelMu sync.Mutex
-	engine   *core.Instance
-	tunnelFD = -1
-	dialer   protectedDialer
+	tunnelMu     sync.Mutex
+	engine       *core.Instance
+	tunnelFD     = -1
+	dialer       protectedDialer
+	engineCancel context.CancelFunc
 )
 
 func init() { internet.UseAlternativeSystemDialer(&dialer) }
@@ -103,11 +104,12 @@ func Start(link, endpointIP string, fd int32, protector SocketProtector) string 
 		return "engine_start"
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	engineCancel = cancel
 	dialer.mu.Lock()
 	dialer.engine = engine
 	dialer.target = &dialTarget{
 		address:   xnet.TCPDestination(xnet.IPAddress(ip), xnet.Port(port)),
-		protector: protector, ctx: ctx, cancel: cancel,
+		protector: protector, ctx: ctx,
 	}
 	dialer.mu.Unlock()
 	if err := engine.Start(); err != nil {
@@ -136,8 +138,9 @@ func Stop() {
 
 func stopLocked() {
 	dialer.mu.Lock()
-	if dialer.target != nil {
-		dialer.target.cancel()
+	if engineCancel != nil {
+		engineCancel()
+		engineCancel = nil
 	}
 	dialer.target, dialer.engine = nil, nil
 	dialer.mu.Unlock()
