@@ -149,7 +149,7 @@ export function ActionDialog({
         arguments: args,
       });
       setPlan(created);
-      if (!action.mutation) {
+      if (!created.mutation) {
         const started = await desk.start(created, key.current);
         setJobId(started.id);
         onStarted();
@@ -212,6 +212,8 @@ export function ActionDialog({
         </label>
       );
     if (
+      field.name === "from-server" ||
+      field.name === "to-server" ||
       field.name === "server" ||
       field.name === "proxy" ||
       field.name === "backend"
@@ -450,7 +452,7 @@ export function ActionDialog({
                 </li>
               ))}
             </ul>
-            {action.destructive && (
+            {(plan?.destructive ?? action.destructive) && (
               <div className="desk-alert danger">
                 <p>{t.destructive}</p>
                 <label>
@@ -473,8 +475,12 @@ export function ActionDialog({
               {t.back}
             </button>
             <button
-              className={`button ${action.destructive ? "destructive" : "primary"}`}
-              disabled={busy || (action.destructive && confirmation !== word)}
+              className={`button ${(plan?.destructive ?? action.destructive) ? "destructive" : "primary"}`}
+              disabled={
+                busy ||
+                ((plan?.destructive ?? action.destructive) &&
+                  confirmation !== word)
+              }
               onClick={() => void apply()}
             >
               {busy ? t.preparing : t.confirm}
@@ -548,7 +554,7 @@ export function ActionDialog({
               </>
             )}
             {result?.text && (
-              <details open={!action.mutation}>
+              <details open={!(plan?.mutation ?? action.mutation)}>
                 <summary>{t.output}</summary>
                 <pre>{result.text}</pre>
               </details>

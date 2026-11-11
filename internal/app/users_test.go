@@ -135,3 +135,29 @@ func TestUserInventoryDistinguishesAgentDefaultFromUnmeteredAndExplicitQuotas(t 
 		}
 	}
 }
+
+func TestUserInventoryReportsMissingAssignmentsOnlyOnEnabledNodes(t *testing.T) {
+	ctx := context.Background()
+	svc, st, servers := planFixture(t, 3)
+	servers[2].Enabled = false
+	if err := st.UpdateServer(ctx, &servers[2]); err != nil {
+		t.Fatal(err)
+	}
+	user := model.User{ServerID: servers[0].ID, Username: "partial", UUID: "11111111-1111-1111-1111-111111111111", Email: "partial@example.test", Enabled: true}
+	if err := st.AddUser(ctx, &user); err != nil {
+		t.Fatal(err)
+	}
+	page, err := svc.Users(ctx, "", 50)
+	if err != nil || len(page.Items) != 1 || page.Items[0].MissingNodes != 1 {
+		t.Fatalf("missing enabled assignment hidden: %+v %v", page, err)
+	}
+	user.ID = 0
+	user.ServerID = servers[1].ID
+	if err := st.AddUser(ctx, &user); err != nil {
+		t.Fatal(err)
+	}
+	page, err = svc.Users(ctx, "", 50)
+	if err != nil || page.Items[0].MissingNodes != 0 {
+		t.Fatal("disabled server incorrectly required an assignment", err)
+	}
+}

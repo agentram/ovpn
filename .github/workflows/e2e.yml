@@ -100,7 +100,7 @@ jobs:
           cache-dependency-path: apps/desktop/frontend/package-lock.json
       - name: Linux native dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
       - name: Frontend regression checks
         working-directory: apps/desktop/frontend
         run: |
@@ -115,6 +115,12 @@ jobs:
         run: |
           go -C apps/desktop vet ./...
           go -C apps/desktop test ./...
+      - name: Scan desktop module dependencies
+        working-directory: apps/desktop
+        env:
+          CGO_ENABLED: ${{ runner.os == 'Windows' && '0' || '1' }}
+          GOTOOLCHAIN: local
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
 
   android:
     name: O Tunnel emulator journeys

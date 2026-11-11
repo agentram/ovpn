@@ -24,7 +24,7 @@ func TestTelemetryKeepsMissingUsageUnknownAndNeverProjectsPrivateIdentities(t *t
 		case strings.Contains(url, "/health"):
 			return []byte(fmt.Sprintf(`{"xray_api_reachable":true,"last_collect_at":%q}`, collected)), nil
 		case strings.Contains(url, "/users/status"):
-			return []byte(`{"time":"2026-01-01T12:00:00Z","users":[{"username":"alice","uuid":"11111111-1111-1111-1111-111111111111","email":"alice@example.com","quota_enabled":true,"window_30d_quota_byte":100,"window_30d_usage_byte":23}]}`), nil
+			return []byte(`{"time":"2026-01-01T12:00:00Z","users":[{"username":"alice","uuid":"11111111-1111-1111-1111-111111111111","email":"alice@example.com","traffic_known":true,"quota_policy_known":true,"quota_enabled":true,"window_30d_quota_byte":100,"window_30d_usage_byte":23}]}`), nil
 		case strings.Contains(url, "/users/online"):
 			return []byte(`{"supported":false,"sampled_at":"2026-01-01T12:00:00Z","online":[]}`), nil
 		}

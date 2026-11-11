@@ -77,3 +77,7 @@ test("quota blocks require fresh server data", () => {
   rows[0].trafficAt = "2020-01-01T00:00:00Z";
   assert.equal(accessState(person, rows, true).key, "unknown");
 });
+test("a successful configured route cannot hide missing access on another enabled server", () => {
+  const partial = { ...person, eligibleNodes: 1, missingNodes: 1 };
+  assert.equal(accessState(partial, [row("one", 1)], true).key, "partial");
+});

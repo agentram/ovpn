@@ -261,6 +261,8 @@ type QuotaStatusResponse struct {
 }
 
 type UserAccessStatus struct {
+	TrafficKnown       bool       `json:"traffic_known"`
+	QuotaPolicyKnown   bool       `json:"quota_policy_known"`
 	Username           string     `json:"username"`
 	Email              string     `json:"email"`
 	UUID               string     `json:"uuid"`

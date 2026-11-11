@@ -205,7 +205,7 @@ flowchart LR
 
 ## Requirements
 
-- Release binary, or Go `1.27.3+` when building from source
+- Release binary, or Go `1.27.4+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
 - Clean Linux host recommended

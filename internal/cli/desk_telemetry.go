@@ -90,15 +90,17 @@ func (d *deskControl) Telemetry(ctx context.Context, presenceOnly bool) ([]dto.S
 								remaining = 0
 							}
 							live.TrafficAt = collectedAt
-							if collectedAt != "" {
+							if collectedAt != "" && (user.TrafficKnown || user.HasRuntimeIdentity) {
 								live.UsedBytes = &used
 							}
-							live.QuotaEnabled = &user.QuotaEnabled
+							if user.QuotaPolicyKnown || user.HasRuntimeIdentity {
+								live.QuotaEnabled = &user.QuotaEnabled
+							}
 							live.BlockedByQuota = &user.BlockedByQuota
 							live.RuntimeApplied = &user.HasRuntimeIdentity
-							if user.QuotaEnabled {
+							if user.QuotaEnabled && (user.QuotaPolicyKnown || user.HasRuntimeIdentity) {
 								live.QuotaBytes = &quota
-								if collectedAt != "" {
+								if collectedAt != "" && (user.TrafficKnown || user.HasRuntimeIdentity) {
 									live.RemainingBytes = &remaining
 								}
 							}

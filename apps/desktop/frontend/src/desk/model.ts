@@ -42,6 +42,7 @@ export function accessState(
     rows.every((row) => row.blockedByQuota === true && isRecent(row.trafficAt))
   )
     return { key: "blocked", tone: "warn" };
+  if (user.missingNodes) return { key: "partial", tone: "warn" };
   if (!running) return { key: "unknown", tone: "neutral" };
   const expected = rows.reduce((sum, row) => sum + row.routesTotal, 0);
   const passed = rows.reduce((sum, row) => sum + row.routesPassed, 0);

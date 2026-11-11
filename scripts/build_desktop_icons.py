@@ -31,4 +31,4 @@ with tempfile.TemporaryDirectory(prefix='ovpn-icons-') as temporary:
         subprocess.run(['iconutil','-c','icns',str(iconset),'-o',str(assets/'icon.icns')],check=True)
     else:
         raise SystemExit('Regenerate macOS icons on macOS with iconutil before updating the brand digest.')
-(assets/'brand.sha256').write_text(hashlib.sha256(source.read_bytes()).hexdigest()+'\n')
+(assets/'brand.sha256').write_text(hashlib.sha256(source.read_bytes().replace(b'\r\n', b'\n')).hexdigest()+'\n')

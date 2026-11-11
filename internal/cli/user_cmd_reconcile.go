@@ -190,6 +190,7 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 	cmd.Flags().StringVar(&reconcile.toServer, "to-server", "", "Target server name (optional)")
 	cmd.Flags().BoolVar(&reconcile.all, "all", false, "Reconcile into all other servers")
 	cmd.Flags().BoolVar(&reconcile.apply, "apply", false, "Persist planned changes")
+	_ = cmd.MarkFlagRequired("from-server")
 	return cmd
 }
 
