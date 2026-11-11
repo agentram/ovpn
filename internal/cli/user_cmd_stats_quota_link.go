@@ -57,10 +57,10 @@ func (a *App) newUserTopCmd() *cobra.Command {
 			}
 			rows := buildUserTopRows(totals, users, quotaByEmail, top.limit)
 			if len(rows) == 0 {
-				fmt.Println("no traffic rows")
+				fmt.Fprintln(a.output(), "no traffic rows")
 				return nil
 			}
-			fmt.Println(renderUserTopTable(rows))
+			fmt.Fprintln(a.output(), renderUserTopTable(rows))
 			return nil
 		},
 	}
@@ -103,9 +103,9 @@ func (a *App) newUserQuotaResetCmd() *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Printf("quota reset for user %s\n", quotaReset.username)
+				fmt.Fprintf(a.output(), "quota reset for user %s\n", quotaReset.username)
 			} else {
-				fmt.Printf("quota reset for user %s on %d servers\n", quotaReset.username, len(targets))
+				fmt.Fprintf(a.output(), "quota reset for user %s on %d servers\n", quotaReset.username, len(targets))
 			}
 			return nil
 		},
@@ -168,9 +168,9 @@ func (a *App) newUserQuotaSetCmd() *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Printf("quota updated for user %s\n", quotaSet.username)
+				fmt.Fprintf(a.output(), "quota updated for user %s\n", quotaSet.username)
 			} else {
-				fmt.Printf("quota updated for user %s on %d servers\n", quotaSet.username, len(targets))
+				fmt.Fprintf(a.output(), "quota updated for user %s on %d servers\n", quotaSet.username, len(targets))
 			}
 			return nil
 		},
@@ -247,13 +247,14 @@ func (a *App) newUserLinkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(vless)
+			a.sharedContent = vless
+			fmt.Fprintln(a.output(), vless)
 			if link.qr {
 				qrText, err := renderTerminalQRCode(vless)
 				if err != nil {
 					return fmt.Errorf("render QR: %w", err)
 				}
-				fmt.Print(qrText)
+				fmt.Fprint(a.output(), qrText)
 			}
 			if link.qrFile != "" {
 				if err := writeQRCodePNG(vless, link.qrFile); err != nil {
@@ -455,7 +456,7 @@ func (a *App) newUserExportCmd() *cobra.Command {
 						if err := writePrivateClientConfig(path, data); err != nil {
 							return err
 						}
-						fmt.Printf("exported %s\n", filepath.Clean(path))
+						fmt.Fprintf(a.output(), "exported %s\n", filepath.Clean(path))
 						continue
 					}
 					linkPath := filepath.Join(out, base+".txt")
@@ -466,7 +467,7 @@ func (a *App) newUserExportCmd() *cobra.Command {
 					if err := writeQRCodePNG(vless, qrPath); err != nil {
 						return fmt.Errorf("write QR file: %w", err)
 					}
-					fmt.Printf("exported %s\n", filepath.Clean(qrPath))
+					fmt.Fprintf(a.output(), "exported %s\n", filepath.Clean(qrPath))
 				}
 			}
 			return nil

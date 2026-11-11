@@ -40,7 +40,7 @@ func (a *App) statsCmd() *cobra.Command {
 			if err := json.Unmarshal(body, &rows); err != nil {
 				return err
 			}
-			fmt.Println(renderTrafficTotalsTable(rows))
+			fmt.Fprintln(a.output(), renderTrafficTotalsTable(rows))
 			return nil
 		},
 	}
@@ -77,7 +77,7 @@ func (a *App) statsCmd() *cobra.Command {
 			if err := json.Unmarshal(body, &rows); err != nil {
 				return err
 			}
-			fmt.Println(renderDailyTrafficTable(rows, day))
+			fmt.Fprintln(a.output(), renderDailyTrafficTable(rows, day))
 			return nil
 		},
 	}
@@ -117,7 +117,7 @@ func (a *App) statsCmd() *cobra.Command {
 					return err
 				}
 			}
-			fmt.Printf("synced %d rows\n", len(rows))
+			fmt.Fprintf(a.output(), "synced %d rows\n", len(rows))
 			return nil
 		},
 	}

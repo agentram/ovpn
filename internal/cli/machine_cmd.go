@@ -20,6 +20,7 @@ func (a *App) machineCmd() *cobra.Command {
 				return fmt.Errorf("machine requires --stdio --protocol %d and does not support --dry-run", protocol.Version)
 			}
 			backend := app.NewDesktopService(cmd.Context(), a.dataDir)
+			backend.AttachControl(cmd.Context(), &deskControl{dataDir: a.dataDir, template: a, interactive: true})
 			defer backend.Close()
 			return machine.Serve(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout(), backend)
 		}}

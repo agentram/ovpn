@@ -58,7 +58,8 @@ Never point these tests at an operator workspace, deployed server, or personal d
 | First server, TLS/REALITY links, XHTTP Vision, Checker export | Deployment and CLI tests cover bootstrap sequencing, generated profiles, and private exports. `make client-compatibility` exercises real client cores with accepted and rejected credentials. |
 | CLI subscription delivery | A real CLI process exports only eligible profiles, serves the published snapshot, refreshes it, rotates its URL, and rejects old or revoked tokens. Revocation must leave user policy and links intact. |
 | CLI probes, scheduling and tools | Start and stop a real observer, reject a second owner, require consent, retain stale history, and enforce the daily budget after restart. Install checksum-pinned Checker and Knife and test real HTTPS with valid and invalid identities. Incident transitions and tool compatibility edges are tested in the Go packages. |
-| OVPN Desk | Chromium drives the built UI through the Go bindings and verified CLI worker. Cover inventory paging, quotas, server-specific user selection, failed checks, schedule consent, saved preferences, and read-only or stale plans. |
+| OVPN Desk | Chromium drives production UI, Go bindings and the verified worker: complete inventory search, reviewed creation scope, explicit QR delivery, positional server actions, three languages, large text and stale-plan rejection. Required native build/host checks run on macOS, Windows and Linux. |
+| Shared operations and monitoring | Independent processes test writer exclusion and kill-after-write reconciliation. Queue tests cover 1,000 assignments, four shared traffic slots, per-server exclusion, changed targets, sleep and probe presence masking. SQLite snapshots include committed WAL pages; unavailable traffic/presence remains unknown. |
 | O Tunnel | Android emulator drives setup with a one-time code or saved QR, permission denial and grant, REALITY and TLS, profile switching, an invalid identity, local report redaction, language selection, disconnect, and unavailable subscription recovery. A private DNS/HTTPS fixture proves traffic crossed TUN. Kotlin and Go tests cover malformed input, snapshot replacement, and transport compatibility. |
 
 Run from the repository root:
@@ -84,3 +85,5 @@ workflow changes run all suites. Documentation-only changes skip the runtime
 suites. The required **Go Quality** status fails if a selected suite fails or
 does not run. Physical camera, Wi-Fi/mobile handover, accessibility, and live
 VPS rollout remain device or operator acceptance checks.
+
+Native builds do not replace the [three-platform and five-person acceptance gates](design/desktop/acceptance.md).

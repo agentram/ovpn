@@ -6,7 +6,6 @@ import (
 	"fmt"
 	neturl "net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -120,7 +119,7 @@ func (a *App) initOrDeployServer(srv model.Server, bootstrap bool) (err error) {
 		return err
 	}
 	a.log().Info("deploy workflow completed", "server", srv.Name, "host", srv.Host, "config_hash", rev.ConfigHash)
-	fmt.Println("deploy complete")
+	fmt.Fprintln(a.output(), "deploy complete")
 	return nil
 }
 
@@ -322,8 +321,18 @@ func (a *App) persistConfigOnly(srv model.Server) error {
 	if err != nil {
 		return err
 	}
-	tmpFile := filepath.Join(os.TempDir(), "ovpn-config-persist.json")
-	if err := os.WriteFile(tmpFile, jsonRaw, 0o600); err != nil {
+	file, err := os.CreateTemp("", "ovpn-config-*.json")
+	if err != nil {
+		return err
+	}
+	tmpFile := file.Name()
+	if _, err = file.Write(jsonRaw); err != nil {
+		file.Close()
+		os.Remove(tmpFile)
+		return err
+	}
+	if err = file.Close(); err != nil {
+		os.Remove(tmpFile)
 		return err
 	}
 	defer os.Remove(tmpFile)

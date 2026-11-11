@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -344,6 +345,31 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
+	})
+	mux.HandleFunc("/users/online", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		result := model.UserPresence{Supported: os.Getenv("OVPN_USER_ONLINE_STATS") == "true", SampledAt: time.Now().UTC().Format(time.RFC3339), Online: []string{}}
+		if !result.Supported {
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		client, err := xrayapi.New(ctx, d.xrayAPI)
+		if err != nil {
+			http.Error(w, "presence unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		defer client.Close()
+		result.Online, err = client.OnlineUsers(ctx)
+		if err != nil {
+			http.Error(w, "presence unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	})
 	mux.HandleFunc("/users/status", func(w http.ResponseWriter, r *http.Request) {
 		email := strings.TrimSpace(r.URL.Query().Get("email"))

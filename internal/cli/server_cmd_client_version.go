@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,19 +36,21 @@ func (a *App) newServerSetRealityMinClientVersionCmd() *cobra.Command {
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}
-			printRealityMinClientVersion(version)
-			fmt.Printf("Run `ovpn deploy %s` to apply the setting; existing client links stay valid.\n", srv.Name)
+			printRealityMinClientVersion(version, a.output())
+			fmt.Fprintf(a.output(), "Run `ovpn deploy %s` to apply the setting; existing client links stay valid.\n", srv.Name)
 			return nil
 		},
 	}
 }
 
-func printRealityMinClientVersion(version string) {
+func printRealityMinClientVersion(version string, writers ...io.Writer) {
+	out := outputOrDefault(writers)
+
 	if version == "" {
-		fmt.Println("REALITY minimum client version: Xray default")
+		fmt.Fprintln(out, "REALITY minimum client version: Xray default")
 		return
 	}
 	// A custom minimum is an operator choice; Xray's default protects against outdated TLS fingerprints.
-	fmt.Printf("REALITY minimum client version: %s\n", version)
-	fmt.Println("Custom minimum enabled: keep client cores updated; outdated TLS fingerprints can make traffic easier to identify.")
+	fmt.Fprintf(out, "REALITY minimum client version: %s\n", version)
+	fmt.Fprintln(out, "Custom minimum enabled: keep client cores updated; outdated TLS fingerprints can make traffic easier to identify.")
 }

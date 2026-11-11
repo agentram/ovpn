@@ -9,8 +9,8 @@ import (
 )
 
 var vlessURLPattern = regexp.MustCompile(`vless://\S+`)
-var kvSecretPattern = regexp.MustCompile(`(?i)\b((?:smtp_)?password|token|secret|private_key)\s*=\s*([^\s,;]+)`)
-var jsonSecretPattern = regexp.MustCompile(`(?i)"((?:smtp_)?password|token|secret|private_key)"\s*:\s*"[^"]*"`)
+var kvSecretPattern = regexp.MustCompile(`(?i)\b([a-z0-9_]*(?:password|token|secret|private_?key|uuid|authorization|decryption|encryption))\s*=\s*([^\s,;]+)`)
+var jsonSecretPattern = regexp.MustCompile(`(?i)"([a-z0-9_]*(?:password|token|secret|private_?key|uuid|authorization|decryption|encryption))"\s*:\s*"[^"]*"`)
 
 // ParseLevel maps debug|info|warn|error to an slog.Level, defaulting to info when empty.
 func ParseLevel(raw string) (slog.Level, error) {
@@ -82,4 +82,18 @@ func sanitizeSensitiveString(v string) string {
 	v = kvSecretPattern.ReplaceAllString(v, "${1}=[REDACTED]")
 	v = jsonSecretPattern.ReplaceAllString(v, "\"$1\":\"[REDACTED]\"")
 	return v
+}
+
+// Sanitize removes credentials from human diagnostic output.
+var diagnosticUUID = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
+var diagnosticEmail = regexp.MustCompile(`[^\s"<>@,:{}]+@[^\s"<>@,:{}]+`)
+var diagnosticIPv6 = regexp.MustCompile(`\[[0-9a-fA-F:]+\]`)
+var diagnosticIP = regexp.MustCompile(`\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`)
+
+func Sanitize(value string) string {
+	value = sanitizeSensitiveString(value)
+	value = diagnosticUUID.ReplaceAllString(value, "[identity]")
+	value = diagnosticEmail.ReplaceAllString(value, "[identity]")
+	value = diagnosticIPv6.ReplaceAllString(value, "[address]")
+	return diagnosticIP.ReplaceAllString(value, "[address]")
 }

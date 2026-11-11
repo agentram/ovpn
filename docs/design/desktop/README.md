@@ -1,5 +1,9 @@
 # OVPN Desk — desktop design proposal
 
+Desk 1.13 implementation and current limits are described in the [operator guide](../../desktop.md).
+The design below also contains later milestones; native acceptance and the usability pilot remain open.
+
+
 Status: **design proposal and interactive prototype**, with a separate [first desktop development build](../../desktop.md). This is not a public desktop release. The prototype uses synthetic data, performs no network operations against VPN servers, and cannot modify control state.
 
 OVPN Desk is an operator application for Linux, macOS and Windows: connect a server, deliver access, verify traffic and recover from a change. The initial product manages servers; a system-wide VPN/TUN client is a separate scope.

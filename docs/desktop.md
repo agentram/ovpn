@@ -1,92 +1,106 @@
-# OVPN Desk development build
+# OVPN Desk
 
-The development build reads existing server/user inventory, runs explicit native HTTPS checks and supports opt-in automatic observation and Checker/Knife jobs. Users shows configured assignments, policy differences, quota limits and expiry without exposing credentials. It uses Wails 3, React/TypeScript and a bundled OVPN worker. Server deployment, user mutations, subscription management and recovery actions remain in the CLI.
+Desk manages the same local workspace as the CLI. It uses Wails, React and a
+version-verified Go worker. English is the default; Settings offers Russian,
+Simplified Chinese and dark/light themes.
 
-English is the default. Settings offers Russian and dark/light themes; only these preferences are persisted in WebView storage. The application opens the existing local workspace on startup. No database is created or migrated by desktop queries.
+## Start
 
-## Build and open
-
-Requirements: the repository's Go toolchain, Node.js 26/npm and Python 3. macOS native builds require Xcode Command Line Tools. Other native build prerequisites follow [Wails installation](https://v3.wails.io/quick-start/installation/).
-
-From the repository root:
+Build with the repository's Go toolchain, Node.js 26/npm and Python 3.
+Native prerequisites follow [Wails installation](https://v3.wails.io/quick-start/installation/).
+On macOS, install Xcode Command Line Tools.
 
 ```bash
 python3 scripts/build_desktop.py
-```
-
-On macOS:
-
-```bash
 open "bin/desktop/darwin/OVPN Desk.app"
 ```
 
-The macOS development bundle is ad-hoc signed and targets macOS 13+. It is not notarized or a public distribution build. To open an explicitly selected workspace:
+The `OVPN_DESK_DATA_DIR` environment variable also selects the startup workspace;
+`--data-dir` takes precedence. To use an isolated workspace:
 
 ```bash
 "bin/desktop/darwin/OVPN Desk.app/Contents/MacOS/ovpn-desk" \
   --data-dir /path/to/workspace
 ```
 
-A Windows x64 cross-build is available:
+The development macOS bundle targets macOS 13+, is ad-hoc signed, and is not
+notarized. Windows builds use `--target windows --arch amd64`; Linux builds
+require a native Linux host. Keep the matching worker beside the executable.
+Native acceptance on all three operating systems remains a release gate.
 
-```bash
-python3 scripts/build_desktop.py --target windows --arch amd64
-```
+## Everyday actions
 
-This produces an executable and matching worker, not an installer. Native Windows/WebView2, Linux/GTK, SSH-agent and credential-vault integration remain validation gates. A cross-build alone does not establish platform support. Keep the worker beside the application executable; its digest is pinned into the host at build time. Rebuild the host after changing the worker. Distribution signing must sign the worker **before** calculating its digest.
+- **Overview:** open a server, user, connection problem or recent operation.
+- **Users:** select **Add user**, enter a name and optional quota/end date,
+  review every enabled server, then apply. Open a user to change access or
+  explicitly reveal a connection link and QR. Search covers the whole loaded
+  inventory, including all pages for the supported 100-user workspace.
+- **Servers:** select **Add server**, enter its address/domain and SSH key,
+  compare the displayed SSH fingerprint with the server console, then confirm
+  registration and installation. Existing SSH-agent keys are supported. The
+  account needs passwordless sudo. Use a supported Linux host with a domain
+  pointing to it. Server details expose update, restart, logs and backups;
+  less common profile/backend actions are under **Advanced**.
+- **Activity:** inspect operation progress and per-server results, check history
+  and diagnostic jobs. A partial change retains completed steps. Resume
+  reconciles interrupted user changes; other interrupted writes require a new
+  reviewed plan. A changed workspace also requires a fresh review.
 
-Use the native application to exercise the workspace and check controls. Production assets are bundled with the application.
+Use the matching 1.13 CLI when writing to this workspace; older CLIs do not
+participate in the operation journal and writer locks.
 
-## Users and observation
+User mutations continue to apply to **all enabled servers**. Limits are
+per-server rolling 30-day allowances. Changing policy does not reset collected
+traffic. Deletion, restore and cleanup require a second confirmation.
 
-Open **Users** in Local workspace to inspect configured access. Policy states are local evidence: Allowed does not establish runtime distribution or user connectivity. The last manual check is linked to its selected user and one server/profile; it expires and does not certify every assignment. Quotas remain per-server rolling 30-day policies. Agent-default, explicit and disabled quotas are displayed separately; an inherited default is not an unlimited allowance. The displayed assignment count refers to configured records on enabled nodes. Search filters the loaded page; load additional pages explicitly.
+A verified backup precedes remote changes. A newly registered server is checked
+for an existing runtime before installation; an imported existing installation
+is backed up too. Do not equate a completed operation with demonstrated client
+connectivity: inspect its connection checks afterwards.
 
-**Preview new user** and **Review access change** now query the shared local planner for create/enable/disable intent. The plan lists every enabled server, current/proposed policy, missing/duplicate records and identity conflicts. It preserves quota blocks and expiry when changing the enabled flag. **Recheck snapshot** rejects a changed local snapshot or request; **Rebuild plan** requires reviewing the resulting scope again. Plans are limited to 100 targets and are not stored execution authorizations. No remote preflight, backup, write or publication is performed. CLI access changes remain separate operations until the journal/locking milestone is implemented.
+## Automatic checks and live data
 
-The same review is available without the desktop:
+Enable automatic checks once after reading the traffic notice. Desk selects
+eligible users and enabled profiles itself. It checks access every 15 minutes
+and refreshes changed assignments immediately, with four shared traffic slots
+and one per server. Native Xray handles TCP/TLS and TCP/REALITY; compatible
+XHTTP uses checksum-pinned Checker. Tool preparation starts when needed.
+Knife is an explicit advanced diagnostic and requires traffic consent.
 
-```bash
-ovpn user plan --action create --username example-user --quota-bytes 107374182400
-ovpn user plan --action disable --username example-user
-# Repeat the same intent with its full returned digest to reject changed local state:
-ovpn user plan --action disable --username example-user --expect-digest <digest>
-```
+Checks run **only while Desk is open**. Service/traffic reads run every
+30 seconds and presence reads every 10 seconds. After sleep or source loss,
+old measurements stop being current. A connection check confirms access from
+this computer; it does not establish availability from every client network.
 
-**Monitoring** configures Native and Checker schedules and shows history and incidents. **Integrations** installs pinned tools and starts finite Knife diagnostics. See [automatic observation](observation.md) for schedules, limits and lifecycle.
+**Access works**, **Connected now**, **Traffic used** and **Remaining** are
+separate facts. Presence comes from Xray online statistics, not a device count.
+Older agents need updating to expose presence. During probe activity and its
+closing window, presence displays **Updating data** rather than counting the
+probe as a person. Probe traffic still consumes a small part of the allowance.
+An unavailable collector is unknown, not zero usage.
 
-## Check traffic
+## Share a setup code
 
-Open **Checks**, select an enabled server and a TCP/REALITY or TCP/TLS profile, choose an eligible user from the selected server’s list and press **Run HTTPS check**. The request uses the pinned native Xray client and verifies `https://example.com/`, HTTP 200 and its certificate, with a 20-second timeout and a 1 MiB body limit. It does not create users or deploy configuration. Existing encryption keys are resolved as in the CLI; OS-vault migration is not implemented yet.
+**Create setup code** needs an existing trusted HTTPS subscription service
+serving this worker's prepared bundle and invitation directories. Defaults are
+`delivery/bundles` and `delivery/invites` within the workspace. Use
+`subscription serve` with these directories behind your configured HTTPS
+endpoint, or supply existing directories under **Advanced**. The form checks
+HTTPS and the exact published snapshot before issuing a 30-minute one-time
+code. A failed check revokes the newly prepared delivery bundle.
 
-Runtime health remains **Not checked** when inventory has been read. A successful traffic sample expires after five minutes and does not certify UDP, DNS, IPv6 or GUI-client import. For XHTTP, use the owned Checker or Knife/Xray adapters in Integrations. Automatic observations have a separate lifetime and history; their green results cover only the explicitly selected identities and paths.
+Revoking profile delivery stops future downloads; disabling VPN access is a
+separate user action. Current user traffic never enters diagnostic reports.
+Links/codes appear only on explicit delivery actions and are not journaled.
 
-## Machine protocol 1
+## Architecture and validation
 
-```bash
-ovpn machine --stdio --protocol 1
-```
+Machine protocol 1 adds `operations.catalog/plan/start/list/result/resume/cancel`
+and `desk.snapshot/configure/routes/pause`. Inputs are typed flag values and
+positional arguments; the worker uses the same registered management handlers
+as the CLI without parsing terminal output. The common coordinator owns plans,
+private journals, locking, checkpoints and reconciliation. Existing command
+handlers remain composition adapters while domain extraction continues.
 
-Send one JSON object per line. Start every session with:
-
-```json
-{"id":"hello-1","method":"engine.hello","params":{"protocolVersion":1}}
-{"id":"summary-1","method":"workspace.summary","params":{}}
-{"id":"servers-1","method":"servers.list","params":{"limit":50}}
-```
-
-Implemented methods include `engine.hello`, `workspace.summary`, `servers.list`, `users.list`, `users.plan`, `checks.users` and `checks.run`. Inventory uses `node-<id>` identifiers and keyset cursors. `users.plan` accepts `action`, `username`, create-only `expiry`/`quotaBytes` and optional `expectedDigest`; it advertises `users.plan.read` without enabling writes. `checks.run` accepts `serverId`, an existing `username` and optional `profile`; it deliberately accepts no custom URL or raw configuration. `checks.users` returns paginated usernames for enabled, unexpired and non-quota-blocked assignments on the selected server. It advertises `checks.users.read`. Additional implemented observation methods are `observer.status/configure/start/stop/remove/run/cancel`, `integrations.install/setup` and `diagnostics.start`. They advertise observation/integration capabilities separately from server/user writes. Proposed server execution methods in the [architecture](design/desktop/architecture.md) remain unavailable.
-
-The worker processes requests sequentially, rejects unknown fields, bounds messages to 1 MiB and returns stable errors without raw database, path or tunnel diagnostics. Its stdout carries protocol envelopes only. The host verifies the worker digest and exact engine/protocol versions, serializes calls and terminates the session on timeout or malformed output. An explicit later action may reconnect; a failed check is not automatically repeated.
-
-## Validation
-
-```bash
-go test ./...
-make client-compatibility
-make test-race
-npm --prefix apps/desktop/frontend test
-npm --prefix apps/desktop/frontend run build
-go -C apps/desktop vet ./...
-```
-
-Native macOS launch and the local inventory handshake were exercised during implementation. Windows x64 has a cross-build gate; native three-platform support, screen-reader/scaling coverage and public installer signing remain outstanding. See the [implementation roadmap](design/desktop/roadmap.md) for subsequent stages.
+See [command coverage](design/desktop/cli-coverage.md),
+[testing](testing.md), and [native/pilot acceptance](design/desktop/acceptance.md).

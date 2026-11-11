@@ -14,6 +14,7 @@
     "levels": {
       "0": {
         "statsUserDownlink": true,
+        "statsUserOnline": true,
         "statsUserUplink": true
       }
     },

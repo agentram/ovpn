@@ -37,7 +37,7 @@ func (a *App) newServerProfileListCmd() *cobra.Command {
 			for _, p := range srv.NormalizedEnabledProfiles() {
 				enabled[p] = true
 			}
-			fmt.Println(renderServerProfileTable(*srv, enabled))
+			fmt.Fprintln(a.output(), renderServerProfileTable(*srv, enabled))
 			return nil
 		},
 	}
@@ -70,8 +70,8 @@ func (a *App) newServerProfileEnableCmd() *cobra.Command {
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}
-			fmt.Printf("enabled profile %s on %s\n", profile, srv.Name)
-			fmt.Println("redeploy the server before using generated links for newly enabled profiles")
+			fmt.Fprintf(a.output(), "enabled profile %s on %s\n", profile, srv.Name)
+			fmt.Fprintln(a.output(), "redeploy the server before using generated links for newly enabled profiles")
 			return nil
 		},
 	}
@@ -106,7 +106,7 @@ func (a *App) newServerProfileDisableCmd() *cobra.Command {
 				next = append(next, item)
 			}
 			if !removed {
-				fmt.Printf("profile %s is already disabled on %s\n", profile, srv.Name)
+				fmt.Fprintf(a.output(), "profile %s is already disabled on %s\n", profile, srv.Name)
 				return nil
 			}
 			if err := a.validateAttachedBackendProfiles(*srv, next); err != nil {
@@ -116,8 +116,8 @@ func (a *App) newServerProfileDisableCmd() *cobra.Command {
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}
-			fmt.Printf("disabled profile %s on %s\n", profile, srv.Name)
-			fmt.Println("redeploy the server before assuming old links for this profile have stopped working")
+			fmt.Fprintf(a.output(), "disabled profile %s on %s\n", profile, srv.Name)
+			fmt.Fprintln(a.output(), "redeploy the server before assuming old links for this profile have stopped working")
 			return nil
 		},
 	}
@@ -151,8 +151,8 @@ func (a *App) newServerProfileSwitchCmd() *cobra.Command {
 			if err := a.store.UpdateServer(a.ctx, srv); err != nil {
 				return err
 			}
-			fmt.Printf("primary profile for %s: %s\n", srv.Name, profile)
-			fmt.Println("redeploy the server before using generated links if the profile was not already live")
+			fmt.Fprintf(a.output(), "primary profile for %s: %s\n", srv.Name, profile)
+			fmt.Fprintln(a.output(), "redeploy the server before using generated links if the profile was not already live")
 			return nil
 		},
 	}

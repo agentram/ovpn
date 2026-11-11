@@ -52,23 +52,23 @@ func (a *App) newServerCleanupCmd() *cobra.Command {
 			}()
 
 			removeBackupsEffective := cleanupRemoveBackupsEffective(cleanup.keepBackups, cleanup.removeBackups)
-			fmt.Printf("cleanup plan for server %s (%s)\n", srv.Name, srv.Host)
-			fmt.Printf("- include monitoring cleanup: %v\n", cleanup.includeMonitoring)
-			fmt.Printf("- remove runtime compose stack: %v\n", true)
-			fmt.Printf("- remove runtime directory (%s): %v\n", deploy.RemoteDir, true)
-			fmt.Printf("- remove ovpn docker volumes: %v\n", cleanup.removeVolumes)
-			fmt.Printf("- remove remote backups (%s): %v\n", deploy.RemoteBackupDir, removeBackupsEffective)
-			fmt.Printf("- remove local metadata: %v\n", cleanup.removeLocal)
-			fmt.Printf("- dry-run mode: %v\n", a.dryRun)
+			fmt.Fprintf(a.output(), "cleanup plan for server %s (%s)\n", srv.Name, srv.Host)
+			fmt.Fprintf(a.output(), "- include monitoring cleanup: %v\n", cleanup.includeMonitoring)
+			fmt.Fprintf(a.output(), "- remove runtime compose stack: %v\n", true)
+			fmt.Fprintf(a.output(), "- remove runtime directory (%s): %v\n", deploy.RemoteDir, true)
+			fmt.Fprintf(a.output(), "- remove ovpn docker volumes: %v\n", cleanup.removeVolumes)
+			fmt.Fprintf(a.output(), "- remove remote backups (%s): %v\n", deploy.RemoteBackupDir, removeBackupsEffective)
+			fmt.Fprintf(a.output(), "- remove local metadata: %v\n", cleanup.removeLocal)
+			fmt.Fprintf(a.output(), "- dry-run mode: %v\n", a.dryRun)
 
 			if cleanup.skipBackupCheck {
-				fmt.Println("backup check: skipped (--skip-backup-check)")
+				fmt.Fprintln(a.output(), "backup check: skipped (--skip-backup-check)")
 			} else {
 				rec, age, err := a.ensureRecentBackupForCleanup(*srv, 30*24*time.Hour)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("backup check: latest backup %s (%s ago)\n", rec.Path, roundDuration(age))
+				fmt.Fprintf(a.output(), "backup check: latest backup %s (%s ago)\n", rec.Path, roundDuration(age))
 			}
 
 			if err := validateCleanupConfirm(cleanup.confirm, a.dryRun); err != nil {
@@ -87,34 +87,34 @@ func (a *App) newServerCleanupCmd() *cobra.Command {
 
 			if cleanup.removeLocal {
 				if a.dryRun {
-					fmt.Printf("dry-run: local metadata would be removed for server %s\n", srv.Name)
+					fmt.Fprintf(a.output(), "dry-run: local metadata would be removed for server %s\n", srv.Name)
 				} else {
 					if err := a.finalizeCleanupLocalState(srv, true); err != nil {
 						return fmt.Errorf("remove local metadata for server %s: %w", srv.Name, err)
 					}
-					fmt.Printf("local metadata removed for server %s\n", srv.Name)
+					fmt.Fprintf(a.output(), "local metadata removed for server %s\n", srv.Name)
 				}
 			} else {
 				if a.dryRun {
-					fmt.Printf("dry-run: local metadata would be kept and server %s would be marked disabled\n", srv.Name)
+					fmt.Fprintf(a.output(), "dry-run: local metadata would be kept and server %s would be marked disabled\n", srv.Name)
 				} else {
 					wasEnabled := srv.Enabled
 					if err := a.finalizeCleanupLocalState(srv, false); err != nil {
 						return fmt.Errorf("mark server %s disabled in local metadata: %w", srv.Name, err)
 					}
 					if wasEnabled {
-						fmt.Printf("local metadata kept; server %s marked disabled\n", srv.Name)
+						fmt.Fprintf(a.output(), "local metadata kept; server %s marked disabled\n", srv.Name)
 					} else {
-						fmt.Printf("local metadata kept; server %s already disabled\n", srv.Name)
+						fmt.Fprintf(a.output(), "local metadata kept; server %s already disabled\n", srv.Name)
 					}
 				}
 			}
 
 			if a.dryRun {
-				fmt.Println("cleanup dry-run complete")
+				fmt.Fprintln(a.output(), "cleanup dry-run complete")
 				return nil
 			}
-			fmt.Println("cleanup complete")
+			fmt.Fprintln(a.output(), "cleanup complete")
 			return nil
 		},
 	}

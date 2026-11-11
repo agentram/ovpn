@@ -47,7 +47,7 @@ func (a *App) newServerBackupCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("remote backup for server %s on %s: %w", srv.Name, srv.Host, err)
 			}
-			fmt.Printf("remote backup: %s\n", remotePath)
+			fmt.Fprintf(a.output(), "remote backup: %s\n", remotePath)
 			archive, sha, err := backup.LocalBackup(a.dataDir, filepath.Join(a.dataDir, "backups"))
 			if err != nil {
 				return fmt.Errorf("local backup for server %s: %w", srv.Name, err)
@@ -56,7 +56,7 @@ func (a *App) newServerBackupCmd() *cobra.Command {
 			if err := a.store.AddBackupRecord(a.ctx, rec); err != nil {
 				return err
 			}
-			fmt.Printf("local backup: %s\n", archive)
+			fmt.Fprintf(a.output(), "local backup: %s\n", archive)
 			return nil
 		},
 	}
@@ -99,7 +99,7 @@ func (a *App) newServerRestoreCmd() *cobra.Command {
 			if err := backup.RemoteRestore(a.ctx, runner, sshFromServer(*srv), remotePath); err != nil {
 				return fmt.Errorf("restore server %s on %s: %w", srv.Name, srv.Host, err)
 			}
-			fmt.Println("restore complete")
+			fmt.Fprintln(a.output(), "restore complete")
 			return nil
 		},
 	}

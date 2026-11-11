@@ -29,6 +29,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 		sshPort          int
 		identityFile     string
 		knownHosts       string
+		trustFingerprint string
 		strict           bool
 		xrayVersion      string
 		realitySNI       string
@@ -125,6 +126,14 @@ func (a *App) newServerAddCmd() *cobra.Command {
 					add.shortID = randomShortID()
 				}
 			}
+			if add.trustFingerprint != "" {
+				pinned, err := a.trustServerHost(cmd, add.host, add.sshPort, add.trustFingerprint)
+				if err != nil {
+					return err
+				}
+				add.knownHosts = pinned
+				add.strict = true
+			}
 			srv := &model.Server{
 				Name:                    add.name,
 				Role:                    add.role,
@@ -162,15 +171,15 @@ func (a *App) newServerAddCmd() *cobra.Command {
 				return fmt.Errorf("seed global users for %s: %w", srv.Name, err)
 			}
 			a.log().Info("server registered", "server", srv.Name, "host", srv.Host, "domain", srv.Domain, "xray_version", srv.XrayVersion)
-			fmt.Printf("server added: %s (id=%d role=%s)\n", srv.Name, srv.ID, srv.NormalizedRole())
+			fmt.Fprintf(a.output(), "server added: %s (id=%d role=%s)\n", srv.Name, srv.ID, srv.NormalizedRole())
 			if srv.IsProxy() {
-				fmt.Printf("proxy preset: %s\n", srv.NormalizedProxyPreset())
+				fmt.Fprintf(a.output(), "proxy preset: %s\n", srv.NormalizedProxyPreset())
 			}
 			printRealityMinClientVersion(srv.RealityMinClientVersion)
-			fmt.Printf("reality public key: %s\n", srv.RealityPublicKey)
-			fmt.Printf("reality short id: %s\n", srv.RealityShortIDs)
+			fmt.Fprintf(a.output(), "reality public key: %s\n", srv.RealityPublicKey)
+			fmt.Fprintf(a.output(), "reality short id: %s\n", srv.RealityShortIDs)
 			if srv.ProxyServiceUUID != "" {
-				fmt.Printf("proxy service uuid: %s\n", srv.ProxyServiceUUID)
+				fmt.Fprintf(a.output(), "proxy service uuid: %s\n", srv.ProxyServiceUUID)
 			}
 			return nil
 		},
@@ -192,6 +201,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 	addCmd.Flags().StringVar(&add.publicKey, "reality-public-key", "", "REALITY public key")
 	addCmd.Flags().StringVar(&add.minClientVersion, "reality-min-client-version", "", "REALITY minimum client version (x.y.z or default); inherits from the first enabled server of the same role")
 	addCmd.Flags().StringVar(&add.shortID, "reality-short-id", "", "REALITY short ID (hex)")
+	addCmd.Flags().StringVar(&add.trustFingerprint, "trust-fingerprint", "", "Explicitly reviewed SHA256 SSH host fingerprint")
 	_ = addCmd.MarkFlagRequired("name")
 	_ = addCmd.MarkFlagRequired("host")
 	_ = addCmd.MarkFlagRequired("domain")
@@ -230,9 +240,9 @@ func (a *App) newServerSetRealityTargetCmd() *cobra.Command {
 				return err
 			}
 			a.log().Info("reality target updated", "server", srv.Name, "previous_target", previousTarget, "target", target, "previous_server_name", previousSNI, "server_name", sni)
-			fmt.Printf("server %s REALITY target: %s -> %s\n", srv.Name, previousTarget, target)
-			fmt.Printf("server %s REALITY serverName: %s -> %s\n", srv.Name, previousSNI, sni)
-			fmt.Println("redeploy the server, then generate new REALITY links; existing links use the previous target/SNI")
+			fmt.Fprintf(a.output(), "server %s REALITY target: %s -> %s\n", srv.Name, previousTarget, target)
+			fmt.Fprintf(a.output(), "server %s REALITY serverName: %s -> %s\n", srv.Name, previousSNI, sni)
+			fmt.Fprintln(a.output(), "redeploy the server, then generate new REALITY links; existing links use the previous target/SNI")
 			return nil
 		},
 	}
@@ -310,10 +320,10 @@ func (a *App) newServerListCmd() *cobra.Command {
 				return err
 			}
 			if len(servers) == 0 {
-				fmt.Println("no servers")
+				fmt.Fprintln(a.output(), "no servers")
 				return nil
 			}
-			fmt.Println(renderServerListTable(servers))
+			fmt.Fprintln(a.output(), renderServerListTable(servers))
 			return nil
 		},
 	}
@@ -341,7 +351,7 @@ func (a *App) newServerSetXrayVersionCmd() *cobra.Command {
 				return err
 			}
 			a.log().Info("xray version pin updated", "server", srv.Name, "previous", prev, "current", srv.XrayVersion)
-			fmt.Printf("server %s xray version: %s -> %s\n", srv.Name, prev, srv.XrayVersion)
+			fmt.Fprintf(a.output(), "server %s xray version: %s -> %s\n", srv.Name, prev, srv.XrayVersion)
 			return nil
 		},
 	}
@@ -364,7 +374,7 @@ func (a *App) newServerStatusCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("status server %s on %s: %w", srv.Name, srv.Host, err)
 			}
-			fmt.Println(text)
+			fmt.Fprintln(a.output(), text)
 			return nil
 		},
 	}

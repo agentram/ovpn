@@ -72,6 +72,7 @@ func (a *App) subscriptionRevokeCmd() *cobra.Command {
 func (a *App) subscriptionInviteCmd() *cobra.Command {
 	var dir, inviteDir, id, origin, out string
 	var ttl time.Duration
+	var checkService bool
 	cmd := &cobra.Command{
 		Use: "invite", Short: "Create a one-time O Tunnel setup code", Args: cobra.NoArgs,
 		Annotations: map[string]string{"ovpn.local-state": "none"},
@@ -93,10 +94,16 @@ func (a *App) subscriptionInviteCmd() *cobra.Command {
 				return err
 			}
 			defer invites.Close()
+			if checkService {
+				if err := subscription.VerifyDeliveryHealth(cmd.Context(), origin); err != nil {
+					return err
+				}
+			}
 			code, err := invites.Issue(bundle, origin, time.Now(), ttl)
 			if err != nil {
 				return err
 			}
+			a.sharedContent = code
 			if out != "" {
 				return writeQRCodePNG(code, out)
 			}
@@ -109,6 +116,7 @@ func (a *App) subscriptionInviteCmd() *cobra.Command {
 	cmd.Flags().StringVar(&id, "id", "", "Published subscription ID")
 	cmd.Flags().StringVar(&origin, "base-url", "", "HTTPS origin of the subscription service")
 	cmd.Flags().StringVar(&out, "out", "", "Save a private QR PNG instead of printing the code")
+	cmd.Flags().BoolVar(&checkService, "check-service", false, "Verify HTTPS delivery before issuing a setup code")
 	cmd.Flags().DurationVar(&ttl, "ttl", 30*time.Minute, "Time allowed to activate the invitation")
 	for _, flag := range []string{"bundle-dir", "invite-dir", "id", "base-url"} {
 		_ = cmd.MarkFlagRequired(flag)

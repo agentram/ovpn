@@ -154,6 +154,7 @@ func (a *App) newUserSubscriptionPublishCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				a.sharedContent = link
 				fmt.Fprintln(cmd.OutOrStdout(), link)
 			} else {
 				fmt.Fprintln(cmd.OutOrStdout(), "subscription updated; existing URL retained")

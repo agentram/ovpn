@@ -54,7 +54,7 @@ func (a *App) configCmd() *cobra.Command {
 				return err
 			}
 			a.log().Debug("rendered xray config", "server", srv.Name, "users", len(users), "bytes", len(jsonRaw))
-			fmt.Println(string(jsonRaw))
+			fmt.Fprintln(a.output(), string(jsonRaw))
 			return nil
 		},
 	}
@@ -126,7 +126,7 @@ func (a *App) configCmd() *cobra.Command {
 					return err
 				}
 			}
-			fmt.Println("config valid")
+			fmt.Fprintln(a.output(), "config valid")
 			return nil
 		},
 	}
