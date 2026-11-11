@@ -1,5 +1,9 @@
 # OVPN Desk: complete application plan
 
+Desk 1.13 implementation and current limits are described in the [operator guide](../../desktop.md).
+The design below also contains later milestones; native acceptance and the usability pilot remain open.
+
+
 Status: target product and architecture. The current build has live read-only server/user inventory, local user-intent previews and manual native HTTPS checks. An initial native/Checker scheduler, pinned tool installation, Knife jobs and local observation history are implemented; remote collectors, broader observation classes and write execution remain planned. The desktop opens the existing local workspace on startup. Check targets use the selected server’s eligible users. English remains the default, with Russian in Settings.
 
 ## Product boundary

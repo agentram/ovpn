@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -179,5 +180,87 @@ func TestRemoteBackupRestoreUseRunnerAndWrapErrors(t *testing.T) {
 	}
 	if err := RemoteRestore(ctx, runner, cfg, remotePath); err != nil {
 		t.Fatalf("remote restore: %v", err)
+	}
+}
+
+func TestLocalBackupCapturesCommittedWALAndNeverFollowsSymlinks(t *testing.T) {
+	ctx := context.Background()
+	data := t.TempDir()
+	db, err := sql.Open("sqlite", filepath.Join(data, "ovpn.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err = db.ExecContext(ctx, "PRAGMA journal_mode=WAL; CREATE TABLE users (name TEXT); INSERT INTO users VALUES ('alice')"); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside")
+	if err = os.WriteFile(outside, []byte("private-external"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Symlink(outside, filepath.Join(data, "external")); err != nil {
+		t.Fatal(err)
+	}
+	archive, _, err := LocalBackup(data, filepath.Join(data, "backups"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, _ := os.Stat(archive)
+	if info.Mode().Perm() != 0o600 {
+		t.Fatal("archive is not private")
+	}
+	restored := t.TempDir()
+	if err = LocalRestore(restored, archive); err != nil {
+		t.Fatal(err)
+	}
+	copy, err := sql.Open("sqlite", filepath.Join(restored, "ovpn.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer copy.Close()
+	var user string
+	if err = copy.QueryRow("SELECT name FROM users").Scan(&user); err != nil || user != "alice" {
+		t.Fatal("backup lost committed WAL data", err)
+	}
+	if _, err = os.Stat(filepath.Join(restored, "external")); !os.IsNotExist(err) {
+		t.Fatal("external symlink was included")
+	}
+}
+func TestRemoteRestoreRejectsShellInput(t *testing.T) {
+	if err := RemoteRestore(context.Background(), &ssh.Runner{DryRun: true}, ssh.Config{}, "/opt/ovpn-backups/x.tgz;touch injected"); err == nil {
+		t.Fatal("accepted shell input")
+	}
+}
+
+func TestBackupNamesAndRestoreOrderingProtectExistingRuntime(t *testing.T) {
+	for _, name := range []string{"Friendly server", "server; echo unsafe", "../../backup", "用户服务器"} {
+		path := "/opt/ovpn-backups/" + archiveName(name, 1) + "-sample.tgz"
+		if !safeArchivePath(path) {
+			t.Fatal("server label escaped its archive name")
+		}
+	}
+	script := buildRemoteRestoreScript("/opt/ovpn-backups/main.tgz")
+	verified := strings.Index(script, "sha256sum -c")
+	stopped := strings.Index(script, "docker-compose.yml down")
+	replaced := strings.Index(script, "sudo rm -rf /opt/ovpn")
+	started := strings.Index(script, "up -d --force-recreate")
+	if verified < 0 || stopped <= verified || replaced <= stopped || started <= replaced {
+		t.Fatal("restore did not verify, stop, replace and restart in that order")
+	}
+	if !strings.Contains(script, "*.db-wal") {
+		t.Fatal("stale WAL files can override the restored snapshot")
+	}
+}
+
+func TestRemoteBackupAndRestoreScriptsParseBeforeExecution(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("requires a POSIX shell")
+	}
+	for _, script := range []string{buildRemoteBackupScript("/opt/ovpn-backups/example.tgz", "example"), buildRemoteRestoreScript("/opt/ovpn-backups/example.tgz")} {
+		command := exec.Command("sh", "-n")
+		command.Stdin = strings.NewReader(script)
+		if out, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("invalid backup script: %s", out)
+		}
 	}
 }

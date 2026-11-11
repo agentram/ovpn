@@ -166,3 +166,18 @@ func EnsureAPIReachable(ctx context.Context, addr string) error {
 	}
 	return nil
 }
+
+// OnlineUsers reads active user identifiers without fetching client IP addresses.
+func (c *Client) OnlineUsers(ctx context.Context) ([]string, error) {
+	response, err := c.stats.GetAllOnlineUsers(ctx, &statscommand.GetAllOnlineUsersRequest{})
+	if err != nil {
+		return nil, err
+	}
+	users := make([]string, 0, len(response.Users))
+	for _, name := range response.Users {
+		name = strings.TrimPrefix(name, "user>>>")
+		name = strings.TrimSuffix(name, ">>>online")
+		users = append(users, name)
+	}
+	return users, nil
+}

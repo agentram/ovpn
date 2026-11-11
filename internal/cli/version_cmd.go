@@ -13,8 +13,9 @@ func (a *App) versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print pinned ovpn version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version.Current())
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintln(a.output(), version.Current())
+			return nil
 		},
 	}
 }

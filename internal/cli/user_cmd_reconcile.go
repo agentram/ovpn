@@ -112,21 +112,21 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 			})
 
 			if len(actions) == 0 {
-				fmt.Println("reconcile: no changes needed")
+				fmt.Fprintln(a.output(), "reconcile: no changes needed")
 				return nil
 			}
 
-			fmt.Printf("reconcile plan: from %s -> %d target(s)\n", source.Name, len(targets))
+			fmt.Fprintf(a.output(), "reconcile plan: from %s -> %d target(s)\n", source.Name, len(targets))
 			for _, action := range actions {
 				if strings.TrimSpace(action.details) == "" {
-					fmt.Printf("- %s %s on %s\n", action.kind, action.username, action.server)
+					fmt.Fprintf(a.output(), "- %s %s on %s\n", action.kind, action.username, action.server)
 					continue
 				}
-				fmt.Printf("- %s %s on %s (%s)\n", action.kind, action.username, action.server, action.details)
+				fmt.Fprintf(a.output(), "- %s %s on %s (%s)\n", action.kind, action.username, action.server, action.details)
 			}
 
 			if !reconcile.apply {
-				fmt.Println("dry-run mode. Re-run with --apply to persist changes.")
+				fmt.Fprintln(a.output(), "dry-run mode. Re-run with --apply to persist changes.")
 				return nil
 			}
 
@@ -182,7 +182,7 @@ func (a *App) newUserReconcileCmd() *cobra.Command {
 				}
 			}
 
-			fmt.Println("reconcile applied to local state. Run deploy for affected servers.")
+			fmt.Fprintln(a.output(), "reconcile applied to local state. Run deploy for affected servers.")
 			return nil
 		},
 	}

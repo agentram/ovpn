@@ -6,6 +6,22 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+## 1.13.0
+
+### Added
+- Rebuild OVPN Desk around Overview, Users, Servers and Activity, with the site's ring mark, native icons, dark/light themes and English, Russian and Simplified Chinese.
+- Add user creation, enable/disable, expiry and rolling quota changes, explicit QR/link delivery, and one-time setup codes that verify trusted HTTPS delivery and the published profile snapshot before issue.
+- Expose the CLI command catalog through additive machine protocol 1 methods. Review affected servers and input values before writes; deletion, restore and cleanup require a separate typed confirmation.
+- Coordinate CLI and Desk mutations with an encrypted operation journal, snapshot checks, idempotency keys, process ownership and local/remote writer locks. Reconcile interrupted user changes and retain separate outcomes for each server.
+- Add a server setup wizard with fingerprint review, pinned SSH trust, SSH/sudo checks and installation, plus deployment, restart, profile/backend, log, debug, backup and recovery actions.
+- Refresh service/traffic data every 30 seconds and current Xray presence every 10 seconds while Desk is open. Show unknown readings explicitly and keep per-server rolling quotas separate.
+- Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
+
+### Changed
+- Create private, consistent SQLite backup snapshots while monitoring continues; validate remote archives and checksums before reporting backup success.
+- Bundle matching Linux agent binaries into development Desk workers so deployment does not require Go source on the operator's computer.
+- Extend regression coverage with real-worker Desk journeys, telemetry/queue edges, independent-process locking and crash-after-write recovery. Native three-platform acceptance and the five-person usability pilot remain release gates.
+
 ## 1.12.0
 
 ### Added

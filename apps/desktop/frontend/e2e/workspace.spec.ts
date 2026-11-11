@@ -1,104 +1,274 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from "@playwright/test";
 
-test('an operator browses real inventory and checks only eligible identities', async ({ page }) => {
-  await page.goto('/');
-  const nav = page.getByRole('navigation');
-  await nav.getByRole('button', { name: 'Users', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Open user alice', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open user expired-51' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Load more' }).click();
-  await expect(page.getByRole('button', { name: 'Open user expired-51' })).toBeVisible();
-  await page.getByRole('button', { name: 'Open user alice', exact: true }).click();
-  await expect(page.getByRole('dialog').getByText('Nodes using agent quota')).toBeVisible();
-  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
-
-  await nav.getByRole('button', { name: 'Checks', exact: true }).click();
-  const server = page.getByLabel('Choose a server');
-  const user = page.getByRole('combobox', { name: 'User', exact: true });
-  await server.selectOption({ label: 'Primary fixture' });
-  await expect(user.locator('option:not([value=""])')).toHaveText(['alice']);
-  await user.selectOption({ label: 'alice' });
-  await server.selectOption({ label: 'Backup fixture' });
-  await expect(user.locator('option:not([value=""])')).toHaveText(['bob']);
-  await user.selectOption({ label: 'bob' });
-  await page.getByRole('button', { name: 'Run HTTPS check' }).click();
-  await expect(page.getByText('Failed', { exact: true })).toBeVisible({ timeout: 35_000 });
+test("users can be found across inventory pages and access is disclosed only on request", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Users", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "expired-51", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("vless://");
+  await page.getByRole("searchbox").fill("bob");
+  await page.getByRole("button", { name: "bob", exact: true }).click();
+  let dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("button", { name: "Share access", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("img", { name: "Scan to connect" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(
+    dialog.getByRole("textbox", { name: "Share access" }),
+  ).toHaveValue(/^vless:\/\//);
+  await dialog
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
+  await expect(page.locator("body")).not.toContainText("vless://");
 });
 
-test('a schedule is saved paused, requires consent, and cannot run without it', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('navigation').getByRole('button', { name: 'Monitoring' }).click();
-  await page.getByRole('button', { name: 'New policy' }).click();
-  await page.getByLabel('Policy name').fill('Limited fixture');
-  await page.getByRole('combobox', { name: 'Server', exact: true }).selectOption({ label: 'Primary fixture' });
-  await page.getByRole('combobox', { name: 'User', exact: true }).selectOption({ label: 'alice' });
-  await page.getByRole('button', { name: 'Add target' }).click();
-  await page.getByLabel('Checks per target/source per UTC day').fill('1');
-  await expect(page.getByRole('button', { name: 'Enable schedule' })).toBeDisabled();
-  const policy = page.getByRole('row', { name: /Limited fixture/ });
-  await page.getByRole('button', { name: 'Save paused' }).click();
-  await expect(policy.getByText('Paused')).toBeVisible();
+test("creating access reviews every enabled server before any write", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Add user", exact: false })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("textbox", { name: "User", exact: true })
+    .fill("new-user");
+  await dialog.getByRole("button", { name: "Review changes" }).click();
+  await expect(
+    dialog.getByText("Primary fixture", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("Backup fixture", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(
+    dialog.getByRole("textbox", { name: "User", exact: true }),
+  ).toHaveValue("new-user");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Users", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "new-user", exact: true }),
+  ).toHaveCount(0);
+});
 
+test("server details execute the existing profile action with its positional server argument", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Servers", exact: true })
+    .click();
+  await page
+    .getByRole("button")
+    .filter({
+      has: page.getByRole("heading", { name: "Primary fixture", exact: true }),
+    })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Advanced", exact: false }).click();
+  await dialog
+    .getByRole("button", { name: "Connection methods", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Completed", exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(dialog.locator("pre")).toContainText("tls");
+});
+
+test("three languages, light theme, small window and enlarged text remain usable", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: false }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Appearance").selectOption("light");
+  await dialog.getByLabel("Language").selectOption("zh");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh");
+  await dialog.getByLabel("语言").selectOption("ru");
+  await dialog.getByLabel("Язык").selectOption("en");
+  await dialog
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
   await page.reload();
-  await page.getByRole('navigation').getByRole('button', { name: 'Monitoring' }).click();
-  await expect(policy.getByText('Paused')).toBeVisible();
-  await expect(policy.getByRole('button', { name: 'Enable', exact: true })).toBeDisabled();
-  await expect(policy.getByRole('button', { name: 'Run once' })).toBeDisabled();
-  await policy.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByRole('checkbox', { name: /I authorize checks/ }).check();
-  await page.getByRole('button', { name: 'Save paused' }).click();
-  await policy.getByRole('button', { name: 'Run once' }).click();
-  await expect(page.getByRole('row', { name: /Native Xray · Manual/ }).getByText('Completed', { exact: true })).toBeVisible({ timeout: 35_000 });
-  await policy.getByRole('button', { name: 'Remove policy Limited fixture' }).click();
-  await expect(policy).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.setViewportSize({ width: 960, height: 720 });
+  await page.addStyleTag({ content: "html{font-size:24px}" });
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Users", exact: true })
+    .click();
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await page.getByRole("searchbox").fill("alice");
+  await page.getByRole("button", { name: "alice", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "alice", exact: true }),
+  ).toBeVisible();
 });
 
-test('a review becomes stale if access changes outside Desk', async ({ page, request }) => {
-  await page.goto('/');
-  await page.getByRole('navigation').getByRole('button', { name: 'Users', exact: true }).click();
-  await page.getByRole('button', { name: 'Open user alice', exact: true }).click();
-  await page.getByRole('button', { name: 'Review access change' }).click();
-  const review = page.getByRole('dialog');
-  await expect(review.getByRole('heading', { name: 'Disable access · alice' })).toBeVisible();
-  await expect(review.getByRole('button', { name: 'Recheck snapshot' })).toBeVisible();
-  await review.getByRole('button', { name: 'Recheck snapshot' }).click();
-  await expect(review.getByText(/Local snapshot unchanged/)).toBeVisible();
-  expect((await request.post('/fixture/disable-alice')).status()).toBe(204);
-  await review.getByRole('button', { name: 'Recheck snapshot' }).click();
-  await expect(review.getByRole('button', { name: 'Rebuild plan' })).toBeVisible();
+test("a stale reviewed change fails before backup or remote writes", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Add user", exact: false })
+    .first()
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("textbox", { name: "User", exact: true })
+    .fill("stale-user");
+  await dialog.getByRole("button", { name: "Review changes" }).click();
+  expect((await request.post("/fixture/disable-alice")).status()).toBe(204);
+  await dialog.getByRole("button", { name: "Apply changes" }).click();
+  await expect(
+    dialog.getByText(
+      "The configuration changed. Review a new plan before applying.",
+    ),
+  ).toBeVisible({ timeout: 15000 });
+  await dialog.getByText("Details", { exact: true }).click();
+  await expect(
+    dialog.locator("code").filter({ hasText: "STALE_PLAN" }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Activity", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("row")
+      .filter({ hasText: "Add user" })
+      .getByText("Failed", { exact: true }),
+  ).toBeVisible();
 });
 
-test('a new user plan previews every node without adding an identity', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('navigation').getByRole('button', { name: 'Users', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview new user' }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('textbox', { name: 'Username' }).fill('preview-only');
-  await dialog.getByRole('button', { name: 'Review plan' }).click();
-  await expect(dialog.getByText('Enabled servers affected: 2')).toBeVisible();
-  await expect(dialog.getByText('Review only · nothing applied')).toBeVisible();
-  await dialog.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: 'Refresh inventory' }).click();
-  await expect(page.getByRole('button', { name: 'Open user alice' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open user preview-only' })).toHaveCount(0);
+test("automatic checks discover eligible assignments without reporting probes as connected users", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Enable automatic checks", exact: true })
+    .click();
+  await expect(
+    page.getByText("Automatic checks are running", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Users", exact: true })
+    .click();
+  await page.getByRole("searchbox").fill("bob");
+  await page.getByRole("button", { name: "bob", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("table").getByText("REALITY", { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(
+    dialog.getByRole("table").getByText("Connection failed", { exact: true }),
+  ).toBeVisible({ timeout: 35000 });
+  await expect(dialog.getByText("Connected now", { exact: true })).toHaveCount(
+    0,
+  );
+  await dialog
+    .getByRole("button", { name: "Close", exact: true })
+    .last()
+    .click();
+  await page
+    .getByRole("button", { name: "Pause automatic checks", exact: true })
+    .click();
+  await expect(
+    page.getByText("Automatic checks are paused", { exact: true }).first(),
+  ).toBeVisible();
 });
 
-test('settings persist and an uninstalled Knife cannot run diagnostics', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('Appearance').selectOption({ label: 'Light' });
-  await dialog.getByLabel('Language').selectOption('ru');
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await page.getByRole('button', { name: 'Настройки', exact: true }).click();
-  await dialog.getByLabel('Язык').selectOption('en');
-  await dialog.getByLabel('Close', { exact: true }).click();
-  await page.getByRole('navigation').getByRole('button', { name: 'Integrations' }).click();
-  for (const name of ['Xray Checker', 'Xray Knife']) {
-    const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) });
-    await expect(card.getByText('Not installed', { exact: true })).toBeVisible();
-  }
-  await expect(page.getByRole('button', { name: 'Run diagnostic', exact: true })).toBeDisabled();
-  await expect(page.getByRole('row', { name: /· Diagnostic/ })).toHaveCount(0);
+test("linked design screens expose the main user journey", async ({ page }) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Your OVPN workspace" }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  const capture = async (name: string) => {
+    if (process.env.OVPN_DESK_SCREENSHOTS)
+      await page.screenshot({
+        path: `${process.env.OVPN_DESK_SCREENSHOTS}/${name}.png`,
+        fullPage: true,
+      });
+  };
+  await capture("overview");
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Users", exact: true })
+    .click();
+  await page.getByRole("searchbox").fill("bob");
+  await capture("users");
+  await page
+    .getByRole("button", { name: "Add user", exact: false })
+    .first()
+    .click();
+  await capture("add-user");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Servers", exact: true })
+    .click();
+  await page
+    .getByRole("button")
+    .filter({
+      has: page.getByRole("heading", { name: "Primary fixture", exact: true }),
+    })
+    .click();
+  await capture("server");
+});
+
+test("connection checks offer only eligible users assigned to the selected server", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Settings", exact: false }).click();
+  await page
+    .getByRole("dialog")
+    .getByText("Advanced settings", { exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Check now", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Server", exact: true })
+    .selectOption({ label: "Backup fixture" });
+  const users = dialog.getByRole("combobox", { name: "User", exact: true });
+  await expect(users.locator('option:not([value=""])')).toHaveText(["bob"]);
+  await users.selectOption("bob");
+  await dialog
+    .getByRole("combobox", { name: "Server", exact: true })
+    .selectOption({ label: "Primary fixture" });
+  await expect(users).toHaveValue("");
+  await expect(users.locator('option:not([value=""])')).toHaveCount(0);
 });

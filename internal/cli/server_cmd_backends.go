@@ -72,7 +72,7 @@ func (a *App) newServerBackendAttachCmd() *cobra.Command {
 			}); err != nil {
 				return err
 			}
-			fmt.Printf("backend attached: proxy=%s backend=%s priority=%d\n", proxy.Name, backend.Name, opts.priority)
+			fmt.Fprintf(a.output(), "backend attached: proxy=%s backend=%s priority=%d\n", proxy.Name, backend.Name, opts.priority)
 			return nil
 		},
 	}
@@ -104,7 +104,7 @@ func (a *App) newServerBackendDetachCmd() *cobra.Command {
 			if err := a.store.DeleteProxyBackend(a.ctx, proxy.ID, backend.ID); err != nil {
 				return err
 			}
-			fmt.Printf("backend detached: proxy=%s backend=%s\n", proxy.Name, backend.Name)
+			fmt.Fprintf(a.output(), "backend detached: proxy=%s backend=%s\n", proxy.Name, backend.Name)
 			return nil
 		},
 	}
@@ -130,10 +130,10 @@ func (a *App) newServerBackendListCmd() *cobra.Command {
 				return err
 			}
 			if len(mappings) == 0 {
-				fmt.Println("no backends")
+				fmt.Fprintln(a.output(), "no backends")
 				return nil
 			}
-			fmt.Println(renderProxyBackendTable(mappings))
+			fmt.Fprintln(a.output(), renderProxyBackendTable(mappings))
 			return nil
 		},
 	}

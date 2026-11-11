@@ -25,6 +25,7 @@ func (a *App) userCmd() *cobra.Command {
 		a.newUserExportCmd(),
 		a.newUserProbeCmd(),
 		a.newUserSubscriptionCmd(),
+		a.newUserInviteCmd(),
 		a.newUserPlanCmd(),
 	)
 	return cmd

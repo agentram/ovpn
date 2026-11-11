@@ -73,6 +73,49 @@ jobs:
           npx --no-install playwright install chromium
       - run: make e2e-desktop
 
+  desktop-native:
+    name: Desk native build (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/desktop/go.sum
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/desktop/frontend/package-lock.json
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Frontend regression checks
+        working-directory: apps/desktop/frontend
+        run: |
+          npm ci --ignore-scripts --no-fund --no-audit
+          npm test
+          npm run build
+      - name: Build matching worker and native application
+        run: python3 scripts/build_desktop.py --skip-frontend
+      - name: Native host regression checks
+        env:
+          CGO_ENABLED: ${{ runner.os == 'Windows' && '0' || '1' }}
+        run: |
+          go -C apps/desktop vet ./...
+          go -C apps/desktop test ./...
+
   android:
     name: O Tunnel emulator journeys
     needs: changes
@@ -121,7 +164,7 @@ jobs:
 
   result:
     name: E2E result
-    needs: [changes, cli, desktop, android]
+    needs: [changes, cli, desktop, desktop-native, android]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -129,6 +172,7 @@ jobs:
       SELECTION: ${{ needs.changes.result }}
       CLI: ${{ needs.cli.result }}
       DESKTOP: ${{ needs.desktop.result }}
+      NATIVE: ${{ needs.desktop-native.result }}
       ANDROID: ${{ needs.android.result }}
       RUN_CLI: ${{ needs.changes.outputs.cli }}
       RUN_DESKTOP: ${{ needs.changes.outputs.desktop }}
@@ -147,5 +191,6 @@ jobs:
           failed=0
           verify CLI "$RUN_CLI" "$CLI" || failed=1
           verify Desk "$RUN_DESKTOP" "$DESKTOP" || failed=1
+          verify Native "$RUN_DESKTOP" "$NATIVE" || failed=1
           verify Android "$RUN_ANDROID" "$ANDROID" || failed=1
           exit "$failed"

@@ -286,3 +286,10 @@ type UserStatusResponse struct {
 	ExpiredUsers          int                `json:"expired_users"`
 	Users                 []UserAccessStatus `json:"users"`
 }
+
+// UserPresence contains identifiers only within the private management channel.
+type UserPresence struct {
+	Supported bool     `json:"supported"`
+	SampledAt string   `json:"sampled_at"`
+	Online    []string `json:"online"`
+}

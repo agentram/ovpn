@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -214,4 +216,55 @@ func sanitizeRemoteCmd(cmd string) string {
 		return trimmed[:500] + "...(truncated)"
 	}
 	return trimmed
+}
+
+// Lock keeps a remote kernel lock until release or context cancellation. It also
+// excludes writers using another local workspace; an interrupted SSH releases it.
+func (r *Runner) Lock(ctx context.Context, cfg Config) (context.Context, func(), error) {
+	if r.DryRun {
+		return ctx, func() {}, nil
+	}
+	lockCtx, cancel := context.WithCancel(ctx)
+	args := append(sshArgs(cfg), target(cfg), "sudo -n flock -n /var/lock/ovpn-control.lock sh -c 'printf \"OVPN_LOCKED\\n\"; cat >/dev/null'")
+	cmd := exec.CommandContext(lockCtx, "ssh", args...)
+	input, err := cmd.StdinPipe()
+	if err != nil {
+		cancel()
+		return nil, nil, err
+	}
+	output, err := cmd.StdoutPipe()
+	if err != nil {
+		input.Close()
+		cancel()
+		return nil, nil, err
+	}
+	if err = cmd.Start(); err != nil {
+		input.Close()
+		cancel()
+		return nil, nil, err
+	}
+	ready := make(chan error, 1)
+	go func() {
+		line, e := bufio.NewReader(output).ReadString('\n')
+		if e == nil && line != "OVPN_LOCKED\n" {
+			e = fmt.Errorf("unexpected remote lock response")
+		}
+		ready <- e
+	}()
+	release := sync.OnceFunc(func() { _ = input.Close(); cancel(); _ = cmd.Wait() })
+	timer := time.NewTimer(15 * time.Second)
+	defer timer.Stop()
+	select {
+	case err = <-ready:
+	case <-ctx.Done():
+		err = ctx.Err()
+	case <-timer.C:
+		err = context.DeadlineExceeded
+	}
+	if err != nil {
+		release()
+		return nil, nil, fmt.Errorf("remote writer lock unavailable")
+	}
+	go func() { _, _ = io.Copy(io.Discard, output); cancel() }()
+	return lockCtx, release, nil
 }

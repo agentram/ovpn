@@ -82,6 +82,9 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 				if _, ok := backend.(observerBackend); ok {
 					capabilities = append(capabilities, "observer.read", "observer.configure", "observer.run", "integrations.install", "diagnostics.run")
 				}
+				if control, ok := backend.(controlBackend); ok && control.ControlReady() {
+					capabilities = append(capabilities, "operations.run", "telemetry.read")
+				}
 				value = protocol.Hello{ProtocolVersion: protocol.Version, EngineVersion: version.Current(), Capabilities: capabilities}
 			}
 		} else if !ready {
@@ -117,6 +120,18 @@ func Serve(ctx context.Context, in io.Reader, out io.Writer, backend Backend) er
 
 func dispatch(ctx context.Context, backend Backend, request protocol.Request) (any, error) {
 	bad := &app.Error{Code: "INVALID_PARAMS"}
+	if strings.HasPrefix(request.Method, "desk.") {
+		if b, ok := backend.(deskBackend); ok && b.ControlReady() {
+			return dispatchDesk(ctx, b, request)
+		}
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
+	}
+	if strings.HasPrefix(request.Method, "operations.") {
+		if control, ok := backend.(controlBackend); ok && control.ControlReady() {
+			return dispatchControl(ctx, control, request)
+		}
+		return nil, &app.Error{Code: "METHOD_NOT_FOUND"}
+	}
 	if strings.HasPrefix(request.Method, "observer.") || strings.HasPrefix(request.Method, "integrations.") || strings.HasPrefix(request.Method, "diagnostics.") {
 		if control, ok := backend.(observerBackend); ok {
 			return dispatchObserver(ctx, control, request)
