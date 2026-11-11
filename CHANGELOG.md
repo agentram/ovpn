@@ -18,6 +18,8 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
 
 ### Changed
+- Preserve usage for disabled users, keep missing quota data unknown, and verify suspended access without requiring an active quota policy. Mark incomplete user distribution as partial and checkpoint local repair per target.
+- Require Go 1.27.4 for the standard-library HTTP security fix and use GTK4/WebKitGTK 6 dependencies for native Linux builds.
 - Create private, consistent SQLite backup snapshots while monitoring continues; validate remote archives and checksums before reporting backup success.
 - Bundle matching Linux agent binaries into development Desk workers so deployment does not require Go source on the operator's computer.
 - Extend regression coverage with real-worker Desk journeys, telemetry/queue edges, independent-process locking and crash-after-write recovery. Native three-platform acceptance and the five-person usability pilot remain release gates.

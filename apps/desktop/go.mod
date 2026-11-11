@@ -1,6 +1,6 @@
 module ovpn/desktop
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/wailsapp/wails/v3 v3.1.0

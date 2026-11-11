@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ func TestNativeIconsTrackTheSharedBrandSVG(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(string(digest)) != fmt.Sprintf("%x", sha256.Sum256(source)) {
+	if strings.TrimSpace(string(digest)) != fmt.Sprintf("%x", sha256.Sum256(bytes.ReplaceAll(source, []byte("\r\n"), []byte("\n")))) {
 		t.Fatal("regenerate native icons with scripts/build_desktop_icons.py")
 	}
 	for _, file := range []string{"assets/icon.png", "assets/icon.ico", "assets/icon.icns"} {

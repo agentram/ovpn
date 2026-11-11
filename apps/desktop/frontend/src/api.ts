@@ -1,7 +1,7 @@
 export interface Summary { state: string; servers: number; enabledServers: number; users: number; readOnly: boolean }
 export interface Server { id: string; name: string; role: string; enabled: boolean; primaryProfile: string; profiles: string[]; xrayVersion: string; runtime: string }
 export interface ServerPage { items: Server[]; nextCursor?: string }
-export interface User { nodeIds?: string[]; username: string; configuredNodes: number; enabledNodes: number; eligibleNodes: number; disabledNodes: number; expiredNodes: number; blockedNodes: number; earliestExpiry?: string; quotaMinBytes: number; quotaMaxBytes: number; defaultQuotaNodes?: number; unmeteredNodes?: number; policyDiff: boolean; identityConflict: boolean }
+export interface User { missingNodes?: number; nodeIds?: string[]; username: string; configuredNodes: number; enabledNodes: number; eligibleNodes: number; disabledNodes: number; expiredNodes: number; blockedNodes: number; earliestExpiry?: string; quotaMinBytes: number; quotaMaxBytes: number; defaultQuotaNodes?: number; unmeteredNodes?: number; policyDiff: boolean; identityConflict: boolean }
 export interface UserObservation { outcome: string; server: string; profile: string; fresh: boolean }
 export interface UserPage { items: User[]; nextCursor?: string }
 export interface CheckUserPage { items: string[]; nextCursor?: string }

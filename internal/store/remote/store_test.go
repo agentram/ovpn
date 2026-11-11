@@ -369,3 +369,26 @@ func TestUserStatusBoundaryCasesAndFilter(t *testing.T) {
 		t.Fatalf("unexpected filtered counts: %+v", filtered)
 	}
 }
+
+func TestDisabledUserStatusPreservesUsageWithoutInventingAnUnlimitedQuota(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+	if err = store.ReplaceUserPolicies(ctx, []model.UserPolicy{{Username: "alice", Email: "alice@example.test", UUID: "11111111-1111-4111-8111-111111111111", Enabled: false, InboundTag: "vless-reality"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.db.ExecContext(ctx, `INSERT INTO user_traffic_daily(email,window_start,uplink_bytes,downlink_bytes) VALUES (?,?,?,?)`, "alice@example.test", now.Truncate(24*time.Hour).Format(time.RFC3339), 100, 200); err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.UserStatus(ctx, now, 30*24*time.Hour, 1000, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Users) != 1 || !result.Users[0].TrafficKnown || result.Users[0].Window30DUsageByte != 300 || result.Users[0].QuotaPolicyKnown {
+		t.Fatal("inactive access lost traffic history or acquired a fabricated quota")
+	}
+}

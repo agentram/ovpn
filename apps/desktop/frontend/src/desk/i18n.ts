@@ -1,6 +1,9 @@
 import { actionLabels } from "./actionLabels.ts";
 export type Language = "en" | "ru" | "zh";
 const en = {
+  missingAssignments:
+    "Access records are missing on an enabled server. Open Activity to continue a partial change, or use advanced repair.",
+
   operationFailed: "Failed",
 
   deliveryAddress: "HTTPS profile service address",
@@ -198,6 +201,9 @@ const en = {
 };
 type Messages = Record<keyof typeof en, string>;
 const ru: Messages = {
+  missingAssignments:
+    "На одном из включённых серверов отсутствует запись доступа. Откройте События, чтобы продолжить частичное изменение, или используйте дополнительные инструменты восстановления.",
+
   operationFailed: "Не выполнено",
 
   deliveryAddress: "HTTPS-адрес службы профилей",
@@ -396,6 +402,9 @@ const ru: Messages = {
   operationUnavailable: "Это действие недоступно в подключённом worker.",
 };
 const zh: Messages = {
+  missingAssignments:
+    "某台已启用的服务器缺少访问记录。请打开“活动”以继续未完成的更改，或使用高级修复。",
+
   operationFailed: "失败",
 
   deliveryAddress: "HTTPS 配置服务地址",

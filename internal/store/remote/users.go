@@ -101,6 +101,13 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 	if err != nil {
 		return model.UserStatusResponse{}, err
 	}
+	if window <= 0 {
+		window = 30 * 24 * time.Hour
+	}
+	usage, err := s.ListUsageBetween(ctx, now.UTC().Add(-window), now.UTC())
+	if err != nil {
+		return model.UserStatusResponse{}, err
+	}
 	quotaByEmail := make(map[string]model.QuotaUserStatus, len(quotaStatus.Users))
 	for _, row := range quotaStatus.Users {
 		quotaByEmail[row.Email] = row
@@ -130,6 +137,7 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 		expired := model.IsExpiredAt(policy.ExpiryAt, now)
 		effectiveEnabled := model.IsEffectivelyEnabled(policy.Enabled, policy.ExpiryAt, now)
 		row := model.UserAccessStatus{
+			TrafficKnown: true, Window30DUsageByte: usage[policy.Email],
 			Username:         policy.Username,
 			Email:            policy.Email,
 			UUID:             policy.UUID,
@@ -144,6 +152,7 @@ func (s *Store) UserStatus(ctx context.Context, now time.Time, window time.Durat
 			row.DaysUntilExpiry = &days
 		}
 		if quota, ok := quotaByEmail[policy.Email]; ok {
+			row.QuotaPolicyKnown = true
 			row.QuotaEnabled = quota.QuotaEnabled
 			row.Window30DQuotaByte = quota.Window30DQuotaByte
 			row.Window30DUsageByte = quota.Window30DUsageByte

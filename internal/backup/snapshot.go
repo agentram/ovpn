@@ -98,10 +98,6 @@ func writeSnapshot(dataDir, outDir, archive string) (err error) {
 			if e != nil {
 				return fmt.Errorf("snapshot database: %w", e)
 			}
-			info, e = os.Stat(source)
-			if e != nil {
-				return e
-			}
 		}
 		input, err := os.Open(source)
 		if err != nil {

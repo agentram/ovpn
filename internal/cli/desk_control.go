@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,13 +37,14 @@ type deskControl struct {
 	template    *App
 }
 type controlSnapshot struct {
-	Servers []model.Server `json:"servers"`
-	Users   []model.User   `json:"users"`
+	Servers  []model.Server       `json:"servers"`
+	Users    []model.User         `json:"users"`
+	Backends []model.ProxyBackend `json:"backends"`
 }
 
 func (d *deskControl) Catalog() []operations.Action { return commandCatalog(newRootCmd(&App{})) }
 func (d *deskControl) snapshot(ctx context.Context) (controlSnapshot, string, error) {
-	snap := controlSnapshot{Servers: []model.Server{}, Users: []model.User{}}
+	snap := controlSnapshot{Servers: []model.Server{}, Users: []model.User{}, Backends: []model.ProxyBackend{}}
 	st, err := local.OpenReadOnly(ctx, d.dataDir)
 	if errors.Is(err, os.ErrNotExist) {
 		sum := sha256.Sum256([]byte("empty"))
@@ -62,6 +64,11 @@ func (d *deskControl) snapshot(ctx context.Context) (controlSnapshot, string, er
 			return snap, "", err
 		}
 		snap.Users = append(snap.Users, rows...)
+		backends, err := st.ListProxyBackends(ctx, server.ID)
+		if err != nil {
+			return snap, "", err
+		}
+		snap.Backends = append(snap.Backends, backends...)
 	}
 	raw, err := json.Marshal(snap)
 	if err != nil {
@@ -116,8 +123,32 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if request.Values["proxy"] != "" {
 		name = request.Values["proxy"]
 	}
+	mutation := definition.Mutation
+	if request.Action == "user.reconcile" {
+		source := strings.TrimSpace(request.Values["from-server"])
+		destination := strings.TrimSpace(request.Values["to-server"])
+		all, _ := strconv.ParseBool(request.Values["all"])
+		mutation, _ = strconv.ParseBool(request.Values["apply"])
+		found := false
+		for _, server := range snap.Servers {
+			if server.Name == source {
+				found = true
+			}
+		}
+		if !found || source == destination || (destination != "" && all) {
+			return operations.Plan{}, operations.ErrInvalid
+		}
+		for _, server := range snap.Servers {
+			if server.Name != source && ((destination != "" && server.Name == destination) || (destination == "" && (all || server.Enabled))) {
+				targets = append(targets, operations.Target{ID: fmt.Sprintf("node-%d", server.ID), Name: server.Name})
+			}
+		}
+		if len(targets) == 0 {
+			return operations.Plan{}, operations.ErrInvalid
+		}
+	}
 	for _, server := range snap.Servers {
-		if global && server.Enabled || !global && name == server.Name {
+		if request.Action != "user.reconcile" && ((global && server.Enabled) || (!global && name == server.Name)) {
 			targets = append(targets, operations.Target{ID: fmt.Sprintf("node-%d", server.ID), Name: server.Name})
 		}
 	}
@@ -186,7 +217,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if err != nil {
 		return operations.Plan{}, err
 	}
-	return operations.Plan{Action: definition.ID, Title: definition.Title, Mutation: definition.Mutation, Targets: targets, Destructive: definition.Destructive, Request: request, Revision: revision, Snapshot: raw}, nil
+	return operations.Plan{Action: definition.ID, Title: definition.Title, Mutation: mutation, Targets: targets, Destructive: definition.Destructive && mutation, Request: request, Revision: revision, Snapshot: raw}, nil
 }
 func userGlobalMutation(action string) bool {
 	switch action {
@@ -263,7 +294,7 @@ func (d *deskControl) Backup(ctx context.Context, p operations.Plan, target oper
 		return nil
 	}
 	if !remoteMutation(p.Action) {
-		if p.Action == "server.add" || strings.HasPrefix(p.Action, "server.profile.") || strings.HasPrefix(p.Action, "server.backend.") || strings.HasPrefix(p.Action, "server.set-") {
+		if p.Action == "user.reconcile" || p.Action == "server.add" || strings.HasPrefix(p.Action, "server.profile.") || strings.HasPrefix(p.Action, "server.backend.") || strings.HasPrefix(p.Action, "server.set-") {
 			_, _, err := backup.LocalBackup(d.dataDir, filepath.Join(d.dataDir, "backups"))
 			return err
 		}
@@ -345,6 +376,11 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 	output := &boundedOutput{}
 	a.writer = output
 	request := p.Request
+	if request.Action == "user.reconcile" {
+		request.Values = maps.Clone(request.Values)
+		request.Values["to-server"] = target.Name
+		request.Values["all"] = "false"
+	}
 	cmd, err := prepareInvocation(a, request)
 	if err != nil {
 		return operations.Result{}, err
@@ -460,7 +496,9 @@ func (a *App) verifyUserOperation(p operations.Plan) error {
 			if err != nil {
 				return err
 			}
-			if u.UUID != localUser.UUID || u.Email != localUser.Email || u.Enabled != localUser.Enabled || u.QuotaEnabled != localUser.QuotaEnabled || u.EffectiveEnabled != effectiveUserEnabled(*localUser) || u.ExpiryDate != model.ExpiryDateString(localUser.ExpiryDate) || (localUser.TrafficLimitByte != nil && u.Window30DQuotaByte != *localUser.TrafficLimitByte) || (!effectiveUserEnabled(*localUser) && u.HasRuntimeIdentity) {
+			effective := effectiveUserEnabled(*localUser)
+			quotaMismatch := effective && (u.QuotaEnabled != localUser.QuotaEnabled || (localUser.TrafficLimitByte != nil && u.Window30DQuotaByte != *localUser.TrafficLimitByte))
+			if u.UUID != localUser.UUID || u.Email != localUser.Email || u.Enabled != localUser.Enabled || u.EffectiveEnabled != effective || u.ExpiryDate != model.ExpiryDateString(localUser.ExpiryDate) || quotaMismatch || (!effective && u.HasRuntimeIdentity) || (effective && !u.HasRuntimeIdentity && !u.BlockedByQuota) {
 				return errors.New("APPLY_UNVERIFIED")
 			}
 			return nil
@@ -516,6 +554,11 @@ func (d *deskControl) validateUserRecovery(ctx context.Context, p operations.Pla
 	}
 	left, _ := json.Marshal(before.Servers)
 	right, _ := json.Marshal(current.Servers)
+	if !bytes.Equal(left, right) {
+		return operations.ErrStale
+	}
+	left, _ = json.Marshal(before.Backends)
+	right, _ = json.Marshal(current.Backends)
 	if !bytes.Equal(left, right) {
 		return operations.ErrStale
 	}
@@ -584,7 +627,7 @@ func (d *deskControl) CanResume(ctx context.Context, p operations.Plan) error {
 }
 
 func remoteMutation(action string) bool {
-	if userGlobalMutation(action) || action == "user.reconcile" {
+	if userGlobalMutation(action) {
 		return true
 	}
 	switch action {

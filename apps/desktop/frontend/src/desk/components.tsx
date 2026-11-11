@@ -811,6 +811,9 @@ export function Detail({
           })}
         </div>
         {server && <p>{t.serverSetupHint}</p>}
+        {user?.missingNodes ? (
+          <p className="desk-alert warn">{t.missingAssignments}</p>
+        ) : null}
         {user && rows.length > 0 && (
           <section>
             <h3>{t.traffic}</h3>

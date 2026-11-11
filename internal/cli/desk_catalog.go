@@ -54,7 +54,7 @@ func commandCatalog(root *cobra.Command) []operations.Action {
 			if title == "" {
 				title = cmd.Short
 			}
-			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke", Fields: []operations.Field{}, Arguments: []operations.Field{}}
+			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "user.reconcile" || id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke", Fields: []operations.Field{}, Arguments: []operations.Field{}}
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 				if flag.Name == "help" {
 					return

@@ -8,6 +8,7 @@ type CheckUserPage struct {
 
 // User contains configured access policy, not a claim of runtime connectivity.
 type User struct {
+	MissingNodes      int      `json:"missingNodes"`
 	NodeIDs           []string `json:"nodeIds"`
 	Username          string   `json:"username"`
 	ConfiguredNodes   int      `json:"configuredNodes"`
