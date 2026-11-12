@@ -9,6 +9,7 @@
 The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
 Use the CLI or [OVPN Desk](docs/desktop.md) to manage your own servers locally. Desk adds reviewed changes, user access, live per-server statistics, automatic connection checks and recovery controls.
+Desk development downloads are available as `ovpn-desk-...` artifacts in app-related GitHub Actions runs; they use the same OVPN version.
 
 [Download a release](https://github.com/agentram/ovpn/releases/latest) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
 

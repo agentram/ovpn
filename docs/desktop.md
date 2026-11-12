@@ -28,6 +28,28 @@ notarized. Windows builds use `--target windows --arch amd64`; Linux builds
 require a native Linux host. Keep the matching worker beside the executable.
 Native acceptance on all three operating systems remains a release gate.
 
+## Download CI builds
+
+Open the relevant **CI** run in GitHub Actions and download an `ovpn-desk-...`
+artifact. It contains an archive, `BUILD.json` and `SHA256SUMS.txt`. Extract the
+application archive too; keep its matching worker beside the application.
+Packages cover macOS arm64/Intel, Windows x64 and Linux x64. These are development
+builds, not signed public installers.
+
+Packaging runs on PRs and `main` when Desk sources, its application services,
+worker contracts, dependency files or packaging workflow/scripts change.
+CLI-only implementation, Ansible, documentation and `VERSION`-only changes do
+not create Desk archives. PR selection covers the full diff against the target
+branch, preserving the build gate for application PRs. Broader shared-code changes still run integration
+checks. Use **Desk packages → Run workflow** to rebuild a chosen ref manually,
+including when distributing an updated worker without a Desk source change.
+
+Desk, its bundled worker and archive metadata use the repository `VERSION`.
+There is no separate Desk release number. Archive names include the source
+commit, so builds of the same OVPN version remain distinguishable. Each build
+freezes the worker/runtime from that source commit. Artifacts expire after
+30 days; this workflow does not publish a GitHub Release.
+
 ## Everyday actions
 
 - **Overview:** open a server, user, connection problem or recent operation.
