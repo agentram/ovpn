@@ -5,8 +5,9 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import platform
+import plistlib
 import shutil
-import shlex
 import struct
 import subprocess
 import sys
@@ -45,11 +46,8 @@ def build_settings(path):
     return {entry['Key']: entry['Value'] for entry in json.loads(raw)['Settings']}
 
 
-def verify_build(path, version, commit):
+def verify_build(path, commit):
     settings = build_settings(path)
-    tokens = shlex.split(settings.get('-ldflags', ''))
-    if 'ovpn/internal/version.pinnedVersion=' + version not in tokens:
-        raise ValueError('Executable version does not match VERSION; rebuild before packaging')
     if settings.get('vcs.revision') != commit or settings.get('vcs.modified') != 'false':
         raise ValueError('Executable source differs from the clean source commit; rebuild before packaging')
 
@@ -61,6 +59,11 @@ def package(root, target, arch, commit, epoch, output):
     if not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', commit):
         raise ValueError('A full source commit is required')
     source = root / 'bin/desktop' / target
+    record = json.loads((source / 'build-desktop.json').read_text())
+    if record.get('version') != version:
+        raise ValueError('Executable version does not match VERSION; rebuild before packaging')
+    if any(record.get(key) != expected for key, expected in [('sourceCommit', commit), ('os', target), ('arch', arch)]):
+        raise ValueError('Build record does not match the source or target; rebuild before packaging')
     bundle = Path('OVPN Desk.app')
     binary_dir = bundle / 'Contents/MacOS' if target == 'darwin' else Path('ovpn-desk')
     suffix = '.exe' if target == 'windows' else ''
@@ -77,9 +80,16 @@ def package(root, target, arch, commit, epoch, output):
     for relative in binaries:
         if executable_target(source_paths[relative]) != (target, arch):
             raise ValueError('Executable target does not match the archive target')
-        verify_build(source_paths[relative], version, commit)
+        verify_build(source_paths[relative], commit)
+    if any(record.get(key) != sha256(source_paths[path]) for key, path in zip(["appSHA256", "workerSHA256"], binaries)):
+        raise ValueError("Build record hash does not match the executable pair")
+    if target == "darwin":
+        with source_paths[bundle / "Contents/Info.plist"].open("rb") as source_info:
+            info = plistlib.load(source_info)
+        if info.get("CFBundleShortVersionString") != version or info.get("CFBundleVersion") != version:
+            raise ValueError("Bundle version does not match VERSION")
     metadata = {'version': version, 'sourceCommit': commit, 'os': target, 'arch': arch,
-                'developmentBuild': True,
+                'developmentBuild': True, 'workerVersionVerified': False,
                 'files': {path.as_posix(): sha256(source_paths[path]) for path in binaries}}
     name = f'ovpn-desk-{version}-{target}-{arch}-{commit[:12]}'
     output.mkdir(parents=True, exist_ok=True)
@@ -92,6 +102,14 @@ def package(root, target, arch, commit, epoch, output):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, destination)
             destination.chmod(0o755 if relative in binaries else 0o644)
+        host = {'darwin': 'darwin', 'win32': 'windows'}.get(sys.platform, 'linux')
+        host_arch = {'x86_64': 'amd64', 'AMD64': 'amd64', 'aarch64': 'arm64', 'arm64': 'arm64'}.get(platform.machine())
+        if (target, arch) == (host, host_arch):
+            with tempfile.TemporaryDirectory(prefix='ovpn-desk-version-') as state:
+                actual = subprocess.check_output([str(staging / binaries[1]), '--data-dir', state, 'version'], text=True, timeout=15).strip()
+            if actual != version:
+                raise ValueError('Worker runtime version does not match VERSION')
+            metadata['workerVersionVerified'] = True
         shutil.copyfile(root / 'LICENSE', staging / 'LICENSE')
         (staging / 'BUILD.json').write_text(json.dumps(metadata, indent=2) + '\n')
         instructions = {

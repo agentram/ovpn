@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import plistlib
 import tarfile
 import tempfile
 import unittest
@@ -24,6 +25,9 @@ class PackageTests(unittest.TestCase):
         reader = patch('package_desktop.build_settings', return_value={'-ldflags': '-s -w -X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': COMMIT, 'vcs.modified': 'false'})
         reader.start()
         self.addCleanup(reader.stop)
+        runner = patch('package_desktop.subprocess.check_output', return_value='7.8.9\n')
+        runner.start()
+        self.addCleanup(runner.stop)
         source = root / 'bin/desktop' / target
         executable = source / 'OVPN Desk.app/Contents/MacOS' if target == 'darwin' else source
         executable.mkdir(parents=True)
@@ -41,9 +45,16 @@ class PackageTests(unittest.TestCase):
             for relative in ['Info.plist', 'Resources/OVPN.icns', '_CodeSignature/CodeResources']:
                 path = source / 'OVPN Desk.app/Contents' / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text('fixture')
+                if relative == 'Info.plist':
+                    path.write_bytes(plistlib.dumps({'CFBundleShortVersionString': '7.8.9', 'CFBundleVersion': '7.8.9'}))
+                else:
+                    path.write_text('fixture')
         for name in ['ovpn-desk', 'ovpn-worker']:
             (executable / (name + suffix)).write_bytes(header + name.encode())
+        record = {'version': '7.8.9', 'sourceCommit': COMMIT, 'os': target, 'arch': 'amd64',
+                  'appSHA256': hashlib.sha256((executable / ('ovpn-desk' + suffix)).read_bytes()).hexdigest(),
+                  'workerSHA256': hashlib.sha256((executable / ('ovpn-worker' + suffix)).read_bytes()).hexdigest()}
+        (source / 'build-desktop.json').write_text(json.dumps(record))
         (executable / 'private-state.json').write_text('fixture-private-marker')
         return root, executable
 
@@ -94,14 +105,23 @@ class PackageTests(unittest.TestCase):
 
     def test_old_version_and_dirty_or_different_source_are_not_mislabeled(self):
         root, _ = self.fixture()
-        for settings in [
-            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=1.0.0', 'vcs.revision': COMMIT, 'vcs.modified': 'false'},
-            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': 'b' * 40, 'vcs.modified': 'false'},
-            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': COMMIT, 'vcs.modified': 'true'},
-        ]:
+        record_path = root / 'bin/desktop/linux/build-desktop.json'
+        record = json.loads(record_path.read_text())
+        record['version'] = '1.0.0'
+        record_path.write_text(json.dumps(record))
+        with self.assertRaisesRegex(ValueError, 'version'):
+            package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+        record['version'] = '7.8.9'
+        record_path.write_text(json.dumps(record))
+        for settings in [{'vcs.revision': 'b' * 40, 'vcs.modified': 'false'},
+                         {'vcs.revision': COMMIT, 'vcs.modified': 'true'}]:
             with self.subTest(settings=settings), patch('package_desktop.build_settings', return_value=settings):
                 with self.assertRaises(ValueError):
                     package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+        record['workerSHA256'] = '0' * 64
+        record_path.write_text(json.dumps(record))
+        with self.assertRaisesRegex(ValueError, 'hash'):
+            package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
 
 
 if __name__ == '__main__':
