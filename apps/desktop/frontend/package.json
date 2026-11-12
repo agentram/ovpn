@@ -1,7 +1,6 @@
 {
   "name": "ovpn-desk",
   "private": true,
-  "version": "1.13.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8940 --strictPort",

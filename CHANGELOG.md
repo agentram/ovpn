@@ -9,6 +9,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 ## 1.13.0
 
 ### Added
+- Publish versioned Desk development archives for macOS arm64/Intel, Windows x64 and Linux x64 as CI artifacts, with the matching worker, source metadata and checksums. Select packaging from Desk-related changes independently of broader integration tests, with a manual rebuild option.
 - Add proxy/backend topology, direct-routing presets, agent-collected HAProxy health and backend-first HA application with verified backups and dependency failure blocking. Include entry-server setup and actual HAProxy Docker failover/recovery acceptance in CI.
 - Rebuild OVPN Desk around Overview, Users, Servers and Activity, with the site's ring mark, native icons, dark/light themes and English, Russian and Simplified Chinese.
 - Add user creation, enable/disable, expiry and rolling quota changes, explicit QR/link delivery, and one-time setup codes that verify trusted HTTPS delivery and the published profile snapshot before issue.
@@ -19,6 +20,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
 
 ### Changed
+- Remove the duplicate unconditional desktop build and use the shared OVPN VERSION as the only Desk product version.
 - Replace overflowing action button grids with compact primary actions and a searchable grouped catalog. Translate diagnostic task states and keep task completion separate from connection success.
 - Preserve usage for disabled users, keep missing quota data unknown, and verify suspended access without requiring an active quota policy. Mark incomplete user distribution as partial and checkpoint local repair per target.
 - Require Go 1.27.4 for the standard-library HTTP security fix and use GTK4/WebKitGTK 6 dependencies for native Linux builds.

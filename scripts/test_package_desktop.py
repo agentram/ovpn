@@ -1,0 +1,108 @@
+"""Regression checks for distributable contents, permissions, identity and hashes."""
+import hashlib
+import json
+from pathlib import Path
+import struct
+import tarfile
+import tempfile
+import unittest
+from unittest.mock import patch
+import zipfile
+
+from package_desktop import package
+
+COMMIT = 'a' * 40
+
+
+class PackageTests(unittest.TestCase):
+    def fixture(self, target='linux'):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        (root / 'VERSION').write_text('7.8.9\n')
+        (root / 'LICENSE').write_text('Fixture license\n')
+        reader = patch('package_desktop.build_settings', return_value={'-ldflags': '-s -w -X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': COMMIT, 'vcs.modified': 'false'})
+        reader.start()
+        self.addCleanup(reader.stop)
+        source = root / 'bin/desktop' / target
+        executable = source / 'OVPN Desk.app/Contents/MacOS' if target == 'darwin' else source
+        executable.mkdir(parents=True)
+        suffix = '.exe' if target == 'windows' else ''
+        header = bytearray(70)
+        if target == 'linux':
+            header[:6] = b'\x7fELF\x02\x01'
+            header[18:20] = struct.pack('<H', 62)
+        elif target == 'windows':
+            header[:2] = b'MZ'
+            header[60:64] = struct.pack('<I', 64)
+            header[64:70] = b'PE\0\0' + struct.pack('<H', 0x8664)
+        else:
+            header[:8] = b'\xcf\xfa\xed\xfe' + struct.pack('<I', 0x1000007)
+            for relative in ['Info.plist', 'Resources/OVPN.icns', '_CodeSignature/CodeResources']:
+                path = source / 'OVPN Desk.app/Contents' / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('fixture')
+        for name in ['ovpn-desk', 'ovpn-worker']:
+            (executable / (name + suffix)).write_bytes(header + name.encode())
+        (executable / 'private-state.json').write_text('fixture-private-marker')
+        return root, executable
+
+    def test_linux_archive_preserves_launch_permissions_without_private_inventory(self):
+        root, _ = self.fixture()
+        name, archive = package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+        self.assertIn('7.8.9-linux-amd64', name)
+        with tarfile.open(archive) as tar:
+            names = tar.getnames()
+            self.assertNotIn('ovpn-desk/private-state.json', names)
+            for member in tar.getmembers():
+                self.assertEqual((member.uid, member.gid, member.uname, member.gname), (0, 0, '', ''))
+            for binary in ['ovpn-desk/ovpn-desk', 'ovpn-desk/ovpn-worker']:
+                self.assertEqual(tar.getmember(binary).mode, 0o755)
+            metadata = json.load(tar.extractfile('BUILD.json'))
+            self.assertEqual(metadata['version'], '7.8.9')
+            for binary, expected in metadata['files'].items():
+                self.assertEqual(hashlib.sha256(tar.extractfile(binary).read()).hexdigest(), expected)
+        expected = hashlib.sha256(archive.read_bytes()).hexdigest()
+        self.assertEqual((archive.parent / 'SHA256SUMS.txt').read_text(), f'{expected}  {archive.name}\n')
+
+    def test_windows_archive_keeps_both_executables_and_source_identity(self):
+        root, _ = self.fixture('windows')
+        _, archive = package(root, 'windows', 'amd64', COMMIT, 1700000000, root / 'packages')
+        with zipfile.ZipFile(archive) as zipped:
+            self.assertIn('ovpn-desk/ovpn-worker.exe', zipped.namelist())
+            self.assertNotIn('ovpn-desk/private-state.json', zipped.namelist())
+            self.assertEqual(json.loads(zipped.read('BUILD.json'))['sourceCommit'], COMMIT)
+
+    def test_mac_bundle_keeps_signature_resources_and_worker(self):
+        root, _ = self.fixture('darwin')
+        with patch('package_desktop.subprocess.run'):
+            _, archive = package(root, 'darwin', 'amd64', COMMIT, 1700000000, root / 'packages')
+        with tarfile.open(archive) as tar:
+            self.assertIn('OVPN Desk.app/Contents/_CodeSignature/CodeResources', tar.getnames())
+            self.assertNotIn('OVPN Desk.app/Contents/MacOS/private-state.json', tar.getnames())
+
+    def test_missing_worker_wrong_architecture_and_invalid_version_fail_closed(self):
+        root, executable = self.fixture()
+        with self.assertRaisesRegex(ValueError, 'target'):
+            package(root, 'linux', 'arm64', COMMIT, 1700000000, root / 'packages')
+        (executable / 'ovpn-worker').unlink()
+        with self.assertRaisesRegex(ValueError, 'output'):
+            package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+        (root / 'VERSION').write_text('../outside')
+        with self.assertRaisesRegex(ValueError, 'VERSION'):
+            package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+
+    def test_old_version_and_dirty_or_different_source_are_not_mislabeled(self):
+        root, _ = self.fixture()
+        for settings in [
+            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=1.0.0', 'vcs.revision': COMMIT, 'vcs.modified': 'false'},
+            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': 'b' * 40, 'vcs.modified': 'false'},
+            {'-ldflags': '-X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': COMMIT, 'vcs.modified': 'true'},
+        ]:
+            with self.subTest(settings=settings), patch('package_desktop.build_settings', return_value=settings):
+                with self.assertRaises(ValueError):
+                    package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+
+
+if __name__ == '__main__':
+    unittest.main()
