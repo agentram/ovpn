@@ -74,7 +74,7 @@ if args.target == 'darwin':
 else:
     print('Development binaries: bin/desktop/'+args.target+' (native runtime and packaging still require validation)')
 
-# The record binds the product version to the final signed binary pair.
+# The record binds the product version to the final binary pair.
 record = {
     'version': version,
     'sourceCommit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
