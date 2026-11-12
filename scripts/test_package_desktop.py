@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import struct
 import plistlib
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -128,6 +129,20 @@ class PackageTests(unittest.TestCase):
         with patch('package_desktop.sys.platform', 'linux'), patch('package_desktop.platform.machine', return_value='x86_64'), patch('package_desktop.subprocess.check_output', return_value='1.0.0\n'):
             with self.assertRaisesRegex(ValueError, 'runtime version'):
                 package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+
+    def test_generated_runtime_assets_are_ignored_in_a_fresh_checkout(self):
+        with tempfile.TemporaryDirectory(prefix='ovpn-build-ignore-') as directory:
+            root = Path(directory)
+            subprocess.run(['git', 'init', '-q', directory], check=True)
+            destination = root / 'internal/runtimeassets'
+            destination.mkdir(parents=True)
+            ignore = Path(__file__).resolve().parents[1] / 'internal/runtimeassets/.gitignore'
+            (destination / '.gitignore').write_text(ignore.read_text())
+            generated = destination / 'assets/linux_amd64/ovpn-agent'
+            generated.parent.mkdir(parents=True)
+            generated.write_bytes(b'fixture generated binary')
+            result = subprocess.run(['git', '-C', directory, 'check-ignore', 'internal/runtimeassets/assets/linux_amd64/ovpn-agent'], capture_output=True)
+            self.assertEqual(result.returncode, 0)
 
 
 if __name__ == '__main__':
