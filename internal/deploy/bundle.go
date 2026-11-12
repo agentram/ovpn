@@ -465,7 +465,11 @@ backend foreign_backends
   default-server inter 5s fall 2 rise 1 observe layer4 error-limit 10 on-error mark-down
 `)
 	for idx, backend := range backends {
-		fmt.Fprintf(&b, "  server backend_%d %s:443 check\n", idx+1, strings.TrimSpace(backend.Host))
+		name := fmt.Sprintf("backend_%d", idx+1)
+		if backend.ID > 0 {
+			name = fmt.Sprintf("ovpn_node_%d", backend.ID)
+		}
+		fmt.Fprintf(&b, "  server %s %s:443 check\n", name, strings.TrimSpace(backend.Host))
 	}
 	return b.String()
 }

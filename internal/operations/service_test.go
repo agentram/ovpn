@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -228,5 +229,40 @@ func TestRestartKeepsResultAndDoesNotRepeatWrites(t *testing.T) {
 	}
 	if _, e = next.Result(j.ID); e == nil {
 		t.Fatal("private delivery result survived restart")
+	}
+}
+
+type chainBackend struct {
+	*testBackend
+	failBackup bool
+}
+
+func (b chainBackend) Prepare(ctx context.Context, r Request) (Plan, error) {
+	p, e := b.testBackend.Prepare(ctx, r)
+	p.StopOnFailure = true
+	return p, e
+}
+func (b chainBackend) Backup(context.Context, Plan, Target) error {
+	if b.failBackup {
+		return errors.New("backup fixture failure")
+	}
+	return nil
+}
+func TestDependentApplyNeverTouchesProxyAfterBackendOrBackupFailure(t *testing.T) {
+	for _, backup := range []bool{false, true} {
+		t.Run(fmt.Sprint(backup), func(t *testing.T) {
+			backend := &testBackend{revision: "first", calls: map[string]int{}, fail: "one"}
+			s := New(context.Background(), t.TempDir(), chainBackend{testBackend: backend, failBackup: backup})
+			defer s.Close()
+			_, start := prepareStart(t, s)
+			job, err := s.Start(context.Background(), start)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result := finished(t, s, job.ID)
+			if result.Steps[1].State != "blocked" || result.Steps[1].Code != "DEPENDENCY_FAILED" || backend.calls["two"] != 0 {
+				t.Fatal("proxy applied after a failed prerequisite")
+			}
+		})
 	}
 }

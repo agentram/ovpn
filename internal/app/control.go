@@ -15,7 +15,7 @@ func (s *DesktopService) AttachControl(ctx context.Context, backend operations.B
 	s.control.OnFinish = func(plan operations.Plan) {
 		s.monitor.Invalidate()
 		switch plan.Action {
-		case "restart", "deploy", "server.init", "server.restore", "user.quota-reset":
+		case "server.ha-apply", "restart", "deploy", "server.init", "server.restore", "user.quota-reset":
 			nodes := map[string]bool{}
 			for _, target := range plan.Targets {
 				nodes[target.ID] = true
@@ -37,7 +37,7 @@ func controlError(err error) error {
 		}
 	}
 	switch err.Error() {
-	case "NO_ENABLED_SERVERS", "IDENTITY_CONFLICT", "USER_ASSIGNMENT_CONFLICT", "SSH_HOST_UNREACHABLE", "SSH_ACCESS_FAILED", "SSH_HOST_KEY_CHANGED", "DELIVERY_UNAVAILABLE":
+	case "HA_BACKENDS_REQUIRED", "HA_BACKENDS_INCOMPATIBLE", "NO_ENABLED_SERVERS", "IDENTITY_CONFLICT", "USER_ASSIGNMENT_CONFLICT", "SSH_HOST_UNREACHABLE", "SSH_ACCESS_FAILED", "SSH_HOST_KEY_CHANGED", "DELIVERY_UNAVAILABLE":
 		return &Error{Code: err.Error()}
 	}
 	return &Error{Code: "OPERATION_UNAVAILABLE"}

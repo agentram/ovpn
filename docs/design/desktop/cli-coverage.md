@@ -3,8 +3,8 @@
 The executable catalog is generated from command registrations. A contract test
 requires an explicit title and screen area for every runnable user command.
 Machine protocol and Cobra help/completion are service exceptions. Common
-actions have dedicated buttons; every listed action is also available under
-Settings → Advanced. No terminal output is parsed to execute a command.
+actions have dedicated controls; every listed action is also available under
+Settings → Advanced → search. No terminal output is parsed to execute a command.
 
 | Command | Screen | Action |
 | --- | --- | --- |
@@ -23,11 +23,12 @@ Settings → Advanced. No terminal output is parsed to execute a command.
 | `ovpn observe tool-set` | Activity | Choose diagnostic tool |
 | `ovpn restart` | Servers | Restart services |
 | `ovpn server add` | Servers | Add server |
-| `ovpn server backend attach` | Servers | Add backup route |
-| `ovpn server backend detach` | Servers | Remove backup route |
-| `ovpn server backend list` | Servers | Backup routes |
+| `ovpn server backend attach` | Servers | Add backend |
+| `ovpn server backend detach` | Servers | Remove backend |
+| `ovpn server backend list` | Servers | Backend pool |
 | `ovpn server backup` | Servers | Create backup |
 | `ovpn server cleanup` | Servers | Remove OVPN from server |
+| `ovpn server ha-apply` | Servers | Apply HA configuration |
 | `ovpn server init` | Servers | Install OVPN |
 | `ovpn server inspect` | Servers | Check server address |
 | `ovpn server list` | Servers | Servers |

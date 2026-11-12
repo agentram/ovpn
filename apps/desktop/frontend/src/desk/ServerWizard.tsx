@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { Server } from "../api";
+import { uiCopy } from "./uiCopy";
 import { desk } from "./api";
 import type { ActionRequest, Job, Result } from "./api";
 import { errorMessage, messages } from "./i18n";
@@ -8,14 +10,26 @@ import { requestKey } from "./model";
 // The wizard sends the same structured plans used by individual management actions.
 export function ServerWizard({
   language,
+  servers,
   onClose,
   onChanged,
 }: {
   language: Language;
+  servers: Server[];
   onClose: () => void;
   onChanged: () => void;
 }) {
   const t = messages(language);
+  const ui = uiCopy(language);
+  const [role, setRole] = useState("vpn");
+  const [preset, setPreset] = useState("ru");
+  const [backends, setBackends] = useState<string[]>([]);
+  const eligibleBackends = servers.filter(
+    (server) =>
+      server.role === "vpn" &&
+      server.enabled &&
+      server.profiles.includes("vless-reality-tcp-vision"),
+  );
   const ref = useRef<HTMLDialogElement>(null);
   const alive = useRef(true);
   const [step, setStep] = useState(0);
@@ -93,6 +107,8 @@ export function ServerWizard({
         action: "server.add",
         values: {
           name,
+          role,
+          "proxy-preset": role === "proxy" ? preset : "",
           host,
           domain,
           "ssh-user": user,
@@ -108,7 +124,16 @@ export function ServerWizard({
   }
   async function install() {
     await execute(async () => {
-      await run({ action: "server.init", values: {}, arguments: [name] });
+      if (role === "proxy") {
+        for (const backend of backends)
+          await run({
+            action: "server.backend.attach",
+            values: { proxy: name, backend },
+            arguments: [],
+          });
+        await run({ action: "server.ha-apply", values: {}, arguments: [name] });
+      } else
+        await run({ action: "server.init", values: {}, arguments: [name] });
       setStep(3);
     });
   }
@@ -154,6 +179,49 @@ export function ServerWizard({
             className="desk-form"
           >
             <p>{t.serverAddressHint}</p>
+            <label>
+              {ui.serverPurpose}
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="vpn">{ui.standardServer}</option>
+                <option value="proxy">{ui.proxyServer}</option>
+              </select>
+            </label>
+            {role === "proxy" && (
+              <>
+                <label>
+                  {ui.routingPreset}
+                  <select
+                    value={preset}
+                    onChange={(e) => setPreset(e.target.value)}
+                  >
+                    <option value="ru">RU</option>
+                    <option value="cn">CN</option>
+                  </select>
+                </label>
+                <fieldset className="desk-backend-choices">
+                  <legend>{ui.backendChoice}</legend>
+                  <p>{ui.backendChoiceHint}</p>
+                  {eligibleBackends.map((server) => (
+                    <label key={server.id}>
+                      <input
+                        type="checkbox"
+                        checked={backends.includes(server.name)}
+                        onChange={(e) =>
+                          setBackends((old) =>
+                            e.target.checked
+                              ? [...old, server.name]
+                              : old.filter((name) => name !== server.name),
+                          )
+                        }
+                      />
+                      {server.name}
+                    </label>
+                  ))}
+                  {!eligibleBackends.length && <p>{ui.noBackends}</p>}
+                </fieldset>
+                <p>{ui.proxyWarning}</p>
+              </>
+            )}
             <label>
               {t.name}
               <input
@@ -241,6 +309,20 @@ export function ServerWizard({
           <>
             <h3>{name}</h3>
             <p>{t.installHint}</p>
+            {role === "proxy" && (
+              <>
+                <p>{ui.haApplyHint}</p>
+                <ul className="desk-targets">
+                  {backends.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                  <li>
+                    {name} · {ui.entry}
+                  </li>
+                </ul>
+                <p>{ui.proxyWarning}</p>
+              </>
+            )}
             <ul className="desk-targets">
               <li>{host}</li>
               <li>{domain}</li>
@@ -276,7 +358,7 @@ export function ServerWizard({
             type="submit"
             form="server-address"
             className="button primary"
-            disabled={busy}
+            disabled={busy || (role === "proxy" && !backends.length)}
           >
             {t.continue}
           </button>

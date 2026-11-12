@@ -1,7 +1,8 @@
 # Desk 1.13 acceptance
 
-Use a disposable two-server workspace with temporary accounts. Never run
-acceptance against an operator workspace or customer installation.
+Use temporary accounts on two disposable VPN servers for access lifecycle
+acceptance, plus a proxy for HA acceptance. Never use an operator workspace or
+customer installation.
 
 ## Platform gates
 
@@ -13,6 +14,20 @@ apply and restore. Repeat after sleep and reopening the app. Check both themes,
 all three languages, keyboard focus, large text, a small window and long names.
 Record actual outcomes per OS; browser tests and cross-compilation do not close
 these gates. Public signing, installers and notarization are separate work.
+
+## HA rollout gate
+
+Review backend-first application and verified backups on the three-node stand.
+Keep a direct client link as a comparison. With a user connected through the
+proxy, stop one backend and verify new connections use the remaining node.
+Stop both and verify relay traffic fails closed; preset-direct destinations
+retain their configured behavior. Restore a backend and recheck access.
+Existing TCP sessions can close during failover; reconnecting is a separate
+client behavior. Stop the proxy and confirm that direct links still work while
+proxy access is unavailable. Retain per-node outcomes and traffic history.
+
+The Docker HA regression proves pool TCP behavior and metric projection. It
+does not close this full VLESS/HTTPS rollout gate or native platform acceptance.
 
 ## Five-person pilot
 

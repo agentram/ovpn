@@ -39,6 +39,13 @@ func (d deskSource) Targets(ctx context.Context) ([]deskmonitor.Target, error) {
 		if !server.Enabled {
 			continue
 		}
+		var topology []model.ProxyBackend
+		if server.IsProxy() {
+			topology, err = store.ListProxyBackends(ctx, server.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
 		users, err := store.ListUsers(ctx, server.ID)
 		if err != nil {
 			return nil, err
@@ -53,10 +60,11 @@ func (d deskSource) Targets(ctx context.Context) ([]deskmonitor.Target, error) {
 					engine = "native"
 				}
 				raw, _ := json.Marshal(struct {
-					Server  model.Server
-					User    model.User
-					Profile string
-				}{server, user, profile})
+					Server   model.Server
+					User     model.User
+					Profile  string
+					Topology []model.ProxyBackend
+				}{server, user, profile, topology})
 				sum := sha256.Sum256(raw)
 				target := dto.ObservationTarget{ServerID: fmt.Sprintf("node-%d", server.ID), Username: user.Username, Profile: profile}
 				targets = append(targets, deskmonitor.Target{Target: target, Engine: engine, Revision: hex.EncodeToString(sum[:])})

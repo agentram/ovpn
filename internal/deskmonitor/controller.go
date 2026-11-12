@@ -278,7 +278,7 @@ func (c *Controller) collect(ctx context.Context, presenceOnly bool) {
 		row.Users = append([]dto.UserLive(nil), row.Users...)
 		previous := c.live[row.ServerID]
 		if presenceOnly {
-			row.State, row.Code, row.CheckedAt = previous.State, previous.Code, previous.CheckedAt
+			row.State, row.Code, row.CheckedAt, row.HA = previous.State, previous.Code, previous.CheckedAt, previous.HA
 			for i := range row.Users {
 				for _, old := range previous.Users {
 					if old.Username == row.Users[i].Username {

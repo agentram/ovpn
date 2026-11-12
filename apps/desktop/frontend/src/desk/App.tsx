@@ -4,6 +4,9 @@ import type { Server, User } from "../api";
 import { desk, emptySnapshot } from "./api";
 import type { Action, Job, Snapshot } from "./api";
 import { ServerWizard } from "./ServerWizard";
+import { ActionBrowser } from "./ActionBrowser";
+import { uiCopy } from "./uiCopy";
+import { toolName } from "./toolModel";
 import { ActionDialog } from "./ActionDialog";
 import type { Selection } from "./ActionDialog";
 import { Activity, Detail, Overview, Servers, Users } from "./components";
@@ -366,6 +369,7 @@ export function App() {
       </div>
       {serverWizard && (
         <ServerWizard
+          servers={servers}
           language={language}
           onClose={() => {
             setServerWizard(false);
@@ -455,10 +459,11 @@ export function App() {
                   <span
                     className={`status-dot ${tool.configured ? "ok" : "neutral"}`}
                   />
-                  <strong>
-                    {tool.engine === "checker" ? "Xray Checker" : "Xray Knife"}
-                  </strong>{" "}
-                  · {tool.version} · {tool.configured ? t.succeeded : t.noData}
+                  <strong>{toolName(tool.engine, language)}</strong> ·{" "}
+                  {tool.version} ·{" "}
+                  {tool.configured
+                    ? uiCopy(language).installed
+                    : uiCopy(language).notInstalled}
                 </p>
               ))}
               {observation.jobs
@@ -493,17 +498,11 @@ export function App() {
           <details>
             <summary>{t.advanced}</summary>
             <p>{t.advancedHint}</p>
-            <div className="desk-command-grid">
-              {catalog.map((action) => (
-                <button
-                  key={action.id}
-                  className="button"
-                  onClick={() => onAction({ action })}
-                >
-                  {actionName(action.id, action.title, language)}
-                </button>
-              ))}
-            </div>
+            <ActionBrowser
+              actions={catalog}
+              language={language}
+              onChoose={(action) => onAction({ action })}
+            />
           </details>
           <small>
             {t.about} · {version}

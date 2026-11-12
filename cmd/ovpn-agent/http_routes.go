@@ -19,17 +19,18 @@ import (
 )
 
 type routeDeps struct {
-	store       *remote.Store
-	collector   *stats.Collector
-	quota       *stats.QuotaEnforcer
-	expiry      *stats.ExpiryEnforcer
-	runtime     stats.RuntimeManager
-	metrics     *agentMetrics
-	logger      *slog.Logger
-	xrayAPI     string
-	dbPath      string
-	collectOnce func(context.Context) error
-	refreshOnce func(context.Context)
+	haMetricsURL string
+	store        *remote.Store
+	collector    *stats.Collector
+	quota        *stats.QuotaEnforcer
+	expiry       *stats.ExpiryEnforcer
+	runtime      stats.RuntimeManager
+	metrics      *agentMetrics
+	logger       *slog.Logger
+	xrayAPI      string
+	dbPath       string
+	collectOnce  func(context.Context) error
+	refreshOnce  func(context.Context)
 }
 
 func parseSinceParam(raw string, fallback time.Duration) (time.Time, error) {
@@ -204,6 +205,7 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 	// Serialize runtime add/remove calls to avoid concurrent AlterInbound races against one Xray process.
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/ha/status", handleHAStatus(d.haMetricsURL))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		hctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()

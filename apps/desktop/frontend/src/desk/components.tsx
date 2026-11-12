@@ -12,6 +12,12 @@ import {
   isRecent,
   timestamp,
 } from "./model";
+import { ActionBrowser } from "./ActionBrowser";
+import { contextualActions } from "./actions";
+import { uiCopy } from "./uiCopy";
+import { HighAvailability } from "./HighAvailability";
+import { toolName, toolJobLabel, toolJobState } from "./toolModel";
+import { serverSignal } from "./haModel";
 import type { Selection } from "./ActionDialog";
 
 export function Signal({
@@ -24,7 +30,7 @@ export function Signal({
   return (
     <span className={`desk-signal ${tone}`}>
       <span className={`status-dot ${tone}`} />
-      {text}
+      <span className="desk-signal-label">{text}</span>
     </span>
   );
 }
@@ -156,13 +162,11 @@ export function Overview({
               const live = snapshot.servers.find(
                 (row) => row.serverId === server.id,
               );
-              const state = !isRecent(live?.checkedAt)
-                ? "neutral"
-                : live?.state === "online"
-                  ? "ok"
-                  : ["failed", "unreachable"].includes(live?.state ?? "")
-                    ? "danger"
-                    : "neutral";
+              const status = serverSignal(
+                server,
+                snapshot.running ? live : undefined,
+              );
+              const state = status.tone;
               return (
                 <button key={server.id} onClick={() => onServer(server)}>
                   <span className={`status-dot ${state}`} />
@@ -173,13 +177,7 @@ export function Overview({
                     </small>
                   </span>
                   <Signal
-                    text={
-                      state === "ok"
-                        ? t.works
-                        : state === "danger"
-                          ? t.nodeUnavailable
-                          : t.unknown
-                    }
+                    text={{ ...t, ...uiCopy(language) }[status.key]}
                     tone={state}
                   />
                 </button>
@@ -419,10 +417,10 @@ export function Servers({
     <div className="desk-server-grid">
       {servers.map((server) => {
         const live = snapshot.servers.find((row) => row.serverId === server.id);
-        const fresh = live?.state === "online" && isRecent(live.checkedAt);
-        const failed =
-          isRecent(live?.checkedAt) &&
-          ["failed", "unreachable"].includes(live?.state ?? "");
+        const status = serverSignal(
+          server,
+          snapshot.running ? live : undefined,
+        );
         const passed =
           live?.users.reduce((sum, user) => sum + user.routesPassed, 0) ?? 0;
         const expected =
@@ -436,8 +434,8 @@ export function Servers({
             <div>
               <span className="desk-server-symbol">▤</span>
               <Signal
-                text={fresh ? t.works : failed ? t.nodeUnavailable : t.unknown}
-                tone={fresh ? "ok" : failed ? "danger" : "neutral"}
+                text={{ ...t, ...uiCopy(language) }[status.key]}
+                tone={status.tone}
               />
             </div>
             <h2>{server.name}</h2>
@@ -511,9 +509,17 @@ export function Activity({
                     tone={
                       job.state === "succeeded"
                         ? "ok"
-                        : ["running", "queued"].includes(job.state)
+                        : [
+                              "running",
+                              "queued",
+                              "partial",
+                              "blocked",
+                              "recovery_required",
+                            ].includes(job.state)
                           ? "warn"
-                          : "danger"
+                          : job.state === "failed"
+                            ? "danger"
+                            : "neutral"
                     }
                   />
                   {job.code && (
@@ -527,9 +533,14 @@ export function Activity({
                   {job.steps.map((step) => (
                     <div key={step.target.id} className="desk-step">
                       <span
-                        className={`status-dot ${step.state === "succeeded" ? "ok" : step.code ? "danger" : "neutral"}`}
+                        className={`status-dot ${step.state === "succeeded" ? "ok" : step.state === "blocked" ? "neutral" : step.code ? "danger" : "neutral"}`}
                       />
-                      {step.target.name}
+                      <span>
+                        {step.target.name}
+                        <small>
+                          {operationLabel(step.state, language, step.code)}
+                        </small>
+                      </span>
                     </div>
                   ))}
                 </td>
@@ -569,34 +580,62 @@ export function Activity({
         </table>
       </div>
       {toolJobs.length > 0 && (
-        <section className="desk-history">
-          <h2>{t.tools}</h2>
-          {toolJobs.slice(0, 10).map((job) => (
-            <p key={job.id}>
-              <Signal
-                text={
-                  job.engine +
-                  " · " +
-                  ((t as Record<string, string>)[job.state] ?? job.state)
-                }
-                tone={
-                  job.state === "completed"
-                    ? "ok"
-                    : job.state === "failed"
-                      ? "danger"
-                      : "warn"
-                }
-              />{" "}
-              <small>{timestamp(job.startedAt)}</small>
-              {job.code && (
-                <details>
-                  <summary>{t.details}</summary>
-                  <code>{job.code}</code>
-                </details>
-              )}
-            </p>
-          ))}
-        </section>
+        <details className="desk-history desk-tool-history">
+          <summary>
+            {uiCopy(language).toolActivity}{" "}
+            <span className="desk-count">{toolJobs.length}</span>
+          </summary>
+          <p>{uiCopy(language).toolActivityHint}</p>
+          <div className="table-scroll">
+            <table className="desk-table">
+              <thead>
+                <tr>
+                  <th>{t.action}</th>
+                  <th>{t.tool}</th>
+                  <th>{t.current}</th>
+                  <th>{t.time}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {toolJobs
+                  .slice()
+                  .sort(
+                    (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt),
+                  )
+                  .slice(0, 10)
+                  .map((job) => (
+                    <tr key={job.id}>
+                      <td>{toolJobLabel(job, language)}</td>
+                      <td>{toolName(job.engine, language)}</td>
+                      <td>
+                        <Signal
+                          text={toolJobState(job.state, language)}
+                          tone={
+                            job.state === "failed"
+                              ? "danger"
+                              : ["running", "queued"].includes(job.state)
+                                ? "warn"
+                                : "neutral"
+                          }
+                        />
+                        {job.code && (
+                          <details>
+                            <summary>{t.details}</summary>
+                            <code>{job.code}</code>
+                          </details>
+                        )}
+                      </td>
+                      <td>
+                        <time>
+                          {timestamp(job.finishedAt || job.startedAt)}
+                        </time>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       )}
       {history.length > 0 && (
         <section className="desk-history">
@@ -726,13 +765,15 @@ export function Detail({
       clearInterval(timer);
     };
   }, [server?.id, user?.username]);
-  function choose(id: string) {
+  function choose(id: string, overrides: Record<string, string> = {}) {
     const action = catalog.find((action) => action.id === id);
     if (!action) return;
     const values: Record<string, string> = {};
     if (user) values.username = user.username;
-    if (server) values.server = server.name;
-    else if (user) {
+    if (server) {
+      values.server = server.name;
+      values.proxy = server.name;
+    } else if (user) {
       const node =
         servers.find(
           (node) => node.enabled && user.nodeIds?.includes(node.id),
@@ -744,6 +785,7 @@ export function Detail({
         servers.find((node) => node.enabled);
       if (node) values.server = node.name;
     }
+    Object.assign(values, overrides);
     const args = action.arguments.map((field) =>
       field.name === "server" ? (server?.name ?? "") : "",
     );
@@ -755,32 +797,10 @@ export function Detail({
     onAction({ action, values: known, arguments: args });
   }
   const primary = user
-    ? [
-        "user.link",
-        "user.invite",
-        "user.enable",
-        "user.disable",
-        "user.quota-set",
-        "user.expiry-set",
-        "user.expiry-clear",
-        "user.probe",
-        "user.diagnose",
-        "observe.diagnose",
-      ]
-    : [
-        "server.init",
-        "deploy",
-        "restart",
-        "doctor",
-        "server.logs",
-        "server.backup",
-        "server.restore",
-      ];
-  const advancedActions = catalog.filter((action) =>
-    user
-      ? (action.area === "users" || action.id === "observe.diagnose") &&
-        !primary.includes(action.id)
-      : action.area === "servers" && !primary.includes(action.id),
+    ? ["user.link", "user.probe"]
+    : [server?.role === "proxy" ? "server.ha-apply" : "deploy", "doctor"];
+  const advancedActions = contextualActions(catalog, user, server).filter(
+    (action) => !primary.includes(action.id),
   );
   return (
     <dialog ref={ref} className="desk-dialog desk-detail" onCancel={onClose}>
@@ -809,7 +829,30 @@ export function Detail({
               )
             );
           })}
+          <button
+            className="button"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced((old) => !old)}
+          >
+            {uiCopy(language).more} <span aria-hidden>⌄</span>
+          </button>
         </div>
+        {advanced && (
+          <ActionBrowser
+            actions={advancedActions}
+            language={language}
+            onChoose={(action) => choose(action.id)}
+          />
+        )}
+        {server?.role === "proxy" && (
+          <HighAvailability
+            server={server}
+            servers={servers}
+            snapshot={snapshot}
+            language={language}
+            onChoose={choose}
+          />
+        )}
         {server && <p>{t.serverSetupHint}</p>}
         {user?.missingNodes ? (
           <p className="desk-alert warn">{t.missingAssignments}</p>
@@ -950,26 +993,6 @@ export function Detail({
             <p className="desk-panel-empty">{t.noRoutes}</p>
           )}
         </section>
-        <button
-          className="text-button"
-          aria-expanded={advanced}
-          onClick={() => setAdvanced((old) => !old)}
-        >
-          {t.advanced} {advanced ? "−" : "+"}
-        </button>
-        {advanced && (
-          <div className="desk-detail-actions">
-            {advancedActions.map((action) => (
-              <button
-                key={action.id}
-                className={`button ${action.destructive ? "danger-text" : ""}`}
-                onClick={() => choose(action.id)}
-              >
-                {actionName(action.id, action.title, language)}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
       <footer>
         <button className="button" onClick={onClose}>

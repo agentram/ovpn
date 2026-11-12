@@ -31,6 +31,7 @@ export interface Plan {
   digest: string;
   targets: { id: string; name: string }[];
   destructive: boolean;
+  stopOnFailure?: boolean;
   mutation: boolean;
   createdAt: string;
 }
@@ -75,7 +76,15 @@ export interface UserLive {
   routesPassed: number;
   routesFailed: number;
 }
+export interface HAStatus {
+  supported: boolean;
+  state: string;
+  code?: string;
+  checkedAt: string;
+  backends: { serverId: string; available: boolean | null }[];
+}
 export interface ServerLive {
+  ha?: HAStatus;
   serverId: string;
   state: string;
   code?: string;
