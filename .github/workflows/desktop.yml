@@ -60,6 +60,7 @@ jobs:
         run: |
           go -C apps/desktop vet ./...
           go -C apps/desktop test ./...
+          go test -run '^(TestWorkspacePathRoundTrip|TestObservationPathRoundTrip|TestVersionDoesNotOpenWorkspace)$' ./internal/store/local ./internal/observation ./internal/cli
       - name: Scan desktop dependencies
         working-directory: apps/desktop
         env:

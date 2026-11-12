@@ -20,6 +20,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 - Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
 
 ### Changed
+- Fix SQLite file URIs for Windows workspaces and observation history, including spaces and non-ASCII paths. Keep the version command independent of local state and check native workspace access in the packaging matrix.
 - Remove the duplicate unconditional desktop build and use the shared OVPN VERSION as the only Desk product version.
 - Replace overflowing action button grids with compact primary actions and a searchable grouped catalog. Translate diagnostic task states and keep task completion separate from connection success.
 - Preserve usage for disabled users, keep missing quota data unknown, and verify suspended access without requiring an active quota policy. Mark incomplete user distribution as partial and checkpoint local repair per target.
