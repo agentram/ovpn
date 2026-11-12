@@ -22,7 +22,7 @@ class PackageTests(unittest.TestCase):
         root = Path(temporary.name)
         (root / 'VERSION').write_text('7.8.9\n')
         (root / 'LICENSE').write_text('Fixture license\n')
-        reader = patch('package_desktop.build_settings', return_value={'-ldflags': '-s -w -X ovpn/internal/version.pinnedVersion=7.8.9', 'vcs.revision': COMMIT, 'vcs.modified': 'false'})
+        reader = patch('package_desktop.build_settings', return_value={'vcs.revision': COMMIT, 'vcs.modified': 'false'})
         reader.start()
         self.addCleanup(reader.stop)
         runner = patch('package_desktop.subprocess.check_output', return_value='7.8.9\n')
@@ -122,6 +122,12 @@ class PackageTests(unittest.TestCase):
         record_path.write_text(json.dumps(record))
         with self.assertRaisesRegex(ValueError, 'hash'):
             package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
+
+    def test_native_worker_version_must_match_the_build_record(self):
+        root, _ = self.fixture()
+        with patch('package_desktop.sys.platform', 'linux'), patch('package_desktop.platform.machine', return_value='x86_64'), patch('package_desktop.subprocess.check_output', return_value='1.0.0\n'):
+            with self.assertRaisesRegex(ValueError, 'runtime version'):
+                package(root, 'linux', 'amd64', COMMIT, 1700000000, root / 'packages')
 
 
 if __name__ == '__main__':
