@@ -19,6 +19,8 @@ func main() {
 	switch os.Args[1] {
 	case "workspace":
 		err = workspace(ctx, os.Args[2])
+	case "ha-workspace":
+		err = haWorkspace(ctx, os.Args[2])
 	case "disable-alice":
 		err = disableAlice(ctx, os.Args[2])
 	case "android":

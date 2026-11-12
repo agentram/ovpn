@@ -41,14 +41,15 @@ type Target struct {
 }
 
 type Plan struct {
-	ID          string    `json:"id"`
-	Action      string    `json:"action"`
-	Title       string    `json:"title"`
-	Digest      string    `json:"digest"`
-	Targets     []Target  `json:"targets"`
-	Destructive bool      `json:"destructive"`
-	Mutation    bool      `json:"mutation"`
-	CreatedAt   time.Time `json:"createdAt"`
+	StopOnFailure bool      `json:"stopOnFailure,omitempty"`
+	ID            string    `json:"id"`
+	Action        string    `json:"action"`
+	Title         string    `json:"title"`
+	Digest        string    `json:"digest"`
+	Targets       []Target  `json:"targets"`
+	Destructive   bool      `json:"destructive"`
+	Mutation      bool      `json:"mutation"`
+	CreatedAt     time.Time `json:"createdAt"`
 	// Request and snapshots stay in the private journal, outside wire projections.
 	Request  Request         `json:"-"`
 	Revision string          `json:"-"`

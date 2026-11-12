@@ -1,6 +1,9 @@
 package dto
 
-import "time"
+import (
+	"ovpn/internal/haproxy/api"
+	"time"
+)
 
 // Live fields are nullable so an unavailable agent never becomes a zero reading.
 type UserLive struct {
@@ -23,12 +26,13 @@ type UserLive struct {
 	RuntimeApplied *bool  `json:"runtimeApplied"`
 }
 type ServerLive struct {
-	ServerID     string     `json:"serverId"`
-	State        string     `json:"state"`
-	Code         string     `json:"code,omitempty"`
-	CheckedAt    string     `json:"checkedAt,omitempty"`
-	AgentVersion string     `json:"agentVersion,omitempty"`
-	Users        []UserLive `json:"users"`
+	HA           *api.Status `json:"ha,omitempty"`
+	ServerID     string      `json:"serverId"`
+	State        string      `json:"state"`
+	Code         string      `json:"code,omitempty"`
+	CheckedAt    string      `json:"checkedAt,omitempty"`
+	AgentVersion string      `json:"agentVersion,omitempty"`
+	Users        []UserLive  `json:"users"`
 }
 type RouteLive struct {
 	Target ObservationTarget `json:"target"`

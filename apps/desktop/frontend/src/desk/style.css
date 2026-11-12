@@ -808,3 +808,224 @@ progress[data-level="warn"] {
   max-height: 260px;
   overflow: auto;
 }
+
+/* Compact action lists keep long translations aligned without fixed text heights. */
+.desk-signal {
+  align-items: flex-start;
+  min-width: 0;
+}
+.desk-signal .status-dot {
+  flex: 0 0 7px;
+  margin-top: 0.42em;
+}
+.desk-signal-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+.desk-detail-actions {
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+.desk-detail-actions > .button {
+  min-height: 42px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.desk-action-browser {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 0 0 24px;
+}
+.desk-action-browser > input {
+  width: calc(100% - 24px);
+  margin: 12px;
+}
+.desk-action-layout {
+  display: grid;
+  grid-template-columns: minmax(145px, 30%) minmax(0, 1fr);
+  border-top: 1px solid var(--line);
+}
+.desk-action-categories {
+  padding: 8px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.desk-action-categories button {
+  border: 0;
+  background: transparent;
+  padding: 11px 12px;
+  border-radius: 7px;
+  text-align: left;
+  color: var(--secondary);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.desk-action-categories button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--bg);
+}
+.desk-action-list {
+  min-width: 0;
+  padding: 8px 16px;
+  max-height: 390px;
+  overflow-y: auto;
+}
+.desk-action-list > button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 12px 4px;
+  text-align: left;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.desk-action-list > button span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.desk-action-list > button:hover {
+  color: var(--accent);
+}
+.desk-action-list > .danger-text {
+  color: var(--danger);
+}
+.desk-action-list > p {
+  color: var(--secondary);
+}
+.desk-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.desk-ha {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+.desk-ha-flow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+  color: var(--secondary);
+}
+.desk-ha-flow strong {
+  color: var(--text);
+  padding: 10px 18px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.desk-ha-flow small {
+  display: block;
+  margin-top: 4px;
+  color: var(--secondary);
+  font-weight: 400;
+}
+.desk-ha-backend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.desk-ha-backend > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.desk-ha-backend small {
+  display: block;
+  color: var(--secondary);
+  margin-top: 5px;
+}
+.desk-ha-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.desk-ha p {
+  line-height: 1.6;
+  color: var(--secondary);
+}
+.desk-ha time {
+  display: block;
+  font-size: 0.85em;
+}
+.desk-ha-notice {
+  border-left: 3px solid var(--warn);
+  padding-left: 12px;
+}
+.desk-tool-history > summary {
+  padding: 0 24px;
+}
+.desk-tool-history > p {
+  padding: 0 24px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
+.desk-count {
+  color: var(--secondary);
+  margin-left: 8px;
+  font-size: 0.85em;
+}
+.desk-tool-history time {
+  font-size: 11px;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .desk-action-layout {
+    grid-template-columns: 1fr;
+  }
+  .desk-action-categories {
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .desk-action-categories button {
+    flex: 0 0 auto;
+    max-width: 180px;
+  }
+}
+.desk-backend-choices {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+}
+.desk-backend-choices label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+.desk-backend-choices input {
+  width: auto;
+}
+.desk-ha .danger-text {
+  color: var(--danger);
+}

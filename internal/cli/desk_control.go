@@ -21,6 +21,8 @@ import (
 	"github.com/skip2/go-qrcode"
 
 	"ovpn/internal/backup"
+	"ovpn/internal/ha"
+	"ovpn/internal/haproxy"
 	"ovpn/internal/logx"
 	"ovpn/internal/model"
 	"ovpn/internal/operations"
@@ -123,6 +125,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if request.Values["proxy"] != "" {
 		name = request.Values["proxy"]
 	}
+	stopOnFailure := false
 	mutation := definition.Mutation
 	if request.Action == "user.reconcile" {
 		source := strings.TrimSpace(request.Values["from-server"])
@@ -151,6 +154,32 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 		if request.Action != "user.reconcile" && ((global && server.Enabled) || (!global && name == server.Name)) {
 			targets = append(targets, operations.Target{ID: fmt.Sprintf("node-%d", server.ID), Name: server.Name})
 		}
+	}
+
+	if request.Action == "server.ha-apply" {
+		st, e := local.OpenReadOnly(ctx, d.dataDir)
+		if e != nil {
+			return operations.Plan{}, operations.ErrUnavailable
+		}
+		defer st.Close()
+		proxy, e := st.GetServerByName(ctx, name)
+		if e != nil || !proxy.IsProxy() || !proxy.Enabled {
+			return operations.Plan{}, operations.ErrInvalid
+		}
+
+		backends, e := st.ListAttachedBackendServers(ctx, proxy.ID)
+		if e != nil {
+			return operations.Plan{}, operations.ErrUnavailable
+		}
+		nodes, e := ha.Plan(*proxy, backends)
+		if e != nil {
+			return operations.Plan{}, e
+		}
+		targets = nil
+		for _, node := range nodes {
+			targets = append(targets, operations.Target{ID: fmt.Sprintf("node-%d", node.ID), Name: node.Name})
+		}
+		stopOnFailure = true
 	}
 	if global && len(targets) == 0 {
 		return operations.Plan{}, errors.New("NO_ENABLED_SERVERS")
@@ -217,7 +246,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if err != nil {
 		return operations.Plan{}, err
 	}
-	return operations.Plan{Action: definition.ID, Title: definition.Title, Mutation: mutation, Targets: targets, Destructive: definition.Destructive && mutation, Request: request, Revision: revision, Snapshot: raw}, nil
+	return operations.Plan{Action: definition.ID, Title: definition.Title, StopOnFailure: stopOnFailure, Mutation: mutation, Targets: targets, Destructive: definition.Destructive && mutation, Request: request, Revision: revision, Snapshot: raw}, nil
 }
 func userGlobalMutation(action string) bool {
 	switch action {
@@ -314,7 +343,7 @@ func (d *deskControl) Backup(ctx context.Context, p operations.Plan, target oper
 		return err
 	}
 	// A registered, uninitialised node has no remote runtime to back up.
-	if server.LastDeployAt == nil && p.Action == "server.init" {
+	if server.LastDeployAt == nil && (p.Action == "server.init" || p.Action == "server.ha-apply") {
 		state, e := a.newRunner("server.detect").Exec(ctx, sshFromServer(*server), "if sudo -n test -d /opt/ovpn; then printf present; else printf absent; fi")
 		if e != nil {
 			return e
@@ -413,8 +442,13 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 		return result, err
 	}
 	switch request.Action {
-	case "server.init", "deploy", "restart", "server.restore":
+	case "server.ha-apply", "server.init", "deploy", "restart", "server.restore":
 		if err := a.verifyServerOperation(); err != nil {
+			return result, err
+		}
+	}
+	if request.Action == "server.ha-apply" {
+		if err := a.verifyHAOperation(); err != nil {
 			return result, err
 		}
 	}
@@ -631,7 +665,7 @@ func remoteMutation(action string) bool {
 		return true
 	}
 	switch action {
-	case "deploy", "restart", "server.init", "server.restore", "server.cleanup", "server.backup", "server.monitor.up", "server.monitor.down", "server.monitor.telegram-setup", "user.debug.start", "user.debug.stop":
+	case "server.ha-apply", "deploy", "restart", "server.init", "server.restore", "server.cleanup", "server.backup", "server.monitor.up", "server.monitor.down", "server.monitor.telegram-setup", "user.debug.start", "user.debug.stop":
 		return true
 	}
 	return false
@@ -652,6 +686,50 @@ func (a *App) verifyServerOperation() error {
 		if e == nil {
 			var health agentHealth
 			if json.Unmarshal(raw, &health) == nil && health.XrayAPIReachable != nil && *health.XrayAPIReachable {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("APPLY_UNVERIFIED")
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func (a *App) verifyHAOperation() error {
+	server, err := a.store.GetServerByID(a.ctx, a.operationTarget)
+	if err != nil {
+		return err
+	}
+	if !server.IsProxy() {
+		return nil
+	}
+	backends, err := a.attachedBackendServers(*server)
+	if err != nil || len(backends) == 0 {
+		return errors.New("APPLY_UNVERIFIED")
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
+	defer cancel()
+	previous := a.ctx
+	a.ctx = ctx
+	defer func() { a.ctx = previous }()
+	for {
+		body, e := a.fetchRemoteAgent(*server, "GET", a.agentURL("/ha/status"), nil)
+		var status haproxy.Status
+		if e == nil && json.Unmarshal(body, &status) == nil && status.Supported && status.Code == "" && len(status.Backends) == len(backends) {
+			ready := true
+			for _, backend := range backends {
+				up := false
+				for _, live := range status.Backends {
+					if live.ServerID == fmt.Sprintf("node-%d", backend.ID) && live.Available != nil && *live.Available {
+						up = true
+					}
+				}
+				ready = ready && up
+			}
+			sampled, e := time.Parse(time.RFC3339, status.CheckedAt)
+			if ready && e == nil && time.Since(sampled) >= 0 && time.Since(sampled) < time.Minute {
 				return nil
 			}
 		}

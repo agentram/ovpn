@@ -53,6 +53,7 @@ services:
     command: ["/usr/local/bin/ovpn-agent", "--listen", ":9090", "--xray-api", "xray:10085", "--db-path", "/var/lib/ovpn-agent", "--poll-interval", "30s", "--log-level", "${OVPN_AGENT_LOG_LEVEL:-info}", "--cert-file", "${OVPN_AGENT_CERT_FILE:-}", "--connection-diagnostics", "${OVPN_CONNECTION_DIAGNOSTICS:-basic}", "--xray-access-log", "${OVPN_XRAY_ACCESS_LOG:-/var/log/ovpn/xray-access.log}", "--access-log-max-bytes", "${OVPN_XRAY_ACCESS_LOG_MAX_BYTES:-31457280}"]
     environment:
       - OVPN_AGENT_TOKEN=${OVPN_AGENT_TOKEN:-}
+      - OVPN_HAPROXY_METRICS_URL=http://haproxy:8404/metrics
     ports:
       - "127.0.0.1:${OVPN_AGENT_HOST_PORT:-19000}:9090"
     volumes:

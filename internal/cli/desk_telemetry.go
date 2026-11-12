@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ovpn/internal/app/dto"
+	"ovpn/internal/haproxy"
 	"ovpn/internal/model"
 	"ovpn/internal/operations"
 	"ovpn/internal/probequeue"
@@ -55,6 +56,15 @@ func (d *deskControl) Telemetry(ctx context.Context, presenceOnly bool) ([]dto.S
 			}
 			defer a.store.Close()
 			if !presenceOnly {
+				if server.IsProxy() {
+					ha := haproxy.Unknown("AGENT_UPDATE_REQUIRED")
+					if body, e := a.fetchRemoteAgent(server, "GET", a.agentURL("/ha/status"), nil); e == nil {
+						if json.Unmarshal(body, &ha) != nil {
+							ha = haproxy.Unknown("HA_METRICS_INVALID")
+						}
+					}
+					row.HA = &ha
+				}
 				collectedAt := ""
 				var coreReachable *bool
 				if body, e := a.fetchRemoteAgent(server, "GET", a.agentURL("/health"), nil); e == nil {

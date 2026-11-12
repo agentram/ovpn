@@ -1,3 +1,4 @@
+import { uiCopy } from "./uiCopy.ts";
 import { actionLabels } from "./actionLabels.ts";
 export type Language = "en" | "ru" | "zh";
 const en = {
@@ -594,6 +595,9 @@ export type MessageKey = keyof typeof en;
 export function errorMessage(error: unknown, language: Language): string {
   const text = error instanceof Error ? error.message : String(error);
   const t = messages(language);
+  if (text.includes("HA_BACKENDS_REQUIRED")) return uiCopy(language).noBackends;
+  if (text.includes("HA_BACKENDS_INCOMPATIBLE"))
+    return uiCopy(language).backendChoiceHint;
   if (text.includes("SSH_HOST_UNREACHABLE")) return t.nodeUnavailable;
   if (text.includes("SSH_ACCESS_FAILED")) return t.sshAccessFailed;
   if (text.includes("SSH_HOST_KEY_CHANGED")) return t.hostKeyChanged;
@@ -621,6 +625,12 @@ export function fieldName(name: string, language: Language): string {
     name: t.name,
     host: t.address,
     domain: t.domain,
+    proxy: uiCopy(language).entry,
+    backend: uiCopy(language).backendPool,
+    "from-server": t.server,
+    "to-server": t.server,
+    role: uiCopy(language).serverPurpose,
+    "proxy-preset": uiCopy(language).routingPreset,
     server: t.server,
     profile: t.profile,
     "ssh-user": t.sshUser,
@@ -676,9 +686,15 @@ export function actionName(
 }
 export { en, ru, zh };
 
-export function operationLabel(state: string, language: Language): string {
+export function operationLabel(
+  state: string,
+  language: Language,
+  code?: string,
+): string {
   const t = messages(language);
   if (state === "failed") return t.operationFailed;
+  if (state === "blocked" && code === "DEPENDENCY_FAILED")
+    return uiCopy(language).dependencyBlocked;
   if (state === "blocked") return t.busy;
   if (state === "partial") return t.operationPartial;
   if (state === "completed") return t.succeeded;

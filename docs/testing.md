@@ -67,6 +67,7 @@ Run from the repository root:
 ```bash
 make e2e-cli
 make e2e-tools
+make e2e-ha
 npm --prefix apps/desktop/frontend ci
 npm --prefix apps/desktop/frontend exec -- playwright install chromium
 make e2e-desktop
@@ -87,3 +88,9 @@ does not run. Physical camera, Wi-Fi/mobile handover, accessibility, and live
 VPS rollout remain device or operator acceptance checks.
 
 Native builds do not replace the [three-platform and five-person acceptance gates](design/desktop/acceptance.md).
+
+`make e2e-ha` uses the pinned HAProxy image and isolated Docker containers to
+check real TCP forwarding, loss of one backend, all-down fail-closed behavior
+and recovery. It also exercises the production HA health parser. It does not
+replace TLS/REALITY authentication or full SSH deployment/restore acceptance.
+The CLI E2E job runs this check before the required Go Quality gate.

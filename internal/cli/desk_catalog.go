@@ -22,10 +22,10 @@ var deskTitles = map[string]string{
 	"user.link": "Show connection link", "user.qr": "Save QR image", "user.export": "Export access", "user.reconcile": "Repair user records", "user.plan": "Review access change", "user.show": "User details", "user.list": "Users", "user.top": "Traffic leaders", "user.probe": "Check connection", "user.diagnose": "Explain connection problem",
 	"user.debug.start": "Start detailed recording", "user.debug.stop": "Stop detailed recording", "user.debug.list": "Active recordings", "user.debug.show": "Connection recording",
 	"user.subscription.export": "Export profile list", "user.subscription.publish": "Publish profile list", "subscription.invite": "Create setup code", "subscription.revoke": "Revoke profile updates", "subscription.serve": "Start profile delivery",
-	"server.inspect": "Check server address", "server.test": "Check SSH access", "server.add": "Add server", "server.init": "Install OVPN", "server.list": "Servers", "server.status": "Check services", "server.backup": "Create backup", "server.restore": "Restore backup", "server.cleanup": "Remove OVPN from server", "server.logs": "View logs",
+	"server.ha-apply": "Apply HA configuration", "server.inspect": "Check server address", "server.test": "Check SSH access", "server.add": "Add server", "server.init": "Install OVPN", "server.list": "Servers", "server.status": "Check services", "server.backup": "Create backup", "server.restore": "Restore backup", "server.cleanup": "Remove OVPN from server", "server.logs": "View logs",
 	"server.set-xray-version": "Change Xray version", "server.set-reality-target": "Change connection destination", "server.set-reality-min-client-version": "Set client compatibility",
 	"server.profile.list": "Connection methods", "server.profile.enable": "Enable connection method", "server.profile.disable": "Disable connection method", "server.profile.switch": "Choose default connection method",
-	"server.backend.attach": "Add backup route", "server.backend.detach": "Remove backup route", "server.backend.list": "Backup routes",
+	"server.backend.attach": "Add backend", "server.backend.detach": "Remove backend", "server.backend.list": "Backend pool",
 	"server.monitor.up": "Enable server monitoring", "server.monitor.down": "Stop server monitoring", "server.monitor.status": "Monitoring status", "server.monitor.telegram-setup": "Set up Telegram alerts",
 	"deploy": "Apply server configuration", "restart": "Restart services", "doctor": "Find connection problems", "config.render": "Preview server configuration", "config.validate": "Validate configuration", "stats": "Traffic totals", "stats.user": "Daily traffic", "stats.sync": "Refresh traffic",
 	"observe.status": "Check history", "observe.run": "Start continuous checks", "observe.install": "Install diagnostic tool", "observe.tool-set": "Choose diagnostic tool", "observe.policy.add": "Add custom checks", "observe.policy.pause": "Pause custom checks", "observe.policy.rm": "Remove custom checks", "observe.once": "Run custom checks", "observe.diagnose": "Run advanced diagnostics", "version": "Application version",
@@ -54,7 +54,7 @@ func commandCatalog(root *cobra.Command) []operations.Action {
 			if title == "" {
 				title = cmd.Short
 			}
-			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "user.reconcile" || id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke", Fields: []operations.Field{}, Arguments: []operations.Field{}}
+			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "server.backend.detach" || id == "user.reconcile" || id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke", Fields: []operations.Field{}, Arguments: []operations.Field{}}
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
 				if flag.Name == "help" {
 					return

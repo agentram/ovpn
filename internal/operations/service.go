@@ -256,6 +256,15 @@ func (s *Service) execute(ctx context.Context, r record, recovering bool) {
 				return err
 			}
 
+			if r.Plan.StopOnFailure && step.State != "succeeded" {
+				for j := i + 1; j < len(r.Job.Steps); j++ {
+					r.Job.Steps[j].State, r.Job.Steps[j].Code = "blocked", "DEPENDENCY_FAILED"
+				}
+				if err := persist(); err != nil {
+					return err
+				}
+				break
+			}
 		}
 		return nil
 	}

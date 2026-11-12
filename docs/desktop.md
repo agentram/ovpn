@@ -40,7 +40,7 @@ Native acceptance on all three operating systems remains a release gate.
   registration and installation. Existing SSH-agent keys are supported. The
   account needs passwordless sudo. Use a supported Linux host with a domain
   pointing to it. Server details expose update, restart, logs and backups;
-  less common profile/backend actions are under **Advanced**.
+  less common actions are under **More actions**, grouped by purpose with a search field. Settings offers the complete searchable command catalog.
 - **Activity:** inspect operation progress and per-server results, check history
   and diagnostic jobs. A partial change retains completed steps. Resume
   reconciles interrupted user changes; other interrupted writes require a new
@@ -57,6 +57,24 @@ A verified backup precedes remote changes. A newly registered server is checked
 for an existing runtime before installation; an imported existing installation
 is backed up too. Do not equate a completed operation with demonstrated client
 connectivity: inspect its connection checks afterwards.
+
+## High availability
+
+In **Add server**, choose an entry server with backend failover and select
+existing REALITY VPN servers. The wizard reviews the pool before installation.
+Existing proxy cards show the entry, attached backends, routing preset and
+HAProxy TCP health collected from that entry. These readings are separate from
+user HTTPS access checks. A single backend is a warning; the proxy itself
+remains a single point of failure.
+
+**Apply HA configuration** reviews and backs up affected nodes, applies backends
+before the proxy, then verifies the pool. A failed dependency blocks later
+steps. Interrupted HA writes require a new review. Attaching or removing a
+backend edits local desired state; apply the HA configuration to deploy it.
+Old agents/configurations have unknown HA readings until updated. Pool changes
+invalidate earlier access-check evidence.
+
+See [HA topology](ha.md) for routing, rollout and failure boundaries.
 
 ## Automatic checks and live data
 

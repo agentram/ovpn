@@ -1,4 +1,5 @@
 export const actionLabels: Record<string, [string, string]> = {
+  "server.ha-apply": ["Применить HA-конфигурацию", "应用高可用配置"],
   "config.render": ["Посмотреть конфигурацию", "查看配置"],
   "config.validate": ["Проверить конфигурацию", "验证配置"],
   "observe.diagnose": ["Подробная диагностика", "高级诊断"],
@@ -10,9 +11,9 @@ export const actionLabels: Record<string, [string, string]> = {
   "observe.run": ["Запустить непрерывные проверки", "启动连续检查"],
   "observe.status": ["История проверок", "检查历史"],
   "observe.tool-set": ["Выбрать инструмент проверки", "选择诊断工具"],
-  "server.backend.attach": ["Добавить резервный маршрут", "添加备用路由"],
-  "server.backend.detach": ["Убрать резервный маршрут", "删除备用路由"],
-  "server.backend.list": ["Резервные маршруты", "备用路由"],
+  "server.backend.attach": ["Добавить сервер в пул", "添加后端"],
+  "server.backend.detach": ["Убрать сервер из пула", "移除后端"],
+  "server.backend.list": ["Пул серверов", "后端池"],
   "server.inspect": ["Проверить адрес сервера", "检查服务器地址"],
   "server.list": ["Список серверов", "服务器列表"],
   "server.monitor.down": ["Отключить мониторинг сервера", "停止服务器监控"],

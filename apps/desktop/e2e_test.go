@@ -73,6 +73,13 @@ func TestDeskBrowserJourneys(t *testing.T) {
 		}
 		_ = json.NewEncoder(w).Encode(value)
 	})
+	mux.HandleFunc("POST /fixture/add-ha", func(w http.ResponseWriter, r *http.Request) {
+		if err := exec.CommandContext(r.Context(), fixture, "ha-workspace", dir).Run(); err != nil {
+			http.Error(w, "fixture update failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("POST /fixture/disable-alice", func(w http.ResponseWriter, r *http.Request) {
 		if err := exec.CommandContext(r.Context(), fixture, "disable-alice", dir).Run(); err != nil {
 			http.Error(w, "fixture update failed", http.StatusInternalServerError)

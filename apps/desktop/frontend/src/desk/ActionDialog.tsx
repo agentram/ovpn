@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { uiCopy } from "./uiCopy";
 import { backend } from "../api";
 import type { Server, User } from "../api";
 import { desk } from "./api";
@@ -89,7 +90,8 @@ export function ActionDialog({
   }, [trafficAction, selectedServer?.id]);
   const title = actionName(action.id, action.title, language);
   const terminal = job && !["queued", "running"].includes(job.state);
-  const word = values.username || args[0] || values.name || title;
+  const word =
+    values.username || values.backend || args[0] || values.name || title;
   useEffect(() => {
     ref.current?.showModal();
     return () => ref.current?.close();
@@ -227,11 +229,21 @@ export function ActionDialog({
             onChange={(event) => change(event.target.value)}
           >
             <option value="">{t.choose}</option>
-            {servers.map((server) => (
-              <option key={server.id} value={server.name}>
-                {server.name}
-              </option>
-            ))}
+            {servers
+              .filter((server) =>
+                field.name === "proxy"
+                  ? server.role === "proxy"
+                  : field.name === "backend"
+                    ? server.role === "vpn" &&
+                      server.enabled &&
+                      server.profiles.includes("vless-reality-tcp-vision")
+                    : true,
+              )
+              .map((server) => (
+                <option key={server.id} value={server.name}>
+                  {server.name}
+                </option>
+              ))}
           </select>
         </label>
       );
@@ -413,6 +425,7 @@ export function ActionDialog({
         <>
           <div className="desk-form">
             <p>{t.reviewHint}</p>
+            {plan.stopOnFailure && <p>{uiCopy(language).haApplyHint}</p>}
             {action.id === "user.add" && !Number(values["quota-bytes"]) && (
               <p>
                 {t.limit}: {t.inherited}
@@ -516,10 +529,10 @@ export function ActionDialog({
               {job?.steps.map((step) => (
                 <li key={step.target.id}>
                   <span
-                    className={`status-dot ${step.state === "succeeded" ? "ok" : step.code ? "danger" : "warn"}`}
+                    className={`status-dot ${step.state === "succeeded" ? "ok" : step.state === "blocked" ? "neutral" : step.code ? "danger" : "warn"}`}
                   />
                   <strong>{step.target.name}</strong>
-                  <span>{operationLabel(step.state, language)}</span>
+                  <span>{operationLabel(step.state, language, step.code)}</span>
                   {step.code && (
                     <details>
                       <summary>{t.details}</summary>
