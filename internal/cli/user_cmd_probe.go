@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,13 +37,13 @@ func (a *App) newUserProbeCmd() *cobra.Command {
 				return checkErr
 			}
 			if jsonOutput {
-				if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+				if err := json.NewEncoder(a.output()).Encode(result); err != nil {
 					return err
 				}
 			} else if result.Success {
-				fmt.Printf("traffic probe passed: HTTP %d, %d bytes, %d ms (TTFB %d ms)\n", result.StatusCode, result.Bytes, result.DurationMS, result.TTFBMS)
+				fmt.Fprintf(a.output(), "traffic probe passed: HTTP %d, %d bytes, %d ms (TTFB %d ms)\n", result.StatusCode, result.Bytes, result.DurationMS, result.TTFBMS)
 			} else {
-				fmt.Printf("traffic probe failed: %s (%d ms)\n", result.ErrorCode, result.DurationMS)
+				fmt.Fprintf(a.output(), "traffic probe failed: %s (%d ms)\n", result.ErrorCode, result.DurationMS)
 			}
 			return checkErr
 		},

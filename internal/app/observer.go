@@ -9,23 +9,35 @@ import (
 
 	"ovpn/internal/app/dto"
 	"ovpn/internal/clientprofile"
+	"ovpn/internal/deskmonitor"
 	"ovpn/internal/integrations"
 	"ovpn/internal/model"
 	"ovpn/internal/observer"
+	"ovpn/internal/operations"
 	"ovpn/internal/store/local"
 )
 
 type DesktopService struct {
 	ReadService
-	observer *observer.Controller
+	observer  *observer.Controller
+	control   *operations.Service
+	monitor   *deskmonitor.Controller
+	telemetry TelemetrySource
 }
 
 func NewDesktopService(ctx context.Context, dataDir string) *DesktopService {
 	s := &DesktopService{ReadService: ReadService{DataDir: dataDir}}
 	s.observer = observer.New(ctx, dataDir, s.prepareObservation)
+	s.monitor = deskmonitor.New(ctx, dataDir, deskSource{service: s})
 	return s
 }
-func (s *DesktopService) Close() error { return s.observer.Stop() }
+func (s *DesktopService) Close() error {
+	s.monitor.Close()
+	if s.control != nil {
+		s.control.Close()
+	}
+	return s.observer.Stop()
+}
 
 func (s ReadService) prepareObservation(ctx context.Context, target dto.ObservationTarget, engine string) (integrations.Input, error) {
 	id, err := serverID(target.ServerID)

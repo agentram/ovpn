@@ -48,7 +48,7 @@ func (s *Store) InventorySummary(ctx context.Context) (servers, enabled, users i
 
 // ListServerInventory projects only non-credential columns and supports keyset paging.
 func (s *Store) ListServerInventory(ctx context.Context, after int64, limit int) ([]model.Server, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,role,enabled,primary_profile,enabled_profiles,xray_version
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,role,enabled,primary_profile,enabled_profiles,xray_version,proxy_preset
 		FROM servers WHERE id>? ORDER BY id LIMIT ?`, after, limit)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (s *Store) ListServerInventory(ctx context.Context, after int64, limit int)
 	for rows.Next() {
 		var srv model.Server
 		var enabled int
-		if err := rows.Scan(&srv.ID, &srv.Name, &srv.Role, &enabled, &srv.PrimaryProfile, &srv.EnabledProfiles, &srv.XrayVersion); err != nil {
+		if err := rows.Scan(&srv.ID, &srv.Name, &srv.Role, &enabled, &srv.PrimaryProfile, &srv.EnabledProfiles, &srv.XrayVersion, &srv.ProxyPreset); err != nil {
 			return nil, err
 		}
 		srv.Enabled = enabled == 1

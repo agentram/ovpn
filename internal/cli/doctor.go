@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func (a *App) doctorCmd() *cobra.Command {
 			}
 			report, err := a.runDoctor(args[0], opts)
 			verboseOutput := a.verbose || a.debug || strings.EqualFold(a.logLevel, "debug")
-			if printErr := printDoctorReport(report, opts.jsonOutput, verboseOutput); printErr != nil {
+			if printErr := printDoctorReport(report, opts.jsonOutput, verboseOutput, a.output()); printErr != nil {
 				return printErr
 			}
 			if err != nil {
@@ -182,16 +183,18 @@ func (a *App) checkProxyTopology(srv model.Server) doctor.Check {
 }
 
 // printDoctorReport writes the diagnostics report as JSON or human-readable text.
-func printDoctorReport(report doctor.Report, jsonOutput, verbose bool) error {
+func printDoctorReport(report doctor.Report, jsonOutput, verbose bool, writers ...io.Writer) error {
+	out := outputOrDefault(writers)
+
 	if jsonOutput {
 		raw, err := report.JSON()
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(raw))
+		fmt.Fprintln(out, string(raw))
 		return nil
 	}
-	fmt.Print(doctor.FormatHuman(report, verbose))
+	fmt.Fprint(out, doctor.FormatHuman(report, verbose))
 	return nil
 }
 

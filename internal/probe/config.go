@@ -3,6 +3,7 @@ package probe
 import (
 	"context"
 	"ovpn/internal/clientcfg"
+	"ovpn/internal/probequeue"
 
 	"github.com/xtls/xray-core/core"
 )
@@ -15,6 +16,11 @@ func CheckConfig(ctx context.Context, config clientcfg.Config, opts Options) (Re
 	}
 	ctx, cancel := context.WithTimeout(ctx, opts.Timeout)
 	defer cancel()
+	release, err := probequeue.Shared.Acquire(ctx, config)
+	if err != nil {
+		return Result{}, err
+	}
+	defer release()
 	tunnel, err := Open(ctx, config)
 	if err != nil {
 		return Result{}, err

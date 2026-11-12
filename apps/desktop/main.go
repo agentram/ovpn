@@ -23,6 +23,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed assets/icon.png
+var icon []byte
+
 var workerSHA256 string
 
 type DeskService struct {
@@ -41,6 +44,7 @@ func (s *DeskService) ServiceShutdown() error {
 	defer s.mu.Unlock()
 	if s.worker != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = s.worker.DeskPause(ctx)
 		_ = s.worker.ObserverAction(ctx, "stop", "")
 		cancel()
 		s.worker.Close()
@@ -196,7 +200,11 @@ func (s *DeskService) IntegrationSetup(ctx context.Context, p dto.ToolSetup) (dt
 
 func main() {
 	_ = os.Unsetenv("FRONTEND_DEVSERVER_URL")
-	dataDir := flag.String("data-dir", util.DefaultDataDir(), "Existing OVPN workspace")
+	defaultDir := os.Getenv("OVPN_DESK_DATA_DIR")
+	if defaultDir == "" {
+		defaultDir = util.DefaultDataDir()
+	}
+	dataDir := flag.String("data-dir", defaultDir, "Existing OVPN workspace")
 	flag.Parse()
 	executable, err := os.Executable()
 	if err != nil {
@@ -212,7 +220,7 @@ func main() {
 		os.Exit(1)
 	}
 	app := application.New(application.Options{
-		Name: "OVPN Desk", Description: "Local Xray fleet management",
+		Name: "OVPN Desk", Icon: icon, Description: "Local Xray fleet management",
 		Services: []application.Service{application.NewService(service)},
 		Assets:   application.AssetOptions{Handler: application.BundledAssetFileServer(frontend), DisableLogging: true},
 		Logger:   slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),

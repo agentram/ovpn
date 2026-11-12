@@ -187,6 +187,7 @@ func RenderServerJSON(spec Spec) ([]byte, error) {
 				"0": map[string]any{
 					"statsUserUplink":   true,
 					"statsUserDownlink": true,
+					"statsUserOnline":   true,
 				},
 			},
 			"system": map[string]any{

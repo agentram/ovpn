@@ -127,6 +127,13 @@ func realityParityDiff(base model.Server, srv model.Server, includeProxyServiceU
 // resolveUserMutationServers resolves target servers for mutating user operations.
 // Users are always distributed across all enabled servers.
 func (a *App) resolveUserMutationServers() ([]model.Server, error) {
+	if a.operationTarget != 0 {
+		srv, err := a.store.GetServerByID(a.ctx, a.operationTarget)
+		if err != nil {
+			return nil, err
+		}
+		return []model.Server{*srv}, nil
+	}
 	servers, err := a.listEnabledServers()
 	if err != nil {
 		return nil, err

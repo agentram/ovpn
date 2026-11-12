@@ -189,16 +189,17 @@ func main() {
 
 	mux := http.NewServeMux()
 	registerHTTPRoutes(ctx, mux, routeDeps{
-		store:       store,
-		collector:   collector,
-		quota:       quotaEnforcer,
-		expiry:      expiryEnforcer,
-		runtime:     runtime,
-		metrics:     metrics,
-		logger:      logger,
-		xrayAPI:     xrayAPI,
-		dbPath:      dbPath,
-		refreshOnce: refreshMetrics,
+		haMetricsURL: strings.TrimSpace(os.Getenv("OVPN_HAPROXY_METRICS_URL")),
+		store:        store,
+		collector:    collector,
+		quota:        quotaEnforcer,
+		expiry:       expiryEnforcer,
+		runtime:      runtime,
+		metrics:      metrics,
+		logger:       logger,
+		xrayAPI:      xrayAPI,
+		dbPath:       dbPath,
+		refreshOnce:  refreshMetrics,
 	})
 
 	srv := &http.Server{

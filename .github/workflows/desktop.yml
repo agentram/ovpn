@@ -1,0 +1,95 @@
+name: Desk packages
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Desk ${{ matrix.target }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin
+            arch: arm64
+          - runner: macos-15-intel
+            target: darwin
+            arch: amd64
+          - runner: windows-2025
+            target: windows
+            arch: amd64
+          - runner: ubuntu-24.04
+            target: linux
+            arch: amd64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            apps/desktop/go.sum
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/desktop/frontend/package-lock.json
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: Frontend checks
+        working-directory: apps/desktop/frontend
+        run: |
+          npm ci --ignore-scripts --no-fund --no-audit
+          npm test
+          npm run build
+      - name: Build matching worker and native application
+        run: python3 scripts/build_desktop.py --target ${{ matrix.target }} --arch ${{ matrix.arch }} --skip-frontend
+      - name: Desktop host checks
+        env:
+          CGO_ENABLED: ${{ runner.os == 'Windows' && '0' || '1' }}
+        run: |
+          go -C apps/desktop vet ./...
+          go -C apps/desktop test ./...
+          go test -run '^(TestWorkspacePathRoundTrip|TestObservationPathRoundTrip|TestVersionDoesNotOpenWorkspace)$' ./internal/store/local ./internal/observation ./internal/cli
+      - name: Scan desktop dependencies
+        working-directory: apps/desktop
+        env:
+          CGO_ENABLED: ${{ runner.os == 'Windows' && '0' || '1' }}
+          GOTOOLCHAIN: local
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - name: Package and verify distribution
+        id: package
+        run: python3 scripts/package_desktop.py --target ${{ matrix.target }} --arch ${{ matrix.arch }} --github-output "$GITHUB_OUTPUT"
+        shell: bash
+      - name: Upload application archive
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          overwrite: true
+      - name: Download instructions
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+        shell: bash
+        run: |
+          {
+            echo "### OVPN Desk"
+            printf '[Download %s](%s)\n\n' "$PACKAGE_NAME" "$ARTIFACT_URL"
+            echo 'The archive includes the matching worker, build metadata and checksums.'
+            echo 'Development build; public installers and distribution signing remain separate.'
+          } >> "$GITHUB_STEP_SUMMARY"

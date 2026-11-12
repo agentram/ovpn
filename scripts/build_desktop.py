@@ -2,9 +2,11 @@
 """Build the development desktop and its matching, verified CLI worker."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 
@@ -44,7 +46,15 @@ app = exedir/('ovpn-desk'+suffix)
 pin = '-s -w -X ovpn/internal/version.pinnedVersion='+version
 if args.target == 'darwin':
     pin += ' -extldflags=-mmacosx-version-min=13.0'
-run(['go','build','-trimpath','-ldflags',pin,'-o',str(worker),'./cmd/ovpn'],env=env)
+# Build matching server-side binaries; the packaged Desk never requires Go sources.
+for server_arch in ['amd64', 'arm64']:
+    asset_dir = root/'internal/runtimeassets/assets'/('linux_'+server_arch)
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    server_env = dict(os.environ, GOOS='linux', GOARCH=server_arch, CGO_ENABLED='0')
+    for component in ['ovpn-agent', 'ovpn-telegram-bot']:
+        run(['go','build','-trimpath','-ldflags','-s -w -X ovpn/internal/version.pinnedVersion='+version,
+             '-o',str(asset_dir/component),'./cmd/'+component],env=server_env)
+run(['go','build','-trimpath','-tags','runtimeassets','-ldflags',pin,'-o',str(worker),'./cmd/ovpn'],env=env)
 if args.target == 'darwin':
     if sys.platform != 'darwin':
         raise SystemExit('Build the macOS desktop on a native macOS host.')
@@ -52,7 +62,10 @@ if args.target == 'darwin':
 digest = hashlib.sha256(worker.read_bytes()).hexdigest()
 run(['go','build','-trimpath','-tags','production','-ldflags',pin+' -X main.workerSHA256='+digest,'-o',str(app),'.'],cwd=root/'apps/desktop',env=env)
 if args.target == 'darwin':
-    info = {'CFBundleName':'OVPN Desk','CFBundleDisplayName':'OVPN Desk','CFBundleIdentifier':'io.github.agentram.ovpn.desk','CFBundleExecutable':'ovpn-desk','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':version,'NSHighResolutionCapable':True,'LSMinimumSystemVersion':'13.0'}
+    resources=bundle/'Contents/Resources'
+    resources.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(root/'apps/desktop/assets/icon.icns',resources/'OVPN.icns')
+    info = {'CFBundleIconFile':'OVPN.icns','CFBundleName':'OVPN Desk','CFBundleDisplayName':'OVPN Desk','CFBundleIdentifier':'io.github.agentram.ovpn.desk','CFBundleExecutable':'ovpn-desk','CFBundlePackageType':'APPL','CFBundleShortVersionString':version,'CFBundleVersion':version,'NSHighResolutionCapable':True,'LSMinimumSystemVersion':'13.0'}
     with (bundle/'Contents/Info.plist').open('wb') as f:
         plistlib.dump(info,f)
     run(['codesign','--force','--sign','-',str(bundle)])
@@ -60,3 +73,14 @@ if args.target == 'darwin':
     print('Development app: bin/desktop/darwin/OVPN Desk.app (ad-hoc signed; not notarized)')
 else:
     print('Development binaries: bin/desktop/'+args.target+' (native runtime and packaging still require validation)')
+
+# The record binds the product version to the final binary pair.
+record = {
+    'version': version,
+    'sourceCommit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
+    'os': args.target,
+    'arch': subprocess.check_output(['go','env','GOARCH'],cwd=root,env=env,text=True).strip(),
+    'appSHA256': hashlib.sha256(app.read_bytes()).hexdigest(),
+    'workerSHA256': hashlib.sha256(worker.read_bytes()).hexdigest(),
+}
+(out/'build-desktop.json').write_text(json.dumps(record,indent=2)+'\n')

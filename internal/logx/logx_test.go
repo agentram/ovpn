@@ -85,3 +85,13 @@ func TestReplaceSensitiveAttrRedactsInlineJSONSecrets(t *testing.T) {
 		t.Fatalf("expected smtp_password JSON redaction, got %q", got)
 	}
 }
+
+func TestDiagnosticOutputMasksEnvironmentTokensAndUserIdentities(t *testing.T) {
+	raw := `OVPN_AGENT_TOKEN=private-fixture-value user=alice@example.test source=[2001:db8::1] address=192.0.2.1 uuid=11111111-1111-4111-8111-111111111111`
+	clean := Sanitize(raw)
+	for _, private := range []string{"private-fixture-value", "alice@example.test", "2001:db8::1", "192.0.2.1", "11111111-1111"} {
+		if strings.Contains(clean, private) {
+			t.Fatal("diagnostic output retained private material")
+		}
+	}
+}

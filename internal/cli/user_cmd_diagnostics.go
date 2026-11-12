@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	neturl "net/url"
 	"strings"
 	"time"
@@ -45,10 +46,10 @@ func (a *App) newUserDiagnoseCmd() *cobra.Command {
 			}
 			if opts.jsonOut {
 				raw, _ := json.MarshalIndent(resp, "", "  ")
-				fmt.Println(string(raw))
+				fmt.Fprintln(a.output(), string(raw))
 				return nil
 			}
-			printUserDiagnostics(resp)
+			printUserDiagnostics(resp, a.output())
 			return nil
 		},
 	}
@@ -97,7 +98,7 @@ func (a *App) newUserDebugStartCmd() *cobra.Command {
 				Session model.ConnectionDebugSession `json:"session"`
 			}
 			_ = json.Unmarshal(body, &out)
-			fmt.Printf("debug started for %s until %s\n", user.Username, out.Session.ExpiresAt.UTC().Format(time.RFC3339))
+			fmt.Fprintf(a.output(), "debug started for %s until %s\n", user.Username, out.Session.ExpiresAt.UTC().Format(time.RFC3339))
 			return nil
 		},
 	}
@@ -137,14 +138,14 @@ func (a *App) newUserDebugListCmd() *cobra.Command {
 			}
 			if opts.jsonOut {
 				raw, _ := json.MarshalIndent(resp, "", "  ")
-				fmt.Println(string(raw))
+				fmt.Fprintln(a.output(), string(raw))
 				return nil
 			}
 			users, err := a.store.ListUsers(a.ctx, srv.ID)
 			if err != nil {
 				return err
 			}
-			printDebugSessions(resp, users)
+			printDebugSessions(resp, users, a.output())
 			return nil
 		},
 	}
@@ -185,10 +186,10 @@ func (a *App) newUserDebugShowCmd() *cobra.Command {
 			}
 			if opts.jsonOut {
 				raw, _ := json.MarshalIndent(resp, "", "  ")
-				fmt.Println(string(raw))
+				fmt.Fprintln(a.output(), string(raw))
 				return nil
 			}
-			printDebugEvents(resp)
+			printDebugEvents(resp, a.output())
 			return nil
 		},
 	}
@@ -218,7 +219,7 @@ func (a *App) newUserDebugStopCmd() *cobra.Command {
 			if _, err := a.fetchRemoteAgent(*srv, "POST", a.agentURL("/diagnostics/debug/stop"), map[string]string{"email": user.Email}); err != nil {
 				return err
 			}
-			fmt.Printf("debug stopped for %s\n", user.Username)
+			fmt.Fprintf(a.output(), "debug stopped for %s\n", user.Username)
 			return nil
 		},
 	}
@@ -249,59 +250,65 @@ func (a *App) resolveUserOnServer(serverName string, username string) (*model.Se
 	return srv, *user, nil
 }
 
-func printUserDiagnostics(resp model.UserDiagnosticsResponse) {
-	fmt.Printf("user: %s (%s)\n", firstNonEmpty(resp.Username, "-"), resp.Email)
+func printUserDiagnostics(resp model.UserDiagnosticsResponse, writers ...io.Writer) {
+	out := outputOrDefault(writers)
+
+	fmt.Fprintf(out, "user: %s (%s)\n", firstNonEmpty(resp.Username, "-"), resp.Email)
 	if resp.User != nil {
-		fmt.Printf("enabled: %v effective: %v expired: %v quota_blocked: %v\n",
+		fmt.Fprintf(out, "enabled: %v effective: %v expired: %v quota_blocked: %v\n",
 			resp.User.Enabled, resp.User.EffectiveEnabled, resp.User.Expired, resp.User.BlockedByQuota)
 		if resp.User.Window30DQuotaByte > 0 {
-			fmt.Printf("quota: %.1f%% (%s / %s)\n",
+			fmt.Fprintf(out, "quota: %.1f%% (%s / %s)\n",
 				quotaPercent(resp.User.Window30DUsageByte, resp.User.Window30DQuotaByte),
 				formatBytes(resp.User.Window30DUsageByte),
 				formatBytes(resp.User.Window30DQuotaByte),
 			)
 		}
 	}
-	fmt.Println("traffic:")
-	fmt.Println(renderTrafficWindowsTable(resp.TrafficWindows))
+	fmt.Fprintln(out, "traffic:")
+	fmt.Fprintln(out, renderTrafficWindowsTable(resp.TrafficWindows))
 	conn := resp.Connections
 	lastSeen := "never"
 	if conn.LastSeenAt != nil {
 		lastSeen = conn.LastSeenAt.UTC().Format(time.RFC3339)
 	}
-	fmt.Println("connections:")
-	fmt.Println(renderConnectionSummaryTable(conn, lastSeen))
+	fmt.Fprintln(out, "connections:")
+	fmt.Fprintln(out, renderConnectionSummaryTable(conn, lastSeen))
 	if len(conn.TopPorts) > 0 {
-		fmt.Println("top ports:")
-		fmt.Println(renderConnectionPortsTable(conn.TopPorts))
+		fmt.Fprintln(out, "top ports:")
+		fmt.Fprintln(out, renderConnectionPortsTable(conn.TopPorts))
 	}
 	if conn.DebugActive && conn.DebugExpiresAt != nil {
-		fmt.Printf("  debug_active=true debug_expires_at=%s\n", conn.DebugExpiresAt.UTC().Format(time.RFC3339))
+		fmt.Fprintf(out, "  debug_active=true debug_expires_at=%s\n", conn.DebugExpiresAt.UTC().Format(time.RFC3339))
 	}
 	for _, hint := range resp.Hints {
-		fmt.Println("hint: " + hint)
+		fmt.Fprintln(out, "hint: "+hint)
 	}
 }
 
-func printDebugEvents(resp model.ConnectionDebugEventsResponse) {
+func printDebugEvents(resp model.ConnectionDebugEventsResponse, writers ...io.Writer) {
+	out := outputOrDefault(writers)
+
 	if len(resp.Events) == 0 {
-		fmt.Println("no debug events")
+		fmt.Fprintln(out, "no debug events")
 		return
 	}
-	fmt.Println(renderDebugEventsTable(resp.Events))
+	fmt.Fprintln(out, renderDebugEventsTable(resp.Events))
 }
 
-func printDebugSessions(resp model.ConnectionDebugSessionsResponse, users []model.User) {
+func printDebugSessions(resp model.ConnectionDebugSessionsResponse, users []model.User, writers ...io.Writer) {
+	out := outputOrDefault(writers)
+
 	if len(resp.Sessions) == 0 {
-		fmt.Println("no active debug sessions")
+		fmt.Fprintln(out, "no active debug sessions")
 		return
 	}
 	usernames := make(map[string]string, len(users))
 	for _, user := range users {
 		usernames[user.Email] = user.Username
 	}
-	fmt.Println("active debug sessions:")
-	fmt.Println(renderDebugSessionsTable(resp.Sessions, usernames))
+	fmt.Fprintln(out, "active debug sessions:")
+	fmt.Fprintln(out, renderDebugSessionsTable(resp.Sessions, usernames))
 }
 
 func renderTrafficWindowsTable(rows []model.TrafficWindow) string {

@@ -14,6 +14,7 @@ jobs:
     outputs:
       cli: ${{ steps.select.outputs.cli }}
       desktop: ${{ steps.select.outputs.desktop }}
+      desktop_package: ${{ steps.select.outputs.desktop_package }}
       android: ${{ steps.select.outputs.android }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -24,10 +25,11 @@ jobs:
         id: select
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           python3 -B tests/e2e/changes.py --test
+          python3 -B scripts/test_package_desktop.py
           python3 -B tests/e2e/changes.py --event "$EVENT" --base "$BASE" --head "$HEAD" --output "$GITHUB_OUTPUT"
 
   cli:
@@ -43,7 +45,9 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: go.mod
-      - run: make e2e-tools
+      - run: |
+          make e2e-tools
+          make e2e-ha
 
   desktop:
     name: Desk operator journeys
@@ -72,6 +76,12 @@ jobs:
           npm ci --ignore-scripts --no-fund --no-audit
           npx --no-install playwright install chromium
       - run: make e2e-desktop
+
+  desktop-native:
+    name: Desk packages
+    needs: changes
+    if: needs.changes.outputs.desktop_package == 'true'
+    uses: ./.github/workflows/desktop.yml
 
   android:
     name: O Tunnel emulator journeys
@@ -121,7 +131,7 @@ jobs:
 
   result:
     name: E2E result
-    needs: [changes, cli, desktop, android]
+    needs: [changes, cli, desktop, desktop-native, android]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -129,9 +139,11 @@ jobs:
       SELECTION: ${{ needs.changes.result }}
       CLI: ${{ needs.cli.result }}
       DESKTOP: ${{ needs.desktop.result }}
+      NATIVE: ${{ needs.desktop-native.result }}
       ANDROID: ${{ needs.android.result }}
       RUN_CLI: ${{ needs.changes.outputs.cli }}
       RUN_DESKTOP: ${{ needs.changes.outputs.desktop }}
+      RUN_PACKAGE: ${{ needs.changes.outputs.desktop_package }}
       RUN_ANDROID: ${{ needs.changes.outputs.android }}
     steps:
       - name: Require every selected suite to pass
@@ -147,5 +159,6 @@ jobs:
           failed=0
           verify CLI "$RUN_CLI" "$CLI" || failed=1
           verify Desk "$RUN_DESKTOP" "$DESKTOP" || failed=1
+          verify Packages "$RUN_PACKAGE" "$NATIVE" || failed=1
           verify Android "$RUN_ANDROID" "$ANDROID" || failed=1
           exit "$failed"

@@ -1,10 +1,16 @@
 # Desktop architecture
 
-Status: target architecture. The [first development slice](../../desktop.md) implements a read-only host/worker, server/user inventory and explicit HTTPS checks. See the [complete product plan](application-plan.md) and [observation/integration design](monitoring-and-integrations.md) for the expanded application. Operation plans, journal, write locks, OS vault and checker supervision below remain proposed. The static prototype and operation examples are design artifacts.
+Status: design reference. The current [operator guide](../../desktop.md)
+describes Desk 1.13: typed worker methods, operation plans/journal, writer locks,
+Checker/Knife supervision, telemetry and HA-aware application are implemented.
+Some sections below remain target design, including OS vault integration and
+tray/service lifetime. Registered Cobra callbacks remain composition adapters;
+extracting their remaining domain logic is still in progress. Native platform
+acceptance and the usability pilot remain release gates.
 
 ## 1. Runtime choice
 
-Choose **Wails 3 + React + TypeScript**, with a native Go host and the existing OVPN executable as a typed local worker. Evaluate stable `v3.1.0` in the platform spike; do not track nightly builds. The first macOS host is built and exercised with the local worker; native Windows/Linux packaging remains unverified.
+Choose **Wails 3 + React + TypeScript**, with a native Go host and the existing OVPN executable as a typed local worker. Evaluate stable `v3.1.0` in the platform spike; do not track nightly builds. Development macOS and Windows binaries are built; full native acceptance on every target remains open.
 
 [Wails v3.1.0](https://github.com/wailsapp/wails/releases/tag/v3.1.0) provides a current desktop baseline. Its [installation requirements](https://v3.wails.io/quick-start/installation/) include platform WebViews and native build dependencies. Do not turn vendor size or memory comparisons into OVPN performance claims: embedded Xray changes the application's footprint.
 
@@ -22,7 +28,7 @@ Use the stable native backend initially. Experimental rendering backends and mob
 ```mermaid
 flowchart TD
   UI[React UI: redacted view models] --> HOST[Wails Go host: narrow typed bridge]
-  HOST -->|bounded JSON lines over stdio| WORKER[ovpn machine worker: proposed]
+  HOST -->|bounded JSON lines over stdio| WORKER[ovpn machine worker]
   CLI[Existing Cobra CLI] --> APP[Shared Go application services]
   WORKER --> APP
   APP --> DB[Existing SQLite control state]
@@ -42,7 +48,7 @@ The UI never opens SQLite, runs a shell or constructs deployment scripts. Do not
 Proposed layout:
 
 ```text
-cmd/ovpn/                       existing CLI + proposed machine entry point
+cmd/ovpn/                       existing CLI + machine entry point
 internal/app/                   use cases and ports, independent of Cobra/Wails
 internal/operations/            plan, journal, locks and recovery
 internal/machine/               versioned JSON-lines transport
@@ -57,7 +63,7 @@ Closing a window leaves an explicitly enabled tray operation running. Quitting, 
 
 ## 3. Machine and application contracts
 
-`machine-api.json` includes **target wire examples**, not a JSON Schema. The implemented worker invocation is `ovpn machine --stdio --protocol 1`; see the development guide for the implemented read-only subset. Operation examples below remain future work.
+`machine-api.json` includes **target wire examples**, not a JSON Schema. The implemented worker invocation is `ovpn machine --stdio --protocol 1`; see the operator guide for the implemented inventory, operations and monitoring methods. The examples below also include target design.
 
 - Stdout contains protocol envelopes only; stderr contains bounded, redacted diagnostics.
 - Query methods: `engine.hello`, `workspace.summary`, `servers.list`, `operations.get`. Explicit traffic action: `checks.run`. Write flow: `operations.plan`, `operations.start`, `operations.cancel`; subscription publication/rotation/revocation are operation kinds rather than unplanned write methods.

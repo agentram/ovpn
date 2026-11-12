@@ -80,3 +80,7 @@ e2e-android-build:
 
 e2e-android:
 	python3 -B tests/e2e/run.py android
+
+.PHONY: e2e-ha
+e2e-ha:
+	OVPN_E2E_HA=1 go test -v -count=1 -run '^TestHAProxyFailover$$' ./internal/deploy

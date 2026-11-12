@@ -11,10 +11,13 @@ import (
 // versionCmd prints the pinned CLI version.
 func (a *App) versionCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "version",
-		Short: "Print pinned ovpn version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(version.Current())
+		Use:         "version",
+		Args:        cobra.NoArgs,
+		Annotations: map[string]string{"ovpn.local-state": "none"},
+		Short:       "Print pinned ovpn version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintln(a.output(), version.Current())
+			return nil
 		},
 	}
 }

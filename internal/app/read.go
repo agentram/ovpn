@@ -83,7 +83,17 @@ func (s ReadService) Servers(ctx context.Context, cursor string, limit int) (dto
 		servers = servers[:limit]
 	}
 	for _, srv := range servers {
-		result.Items = append(result.Items, dto.Server{ID: "node-" + strconv.FormatInt(srv.ID, 10), Name: srv.Name,
+		backends := []dto.Backend{}
+		if srv.IsProxy() {
+			links, e := st.ListProxyBackends(ctx, srv.ID)
+			if e != nil {
+				return dto.ServerPage{}, &Error{Code: "WORKSPACE_UNAVAILABLE"}
+			}
+			for _, link := range links {
+				backends = append(backends, dto.Backend{ServerID: "node-" + strconv.FormatInt(link.BackendServerID, 10), Enabled: link.Enabled, Priority: link.Priority})
+			}
+		}
+		result.Items = append(result.Items, dto.Server{Backends: backends, ProxyPreset: srv.ProxyPreset, ID: "node-" + strconv.FormatInt(srv.ID, 10), Name: srv.Name,
 			Role: srv.NormalizedRole(), Enabled: srv.Enabled, PrimaryProfile: srv.NormalizedPrimaryProfile(),
 			Profiles: srv.NormalizedEnabledProfiles(), XrayVersion: srv.XrayVersion, Runtime: "not_checked"})
 	}

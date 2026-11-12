@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"net/url"
 	"os"
 	"path/filepath"
 	"time"
 
 	"ovpn/internal/app/dto"
+	"ovpn/internal/util"
 
 	_ "modernc.org/sqlite"
 )
@@ -51,7 +51,7 @@ func Open(dataDir string, write bool) (*Store, error) {
 			return nil, err
 		}
 	}
-	u := url.URL{Scheme: "file", Path: path}
+	u := util.FileURL(path)
 	q := u.Query()
 	q.Add("_pragma", "busy_timeout(3000)")
 	if !write {

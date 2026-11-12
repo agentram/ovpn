@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
@@ -19,13 +20,15 @@ func cleanupRemoveBackupsEffective(keepBackups, removeBackups bool) bool {
 }
 
 // validateCleanupConfirm requires the explicit confirmation token for destructive cleanup unless this is a dry run.
-func validateCleanupConfirm(confirm string, dryRun bool) error {
+func validateCleanupConfirm(confirm string, dryRun bool, writers ...io.Writer) error {
+	out := outputOrDefault(writers)
+
 	confirm = strings.TrimSpace(confirm)
 	if confirm == "CLEANUP" {
 		return nil
 	}
 	if dryRun {
-		fmt.Println("dry-run: --confirm CLEANUP is not required for preview mode")
+		fmt.Fprintln(out, "dry-run: --confirm CLEANUP is not required for preview mode")
 		return nil
 	}
 	return errors.New("refusing destructive cleanup without explicit confirmation; pass --confirm CLEANUP")
