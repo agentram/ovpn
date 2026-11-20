@@ -18,8 +18,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -46,6 +48,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -54,6 +58,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -93,11 +98,16 @@ internal fun TunnelScreen(
 
     var qr by remember { mutableStateOf(false) }
     var report by remember { mutableStateOf<String?>(null) }
+    val scroll = rememberLazyListState()
+    LaunchedEffect(page, work.issue, work.refreshed) {
+        scroll.scrollToItem(0)
+    }
     BackHandler(page != Page.Home) { page = if (page == Page.Access) Page.Settings else Page.Home }
 
     Scaffold { insets ->
         Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
+                state = scroll,
                 modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 20.dp),
@@ -354,7 +364,15 @@ private fun ProfileCard(profile: Profile, selected: String?, canSelect: Boolean,
 private fun PasteDialog(close: () -> Unit, review: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
     val clipboard = LocalClipboard.current
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
+    fun submit(value: String) {
+        if (value.isBlank()) return
+        focus.clearFocus()
+        keyboard?.hide()
+        review(value)
+    }
     AlertDialog(
         onDismissRequest = close,
         properties = DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
@@ -365,19 +383,20 @@ private fun PasteDialog(close: () -> Unit, review: (String) -> Unit) {
                     value = text, onValueChange = { if (it.length <= 1024 * 1024) text = it },
                     modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.import_hint)) },
                     visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { submit(text) }),
                     singleLine = true,
                 )
                 TextButton(onClick = {
                     scope.launch {
                         val data = clipboard.getClipEntry()?.clipData
                         val pasted = data?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
-                        if (pasted != null) review(pasted)
+                        if (pasted != null) submit(pasted)
                     }
                 }) { Text(stringResource(R.string.paste_link)) }
             }
         },
-        confirmButton = { Button(onClick = { review(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.review)) } },
+        confirmButton = { Button(onClick = { submit(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.review)) } },
         dismissButton = { TextButton(onClick = close) { Text(stringResource(R.string.cancel)) } },
     )
 }

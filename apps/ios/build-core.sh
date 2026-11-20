@@ -40,8 +40,8 @@ overlay = work / "tun_darwin.go"
 overlay.write_text(raw.replace(old, new).replace(ownership, "ownsFd:  true,"))
 (work / "overlay.json").write_text(json.dumps({"Replace": {str(source): str(overlay)}}))
 PY
-export GOFLAGS="${GOFLAGS:+$GOFLAGS }-overlay=$work/overlay.json"
-gomobile bind -target=ios,iossimulator -iosversion=16.0 -trimpath \
+go list golang.org/x/mobile/bind >/dev/null
+gomobile bind -target=ios,iossimulator -iosversion=16.0 -trimpath -overlay="$work/overlay.json" \
     -ldflags="-s -w -checklinkname=0" -o "$work/MobileCore.xcframework" ./mobile/androidbridge
 rm -rf apps/ios/Frameworks/MobileCore.xcframework
 mv "$work/MobileCore.xcframework" apps/ios/Frameworks
