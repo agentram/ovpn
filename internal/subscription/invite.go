@@ -12,11 +12,15 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Invites stores activation records separately from the published bundles.
-type Invites struct{ root *os.Root }
+type Invites struct {
+	root      *os.Root
+	accountMu sync.Mutex
+}
 
 type invitation struct {
 	Bundle     string    `json:"bundle"`
@@ -98,11 +102,31 @@ func (s *Invites) bundle(id string, bundles *Store) (Bundle, invitation, error) 
 	return bundle, record, nil
 }
 
-func (s *Invites) redeem(bundles *Store, code, session string, now time.Time) error {
+func (s *Invites) redeem(bundles *Store, code, session, subject string, now time.Time) error {
 	if !validToken(code) || !validToken(session) || code == session {
 		return ErrNotFound
 	}
 	id := tokenHash(code)
+	if subject != "" {
+		s.accountMu.Lock()
+		defer s.accountMu.Unlock()
+		linked, err := s.read(subject + ".account")
+		if err == nil && string(linked) != id {
+			if current, _, err := s.bundle(string(linked), bundles); err == nil {
+				if _, err := Encode(current.Entries, now, "base64"); err == nil {
+					return ErrNotFound
+				}
+			}
+		}
+		if err := s.claim(bundles, id, session, subject, now); err != nil {
+			return err
+		}
+		return s.write(subject+".account", []byte(id), true)
+	}
+	return s.claim(bundles, id, session, "", now)
+}
+
+func (s *Invites) claim(bundles *Store, id, session, subject string, now time.Time) error {
 	bundle, record, err := s.bundle(id, bundles)
 	if err != nil {
 		return err
@@ -110,7 +134,7 @@ func (s *Invites) redeem(bundles *Store, code, session string, now time.Time) er
 	if _, err := Encode(bundle.Entries, now, "base64"); err != nil {
 		return err
 	}
-	receipt := []byte(tokenHash(session))
+	receipt := activationReceipt(session, subject)
 	name := id + ".claim"
 	if !now.Before(record.ExpiresAt) {
 		return s.verifyClaim(name, receipt)
@@ -123,12 +147,31 @@ func (s *Invites) redeem(bundles *Store, code, session string, now time.Time) er
 	}
 }
 
-func (s *Invites) deviceBundle(bundles *Store, id, session string) (Bundle, error) {
-	if !validDigest(id) || !validToken(session) || s.verifyClaim(id+".claim", []byte(tokenHash(session))) != nil {
+func (s *Invites) accountBundle(bundles *Store, subject string) (Bundle, error) {
+	if !validDigest(subject) {
+		return Bundle{}, ErrNotFound
+	}
+	linked, err := s.read(subject + ".account")
+	if err != nil {
+		return Bundle{}, err
+	}
+	bundle, _, err := s.bundle(string(linked), bundles)
+	return bundle, err
+}
+
+func (s *Invites) deviceBundle(bundles *Store, id, session, subject string) (Bundle, error) {
+	if !validDigest(id) || !validToken(session) || s.verifyClaim(id+".claim", activationReceipt(session, subject)) != nil {
 		return Bundle{}, ErrNotFound
 	}
 	bundle, _, err := s.bundle(id, bundles)
 	return bundle, err
+}
+
+func activationReceipt(session, subject string) []byte {
+	if subject == "" {
+		return []byte(tokenHash(session))
+	}
+	return []byte(tokenHash("account:v1:" + subject + ":" + session))
 }
 
 func (s *Invites) verifyClaim(name string, receipt []byte) error {
@@ -153,6 +196,10 @@ func (s *Invites) read(name string) ([]byte, error) {
 }
 
 func (s *Invites) create(name string, value []byte) error {
+	return s.write(name, value, false)
+}
+
+func (s *Invites) write(name string, value []byte, replace bool) error {
 	tmp := ".invite-" + randomHex()
 	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -169,6 +216,9 @@ func (s *Invites) create(name string, value []byte) error {
 	}
 	if err := f.Close(); err != nil {
 		return err
+	}
+	if replace {
+		return s.root.Rename(tmp, name)
 	}
 	return s.root.Link(tmp, name)
 }

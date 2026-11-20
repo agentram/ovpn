@@ -1,0 +1,54 @@
+name: O-Tunnel
+options:
+  deploymentTarget:
+    iOS: '16.0'
+packages:
+  AppAuth:
+    url: https://github.com/openid/AppAuth-iOS.git
+    exactVersion: 2.0.0
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    MARKETING_VERSION: '0.3.0'
+    CURRENT_PROJECT_VERSION: '3'
+    OVPN_ACCOUNT_ISSUER: ''
+    OVPN_ACCOUNT_CLIENT_ID: ''
+    OVPN_ACCOUNT_ORIGIN: ''
+    OVPN_KEYCHAIN_GROUP: '$(AppIdentifierPrefix)io.github.agentram.ovpn.tunnel.shared'
+targets:
+  O-Tunnel:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.agentram.ovpn.tunnel
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Shared/Tunnel.entitlements
+    dependencies:
+      - target: PacketTunnel
+      - framework: Frameworks/MobileCore.xcframework
+        embed: false
+      - package: AppAuth
+        product: AppAuth
+  PacketTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Tunnel
+      - path: Shared/AccessStorage.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.agentram.ovpn.tunnel.PacketTunnel
+        APPLICATION_EXTENSION_API_ONLY: YES
+        INFOPLIST_FILE: Tunnel/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Shared/Tunnel.entitlements
+    dependencies:
+      - framework: Frameworks/MobileCore.xcframework
+        embed: false
+schemes:
+  O-Tunnel:
+    build:
+      targets:
+        O-Tunnel: all
+        PacketTunnel: all

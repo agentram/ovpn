@@ -67,24 +67,35 @@ internal class SubscriptionClient(transport: OkHttpClient = OkHttpClient()) {
         .callTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    suspend fun fetch(url: HttpUrl): String = execute(
-        Request.Builder().url(url).header("Cache-Control", "no-store").header("Accept", "text/plain").build(),
+    suspend fun fetch(url: HttpUrl, token: String? = null): String = execute(
+        request(url, token).header("Cache-Control", "no-store").header("Accept", "text/plain").build(),
         ::readSubscription,
     )
 
-    suspend fun activate(invite: InviteCode, session: String) {
+    suspend fun verifyAccount(origin: HttpUrl, token: String) = execute(
+        request(origin.newBuilder().addPathSegment("account").build(), token).build(),
+    ) { response ->
+        if (response.code != 204) throw TunnelIssue("account_failed")
+    }
+
+    suspend fun activate(invite: InviteCode, session: String, token: String? = null) {
         val url = invite.origin.newBuilder().addPathSegment("activate").build()
         val body = JSONObject().put("code", invite.secret).put("session", session).toString()
         execute(
-            Request.Builder().url(url).post(body.toRequestBody("application/json".toMediaType())).build(),
+            request(url, token).post(body.toRequestBody("application/json".toMediaType())).build(),
         ) { response ->
             when (response.code) {
                 204 -> Unit
+                401 -> throw TunnelIssue("account_failed")
                 404, 410 -> throw TunnelIssue("code_unavailable")
                 in 300..399 -> throw TunnelIssue("subscription_redirect")
                 else -> throw TunnelIssue("subscription_http")
             }
         }
+    }
+
+    private fun request(url: HttpUrl, token: String?) = Request.Builder().url(url).apply {
+        if (token != null) header("Authorization", "Bearer $token")
     }
 
     private suspend fun <T> execute(request: Request, read: (Response) -> T): T = suspendCancellableCoroutine { result ->
@@ -114,6 +125,7 @@ internal class SubscriptionClient(transport: OkHttpClient = OkHttpClient()) {
 private fun readSubscription(response: Response): String {
     when (response.code) {
         200 -> Unit
+        401 -> throw TunnelIssue("account_failed")
         404, 410 -> throw TunnelIssue("subscription_unavailable")
         in 300..399 -> throw TunnelIssue("subscription_redirect")
         else -> throw TunnelIssue("subscription_http")

@@ -14,6 +14,7 @@ internal val Phase.label: Int
 
 internal fun issueLabel(code: String) = when (code) {
     "invalid_code" -> R.string.invalid_code
+    "account_failed" -> R.string.account_failed
     "code_unavailable" -> R.string.code_unavailable
     "qr_unreadable" -> R.string.qr_unreadable
     "too_large" -> R.string.too_large

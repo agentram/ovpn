@@ -152,7 +152,11 @@ class TunnelService : VpnService() {
 
     private suspend fun connect(id: String) {
         if (active != null) return
-        val profile = withContext(Dispatchers.IO) { profiles.load().profiles.firstOrNull { it.id == id } }
+        val profile = withContext(Dispatchers.IO) {
+            val library = profiles.load()
+            if (accountRequired && library.account == null) throw TunnelIssue("account_failed")
+            library.profiles.firstOrNull { it.id == id }
+        }
             ?: throw TunnelIssue("profile_changed")
         if (prepare(this) != null) throw TunnelIssue("permission_denied")
         active = profile

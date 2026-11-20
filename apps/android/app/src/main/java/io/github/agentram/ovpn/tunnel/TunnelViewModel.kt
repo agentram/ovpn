@@ -1,6 +1,7 @@
 package io.github.agentram.ovpn.tunnel
 
 import android.app.Application
+import android.content.Intent
 import android.net.ConnectivityManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
+import net.openid.appauth.AuthState
 
 internal data class WorkState(
     val working: Boolean = false,
@@ -23,6 +25,7 @@ internal data class WorkState(
 internal class TunnelViewModel(application: Application) : AndroidViewModel(application) {
     private val store = application.profiles
     private val subscriptions = SubscriptionClient()
+    private val account by lazy { MobileAccount(application) }
     private val connectivity = application.getSystemService(ConnectivityManager::class.java)
     val library = store.state
     val tunnel = TunnelRuntime.state
@@ -33,12 +36,53 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
 
     fun load() = operate("storage_failed") { store.load(); WorkState() }
 
+    fun signIn(open: (Intent) -> Unit) = operate("account_failed") {
+        val intent = account.loginIntent()
+        withContext(Dispatchers.Main) { open(intent) }
+        WorkState()
+    }
+
+    fun finishSignIn(result: Intent) = operate("account_failed") {
+        val origin = account.origin ?: throw TunnelIssue("account_failed")
+        val state = account.finish(result)
+        val token = account.fresh(state)
+        subscriptions.verifyAccount(origin, token)
+        val source = accountProfiles(origin)
+        val data = try {
+            subscriptions.fetch(source, token)
+        } catch (e: TunnelIssue) {
+            if (e.code != "subscription_unavailable") throw e
+            null
+        }
+        val library = Library(account = state.jsonSerializeString())
+        store.update {
+            if (data == null) library else library.import(decodePreview(Androidbridge.inspect(data), source.toString()))
+        }
+        WorkState()
+    }
+
+    fun signOut() = operate("storage_failed") {
+        store.update { Library() }
+        WorkState()
+    }
+
+    private suspend fun accountToken(url: HttpUrl): String? {
+        if (!accountRequired) return null
+        if (!account.owns(url)) throw TunnelIssue("invalid_code")
+        val serialized = store.load().account ?: throw TunnelIssue("account_failed")
+        val state = AuthState.jsonDeserialize(serialized)
+        val token = account.fresh(state)
+        store.update { it.copy(account = state.jsonSerializeString()) }
+        return token
+    }
+
     fun preview(input: String) = operate("invalid_import") {
         val raw = input.trim()
         if (raw.startsWith("OT1:")) {
             activate(raw)
             return@operate WorkState()
         }
+        if (accountRequired) throw TunnelIssue("invalid_code")
         val url = if (raw.startsWith("https:", ignoreCase = true)) {
             subscriptionUrl(raw) ?: throw TunnelIssue("invalid_url")
         } else {
@@ -57,19 +101,20 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
 
     private suspend fun activate(code: String) {
         val invite = inviteCode(code) ?: throw TunnelIssue("invalid_code")
+        val token = accountToken(invite.origin)
         // Persist the request secret before exchange, so retries reuse the same receipt.
         val pending = store.update {
             if (it.pending?.code == code) it else it.copy(pending = PendingActivation(code, newSession()))
         }.pending ?: error("missing activation")
         val client = client()
         try {
-            client.activate(invite, pending.session)
+            client.activate(invite, pending.session, token)
         } catch (e: TunnelIssue) {
             if (e.code == "code_unavailable") store.update { it.copy(pending = null) }
             throw e
         }
-        val url = invite.deviceUrl(pending.session)
-        val preview = decodePreview(Androidbridge.inspect(client.fetch(url)), url.toString())
+        val url = if (accountRequired) accountProfiles(invite.origin) else invite.deviceUrl(pending.session)
+        val preview = decodePreview(Androidbridge.inspect(client.fetch(url, token)), url.toString())
         store.update { it.import(preview).copy(pending = null) }
     }
 
@@ -83,12 +128,16 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
 
     fun refresh(source: Subscription) = operate("storage_failed") {
         val url = subscriptionUrl(source.url) ?: throw TunnelIssue("invalid_url")
-        val preview = decodePreview(Androidbridge.inspect(fetch(url)), source.url)
+        val token = accountToken(url)
+        val preview = decodePreview(Androidbridge.inspect(client().fetch(url, token)), source.url)
         store.update { it.replace(source, preview.compatible) }
         WorkState(refreshed = true)
     }
 
     private suspend fun fetch(url: HttpUrl): String = client().fetch(url)
+
+    private fun accountProfiles(origin: HttpUrl): HttpUrl =
+        origin.newBuilder().addPathSegments("account/profiles").build()
 
     private suspend fun client(): SubscriptionClient {
         val state = tunnel.value
@@ -121,6 +170,10 @@ internal class TunnelViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun showIssue(code: String) { mutable.value = WorkState(issue = code) }
+
+    override fun onCleared() {
+        if (accountRequired) account.close()
+    }
 
     private fun operate(fallback: String, block: suspend () -> WorkState) {
         if (work.value.working) return

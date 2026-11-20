@@ -89,4 +89,11 @@
     <string name="privacy">隐私</string>
     <string name="privacy_body">连接信息加密保存在手机上。二维码在本机识别。O Tunnel 通过 www.gstatic.com 检查连接。只有您选择分享时才会发送问题报告。</string>
     <string name="unverified">连接尚未确认</string>
+    <string name="account_title">欢迎使用 O Tunnel</string>
+    <string name="account_body">通过电子邮件或 Google 登录或创建账号。</string>
+    <string name="account_sign_in">登录</string>
+    <string name="account_sign_out">退出登录</string>
+    <string name="account_code_help">粘贴收到的访问码。</string>
+    <string name="account_failed">请确认邮箱已验证，然后重新登录。</string>
+    <string name="profile_help">先选择第一个连接方案。如果无法连接，请尝试另一个。</string>
 </resources>

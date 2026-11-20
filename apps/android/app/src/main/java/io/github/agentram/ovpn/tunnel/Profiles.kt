@@ -37,6 +37,7 @@ internal data class Library(
     val subscriptions: List<Subscription> = emptyList(),
     val selected: String? = null,
     val pending: PendingActivation? = null,
+    val account: String? = null,
 ) {
     val profiles: List<Profile> get() = manual + subscriptions.flatMap { it.profiles }
     val active: Profile? get() = profiles.firstOrNull { it.id == selected }
@@ -94,6 +95,7 @@ internal fun decodePreview(json: String, source: String?): ImportPreview {
 internal fun Library.encode(): ByteArray = JSONObject()
     .put("schema", 1)
     .put("selected", selected ?: JSONObject.NULL)
+    .put("account", account ?: JSONObject.NULL)
     .put("activation", pending?.let { JSONObject().put("code", it.code).put("session", it.session) } ?: JSONObject.NULL)
     .put("manual", manual.toJson())
     .put("subscriptions", JSONArray(subscriptions.map {
@@ -110,6 +112,7 @@ internal fun decodeLibrary(raw: ByteArray): Library {
         },
         selected = if (data.isNull("selected")) null else data.getString("selected"),
         pending = data.optJSONObject("activation")?.let { PendingActivation(it.getString("code"), it.getString("session")) },
+        account = if (data.isNull("account")) null else data.getString("account"),
     )
 }
 

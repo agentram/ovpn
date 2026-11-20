@@ -40,12 +40,12 @@ class Emulator:
         check(self.shell("id", "-u").strip() == "0", "The emulator image must support adb root")
         cert_hash = command("openssl", "x509", "-subject_hash_old", "-in", root,
                             "-noout", text=True, capture_output=True).stdout.strip()
-        target = "/data/local/tmp/ovpn-e2e-certs"
+        target = self.shell("mktemp", "-d", "/data/local/tmp/ovpn-e2e-certs.XXXXXX").strip()
+        check(re.fullmatch(r"/data/local/tmp/ovpn-e2e-certs\.[A-Za-z0-9]+", target), "Cannot create emulator trust directory")
         ca_path = "/apex/com.android.conscrypt/cacerts"
-        self.shell("mkdir", "-p", target)
         self.shell("sh", "-c", f"cp {ca_path}/* {target}/")
         self.run("push", root, f"{target}/{cert_hash}.0")
-        self.shell("sh", "-c", f"chmod 644 {target}/* && chcon u:object_r:system_file:s0 {target} {target}/*")
+        self.shell("sh", "-c", f"chmod 755 {target} && chmod 644 {target}/* && chcon u:object_r:system_file:s0 {target} {target}/*")
         zygotes = self.shell("sh", "-c", "pidof zygote zygote64 || true").split()
         check(zygotes and all(pid.isdecimal() for pid in zygotes), "Cannot find the Android zygote mount namespace")
         for pid in zygotes:
@@ -100,6 +100,20 @@ class Emulator:
         self.tap("Change profile")
         self.tap(profile)
 
+    def install_egress_probe(self, directory):
+        abi = self.shell("getprop", "ro.product.cpu.abi").strip()
+        arch = {"x86_64": "amd64", "arm64-v8a": "arm64"}.get(abi)
+        check(arch is not None, "Unsupported emulator architecture")
+        probe = directory / "egressprobe"
+        command("go", "build", "-trimpath", "-o", probe, "./tests/e2e/egressprobe",
+                env={**os.environ, "GOOS": "linux", "GOARCH": arch, "CGO_ENABLED": "0"}, timeout=120)
+        self.run("push", probe, "/data/local/tmp/ovpn-egress")
+        self.run("push", directory / "root.pem", "/data/local/tmp/ovpn-egress-ca.pem")
+        self.shell("chmod", "755", "/data/local/tmp/ovpn-egress")
+
+    def egress(self, address):
+        return self.shell("su", "shell", "/data/local/tmp/ovpn-egress", address).strip()
+
 
 def build_android():
     android_dir = ROOT / "apps/android"
@@ -127,6 +141,7 @@ def android(lab):
             return ready.exists() and ready.stat().st_size > 0
         until(available, "local Xray TLS and REALITY listeners")
         emulator.trust(directory / "root.pem")
+        emulator.install_egress_probe(directory)
         emulator.shell("settings", "put", "global", "private_dns_mode", "off")
         emulator.shell("svc", "power", "stayon", "true")
         emulator.shell("input", "keyevent", "KEYCODE_WAKEUP")
@@ -181,17 +196,23 @@ def onboarding(emulator, code):
 
 def tunnels(emulator, directory):
     hits = directory / "probe-hit"
+    direct = "10.0.2.2:" + (directory / "direct-https").read_text()
+    via_tunnel = "192.0.2.88:443"
+    baseline = emulator.egress(direct)
+    check(baseline == "127.0.0.1", "The test website did not see the direct IPv4 path")
     emulator.tap("Connect")
     emulator.tap("android:id/button1")
     emulator.find("Connected", 60)
     first = until(emulator.vpn, "the real Android VPN network")
     check(hits.stat().st_size > 0, "Connected without reaching the private HTTPS responder through TUN")
+    check(emulator.egress(via_tunnel) == "::1", "External HTTPS client did not use REALITY egress")
     before = hits.stat().st_size
     emulator.select("Backup")
     emulator.find("Backup")
     emulator.find("Connected", 60)
     check(hits.stat().st_size > before, "TLS profile did not reach the private HTTPS responder")
     check(emulator.vpn() == first, "Switching REALITY to TLS replaced the Android VPN network")
+    check(emulator.egress(via_tunnel) == "::1", "External HTTPS client did not use TLS egress")
 
     emulator.select("Refused")
     emulator.find("Refused")
@@ -208,6 +229,8 @@ def tunnels(emulator, directory):
     emulator.tap("Disconnect")
     emulator.find("Disconnected")
     until(lambda: emulator.vpn() is None, "VPN network is removed after Disconnect")
+    check(emulator.egress(direct) == baseline, "Disconnect did not restore direct egress")
+    print("PASS independent HTTPS client egress changes through REALITY/TLS and restores on disconnect", flush=True)
     print("PASS private HTTPS through REALITY and TLS, stable TUN, invalid identity and safe report", flush=True)
 
 

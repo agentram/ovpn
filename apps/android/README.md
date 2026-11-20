@@ -27,3 +27,7 @@ Android routes IPv4 and IPv6 into the service's TUN. The only native outbound so
 The service keeps the TUN in place while reconnecting after a network change or switching profiles. Disconnect or revoke VPN permission to release the TUN. A failed HTTPS check can indicate an unreachable check endpoint, tunnel failure or revoked server access. The app reports an unverified tunnel when Xray is running and the HTTPS check fails.
 
 See [release preparation](../../docs/android-release.md) and [privacy policy](../../docs/android-privacy.html).
+
+## Account-based builds
+
+Set `OVPN_ACCOUNT_ISSUER`, `OVPN_ACCOUNT_CLIENT_ID` and `OVPN_ACCOUNT_ORIGIN` before building to require sign-in and a setup code. Use a native public OIDC client with Authorization Code and PKCE, callback `io.github.agentram.ovpn.tunnel:/oauth`, and verified email. Offer email registration and Google at the identity provider. Builds without the three settings retain the direct QR and link workflow. See [account-based delivery](../../docs/subscriptions.md#account-based-delivery).

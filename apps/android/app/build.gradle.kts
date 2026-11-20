@@ -4,6 +4,13 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.0"
 }
 
+val accountConfig = listOf("ISSUER", "CLIENT_ID", "ORIGIN").associateWith {
+    providers.environmentVariable("OVPN_ACCOUNT_$it").orElse("").get()
+}
+require(accountConfig.values.all(String::isEmpty) || accountConfig.values.all {
+    it.isNotEmpty() && it.all { ch -> ch.isLetterOrDigit() || ch in ":/._-" }
+}) { "Supply all three OVPN_ACCOUNT settings or leave them unset" }
+
 android {
     namespace = "io.github.agentram.ovpn.tunnel"
     compileSdk = 36
@@ -13,8 +20,10 @@ android {
         applicationId = "io.github.agentram.ovpn.tunnel"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+        manifestPlaceholders["appAuthRedirectScheme"] = "io.github.agentram.ovpn.tunnel"
+        accountConfig.forEach { (key, value) -> buildConfigField("String", "ACCOUNT_$key", "\"$value\"") }
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
@@ -52,6 +61,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("net.openid:appauth:0.11.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")

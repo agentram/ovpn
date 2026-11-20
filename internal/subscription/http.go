@@ -13,14 +13,16 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strings"
 	"time"
 )
 
 type Handler struct {
-	store   *Store
-	invites *Invites
-	now     func() time.Time
+	store         *Store
+	invites       *Invites
+	now           func() time.Time
+	verifyAccount accountVerifier
 }
 
 func NewHandler(dir string) (*Handler, error) {
@@ -59,7 +61,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	bundle, err := h.lookup(r.URL.Path)
+	if r.URL.Path == "/account" && h.verifyAccount != nil {
+		if _, ok := h.account(w, r); ok {
+			w.WriteHeader(http.StatusNoContent)
+		}
+		return
+	}
+	var subject string
+	if (strings.HasPrefix(r.URL.Path, "/device/") || r.URL.Path == "/account/profiles") && h.invites != nil {
+		var ok bool
+		subject, ok = h.account(w, r)
+		if !ok {
+			return
+		}
+	}
+	bundle, err := h.lookup(r.URL.Path, subject)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -77,7 +93,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) lookup(path string) (Bundle, error) {
+func (h *Handler) lookup(path, subject string) (Bundle, error) {
+	if path == "/account/profiles" && h.invites != nil && subject != "" {
+		return h.invites.accountBundle(h.store, subject)
+	}
 	parts := strings.Split(path, "/")
 	if len(parts) != 4 || parts[0] != "" {
 		return Bundle{}, ErrNotFound
@@ -85,7 +104,7 @@ func (h *Handler) lookup(path string) (Bundle, error) {
 	switch parts[1] {
 	case "device":
 		if h.invites != nil {
-			return h.invites.deviceBundle(h.store, parts[2], parts[3])
+			return h.invites.deviceBundle(h.store, parts[2], parts[3], subject)
 		}
 	case "sub":
 		if !validToken(parts[3]) {
@@ -105,6 +124,10 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	subject, ok := h.account(w, r)
+	if !ok {
+		return
+	}
 	var request struct {
 		Code    string `json:"code"`
 		Session string `json:"session"`
@@ -114,7 +137,7 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	switch err := h.invites.redeem(h.store, request.Code, request.Session, h.now()); {
+	switch err := h.invites.redeem(h.store, request.Code, request.Session, subject, h.now()); {
 	case errors.Is(err, ErrNotFound):
 		w.WriteHeader(http.StatusNotFound)
 	case err != nil:
@@ -126,6 +149,8 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 
 type ServeOptions struct {
 	Dir, InviteDir, Listen, CertFile, KeyFile string
+	AccountIssuer                             string
+	AccountClients                            []string
 }
 
 func (o ServeOptions) Validate() error {
@@ -138,6 +163,19 @@ func (o ServeOptions) Validate() error {
 	}
 	if (o.CertFile == "") != (o.KeyFile == "") {
 		return fmt.Errorf("--tls-cert and --tls-key must be supplied together")
+	}
+	if o.AccountIssuer != "" || len(o.AccountClients) != 0 {
+		issuer, err := url.Parse(o.AccountIssuer)
+		if err != nil || issuer.Scheme != "https" || issuer.Hostname() == "" ||
+			issuer.User != nil || issuer.RawQuery != "" || issuer.ForceQuery || strings.Contains(o.AccountIssuer, "#") ||
+			o.InviteDir == "" || len(o.AccountClients) == 0 || len(o.AccountClients) > 4 {
+			return errors.New("account mode requires an HTTPS issuer, account client IDs and an invitation directory")
+		}
+		for _, client := range o.AccountClients {
+			if client == "" || strings.TrimSpace(client) != client {
+				return errors.New("invalid account client ID")
+			}
+		}
 	}
 	ip, err := netip.ParseAddr(host)
 	if o.CertFile == "" && (err != nil || !ip.IsLoopback()) {
@@ -158,6 +196,12 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	defer handler.Close()
 	if opts.InviteDir != "" {
 		handler.invites, err = OpenInvites(opts.InviteDir)
+		if err != nil {
+			return err
+		}
+	}
+	if opts.AccountIssuer != "" {
+		handler.verifyAccount, err = openAccountVerifier(ctx, opts.AccountIssuer, opts.AccountClients)
 		if err != nil {
 			return err
 		}

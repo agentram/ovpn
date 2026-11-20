@@ -89,4 +89,11 @@
     <string name="privacy">Конфиденциальность</string>
     <string name="privacy_body">Данные доступа зашифрованы на телефоне. QR распознаются на устройстве. O Tunnel проверяет соединение через www.gstatic.com. Отчёт отправляется только по вашему выбору.</string>
     <string name="unverified">Соединение не подтверждено</string>
+    <string name="account_title">Добро пожаловать в O Tunnel</string>
+    <string name="account_body">Войдите или создайте аккаунт через email или Google.</string>
+    <string name="account_sign_in">Войти</string>
+    <string name="account_sign_out">Выйти</string>
+    <string name="account_code_help">Вставьте полученный код доступа.</string>
+    <string name="account_failed">Проверьте, что ваша почта подтверждена, и войдите ещё раз.</string>
+    <string name="profile_help">Начните с первого профиля. Если он не подключается, попробуйте другой.</string>
 </resources>

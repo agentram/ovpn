@@ -45,6 +45,10 @@ class MainActivity : AppCompatActivity() {
 
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
+    private val login = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) result.data?.let(model::finishSignIn)
+    }
+
     private val scanner = registerForActivityResult(ScanContract()) { result ->
         val text = result.contents
         if (text != null) {
@@ -86,6 +90,7 @@ class MainActivity : AppCompatActivity() {
                     scan = ::scan,
                     chooseImage = { qrImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                     shareReport = ::shareReport,
+                    signIn = { model.signIn(login::launch) },
                 )
             }
         }

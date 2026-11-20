@@ -19,6 +19,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,7 +68,16 @@ func androidFixture(ctx context.Context, dir string) error {
 		return err
 	}
 	defer hits.Close()
-	https := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	website := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host == "www.gstatic.com" && r.URL.Path == "/ovpn-egress-test" {
+			host, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, _ = fmt.Fprintln(w, host)
+			return
+		}
 		if r.Host == "www.gstatic.com" && r.URL.Path == "/generate_204" {
 			if _, err := hits.Write([]byte{1}); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -77,11 +87,24 @@ func androidFixture(ctx context.Context, dir string) error {
 			return
 		}
 		_, _ = w.Write([]byte("fixture\n"))
-	}))
+	})
+	https := httptest.NewUnstartedServer(website)
 	https.EnableHTTP2 = true
 	https.TLS = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{cert}}
 	https.StartTLS()
 	defer https.Close()
+	// Keep the same website on a separate egress socket. Its observed source
+	// address differs from the direct IPv4 path on both Linux and macOS.
+	tunnelHTTPS := httptest.NewUnstartedServer(website)
+	_ = tunnelHTTPS.Listener.Close()
+	tunnelHTTPS.Listener, err = net.Listen("tcp6", "[::1]:0")
+	if err != nil {
+		return err
+	}
+	tunnelHTTPS.EnableHTTP2 = true
+	tunnelHTTPS.TLS = https.TLS.Clone()
+	tunnelHTTPS.StartTLS()
+	defer tunnelHTTPS.Close()
 	dns, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -122,7 +145,7 @@ func androidFixture(ctx context.Context, dir string) error {
 		},
 		"outbounds": []any{
 			map[string]string{"protocol": "blackhole"},
-			redirect("https", endpoint), redirect("dns", dns.LocalAddr().String()),
+			redirect("https", tunnelHTTPS.Listener.Addr().String()), redirect("dns", dns.LocalAddr().String()),
 		},
 		"routing": map[string]any{"rules": []any{
 			map[string]any{"type": "field", "network": "tcp", "ip": []string{fixtureIP}, "port": "443", "outboundTag": "https"},
@@ -166,6 +189,9 @@ func androidFixture(ctx context.Context, dir string) error {
 		link("Refused", model.TransportProfileTLSSelfSNIWeb, invalidID, tlsPort),
 	}, false)
 	if err != nil {
+		return err
+	}
+	if err := root.WriteFile("direct-https", []byte(strconv.Itoa(https.Listener.Addr().(*net.TCPAddr).Port)), 0o600); err != nil {
 		return err
 	}
 	if err := root.WriteFile("ready", []byte(bundle), 0o600); err != nil {

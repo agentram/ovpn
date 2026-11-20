@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -11,6 +12,62 @@ import (
 	"testing"
 	"time"
 )
+
+func TestAuthenticatedActivationBindsProfilesToTheAccount(t *testing.T) {
+	_, store, handler := openFixture(t)
+	var err error
+	handler.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.verifyAccount = func(_ context.Context, token string) (string, error) {
+		if token == "first" || token == "second" {
+			return tokenHash(token), nil
+		}
+		return "", ErrNotFound
+	}
+	id, _, err := store.Publish("", "alice", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := issueFixture(t, handler.invites, bundle, time.Now())
+	session := newToken()
+	body, _ := json.Marshal(map[string]string{"code": code, "session": session})
+	path := "/device/" + tokenHash(code) + "/" + session
+	for _, step := range []struct {
+		name, token, method, path string
+		want                      int
+	}{
+		{"anonymous login", "", "GET", "/account", 401},
+		{"account verified", "first", "GET", "/account", 204},
+		{"account alone has no access", "first", "GET", "/account/profiles", 404},
+		{"anonymous activation", "", "POST", "/activate", 401},
+		{"claim", "first", "POST", "/activate", 204},
+		{"retry", "first", "POST", "/activate", 204},
+		{"other account cannot replay", "second", "POST", "/activate", 404},
+		{"invalid token cannot download", "expired", "GET", path, 401},
+		{"other account cannot download", "second", "GET", path, 404},
+		{"original account can download", "first", "GET", path, 200},
+		{"restore without the device receipt", "first", "GET", "/account/profiles", 200},
+		{"other account still has no access", "second", "GET", "/account/profiles", 404},
+	} {
+		t.Run(step.name, func(t *testing.T) {
+			req := httptest.NewRequest(step.method, step.path, strings.NewReader(string(body)))
+			if step.token != "" {
+				req.Header.Set("Authorization", "Bearer "+step.token)
+			}
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != step.want {
+				t.Fatalf("status %d, want %d", w.Code, step.want)
+			}
+		})
+	}
+}
 
 func TestActivationDeliversUpdatesAndRevokesWithParent(t *testing.T) {
 	_, store, handler := openFixture(t)

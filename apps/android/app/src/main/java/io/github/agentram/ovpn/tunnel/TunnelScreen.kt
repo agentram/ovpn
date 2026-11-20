@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -79,6 +82,7 @@ internal fun TunnelScreen(
     scan: () -> Unit,
     chooseImage: () -> Unit,
     shareReport: (String) -> Unit,
+    signIn: () -> Unit,
 ) {
     val library by model.library.collectAsStateWithLifecycle()
     val tunnel by model.tunnel.collectAsStateWithLifecycle()
@@ -123,7 +127,16 @@ internal fun TunnelScreen(
                     if (work.issue == null) item { Text(stringResource(R.string.loading)) }
                 } else when (page) {
                     Page.Home -> if (data != null) item {
-                        Home(data, tunnel, work.working, connect, disconnect, retry,
+                        if (accountRequired && data.account == null) {
+                            Panel {
+                                SectionTitle(R.string.account_title)
+                                Text(stringResource(R.string.account_body))
+                                Button(onClick = signIn, enabled = !work.working,
+                                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)) {
+                                    Text(stringResource(R.string.account_sign_in))
+                                }
+                            }
+                        } else Home(data, tunnel, work.working, connect, disconnect, retry,
                             enterCode = { paste = true }, scan = { qr = true }, resume = model::retrySetup,
                             showProfiles = { page = Page.Profiles },
                             showReport = {
@@ -132,6 +145,7 @@ internal fun TunnelScreen(
                             })
                     }
                     Page.Profiles -> if (data != null) {
+                        item { Text(stringResource(R.string.profile_help)) }
                         items(data.profiles, key = { it.id }) { profile ->
                             ProfileCard(profile, data.selected, !work.working,
                                 select = { model.select(profile.id); page = Page.Home }, remove = null, working = work.working)
@@ -141,7 +155,7 @@ internal fun TunnelScreen(
                         item {
                             Panel {
                                 SectionTitle(R.string.empty_title)
-                                Text(stringResource(R.string.empty_body))
+                                Text(stringResource(if (accountRequired) R.string.account_code_help else R.string.empty_body))
                                 if (data.pending != null) {
                                     Button(onClick = model::retrySetup, enabled = !work.working) { Text(stringResource(R.string.resume_setup)) }
                                 }
@@ -177,7 +191,12 @@ internal fun TunnelScreen(
                         }
                     }
                     Page.Settings -> item {
-                        Settings(theme, setTheme, language, setLanguage) { page = Page.Access }
+                        Settings(theme, setTheme, language, setLanguage,
+                            manageAccess = if (!accountRequired || data?.account != null) ({ page = Page.Access }) else null,
+                            signOut = if (accountRequired && data?.account != null) ({
+                                model.signOut()
+                                page = Page.Home
+                            }) else null)
                     }
                 }
             }
@@ -256,14 +275,19 @@ private fun Home(
         Panel {
             if (library.profiles.isEmpty() && !engaged) {
                 SectionTitle(R.string.empty_title)
-                Text(stringResource(R.string.empty_body))
+                Text(stringResource(if (accountRequired) R.string.account_code_help else R.string.empty_body))
                 if (library.pending != null) {
                     Button(onClick = resume, enabled = !working) { Text(stringResource(R.string.resume_setup)) }
                 }
                 SetupButtons(working, enterCode, scan)
             } else {
-                Signal(stringResource(phase.label), icon, color)
-                selected?.let { Text(it.name, style = MaterialTheme.typography.headlineSmall) }
+                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ConnectionMark(color)
+                    Signal(stringResource(phase.label), icon, color)
+                    selected?.let { Text(it.name, style = MaterialTheme.typography.titleLarge) }
+                }
                 if (engaged || selected != null) {
                     Button(
                         onClick = { if (engaged) disconnect() else selected?.let { connect(it.id) } },
@@ -293,8 +317,18 @@ private fun SetupButtons(working: Boolean, enterCode: () -> Unit, scan: () -> Un
     Button(onClick = enterCode, enabled = !working, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.enter_code))
     }
-    OutlinedButton(onClick = scan, enabled = !working, modifier = Modifier.fillMaxWidth()) {
+    if (!accountRequired) OutlinedButton(onClick = scan, enabled = !working, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.scan_qr))
+    }
+}
+
+@Composable
+private fun ConnectionMark(color: Color) {
+    Canvas(Modifier.size(76.dp)) {
+        drawCircle(color.copy(alpha = 0.10f))
+        drawCircle(color.copy(alpha = 0.35f), radius = size.minDimension * 0.43f, style = Stroke(1.dp.toPx()))
+        drawCircle(color, radius = size.minDimension * 0.31f, style = Stroke(3.dp.toPx()))
+        drawCircle(color, radius = size.minDimension * 0.10f)
     }
 }
 
@@ -374,10 +408,12 @@ private fun PreviewDialog(preview: ImportPreview, close: () -> Unit, save: () ->
 @Composable
 private fun Settings(
     theme: String, setTheme: (String) -> Unit, language: String, setLanguage: (String) -> Unit,
-    manageAccess: () -> Unit,
+    manageAccess: (() -> Unit)?,
+    signOut: (() -> Unit)?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        OutlinedButton(onClick = manageAccess, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manage_access)) }
+        manageAccess?.let { OutlinedButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.manage_access)) } }
+        signOut?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.account_sign_out)) } }
         Panel {
             SectionTitle(R.string.language)
             Choice(R.string.language_en, language == "en") { setLanguage("en") }

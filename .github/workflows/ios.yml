@@ -1,0 +1,57 @@
+name: iOS
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/ios/**'
+      - 'mobile/androidbridge/**'
+      - 'internal/clientcfg/**'
+      - 'internal/xraycfg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ios.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/ios/**'
+      - 'mobile/androidbridge/**'
+      - 'internal/clientcfg/**'
+      - 'internal/xraycfg/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ios.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build O Tunnel and Packet Tunnel
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Build Xray for iOS and the simulator
+        run: apps/ios/build-core.sh
+      - name: Build the unsigned simulator app
+        working-directory: apps/ios
+        run: |
+          xcodegen generate
+          xcodebuild -project O-Tunnel.xcodeproj -scheme O-Tunnel \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath DerivedData ARCHS=arm64 CODE_SIGNING_ALLOWED=NO build
+          ditto -c -k --sequesterRsrc --keepParent \
+            DerivedData/Build/Products/Debug-iphonesimulator/O-Tunnel.app O-Tunnel-simulator.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: ovpn-tunnel-ios-simulator
+          path: apps/ios/O-Tunnel-simulator.zip
+          if-no-files-found: error

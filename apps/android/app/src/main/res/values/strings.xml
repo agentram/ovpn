@@ -89,4 +89,11 @@
     <string name="privacy">Privacy</string>
     <string name="privacy_body">Access is encrypted on this phone. QR codes are read on the device. O Tunnel checks the connection through www.gstatic.com. Problem reports are shared only when you choose to share them.</string>
     <string name="unverified">Connection unconfirmed</string>
+    <string name="account_title">Welcome to O Tunnel</string>
+    <string name="account_body">Sign in or create an account with email or Google.</string>
+    <string name="account_sign_in">Sign in</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_code_help">Paste the access code you received.</string>
+    <string name="account_failed">Check that your email is verified, then sign in again.</string>
+    <string name="profile_help">Start with the first profile. If it will not connect, try another one.</string>
 </resources>

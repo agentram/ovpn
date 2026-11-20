@@ -34,6 +34,8 @@ func (a *App) subscriptionServeCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.Dir, "bundle-dir", "", "Directory containing prepared subscription bundles only")
 	cmd.Flags().StringVar(&opts.InviteDir, "invite-dir", "", "Private writable invitation directory")
+	cmd.Flags().StringVar(&opts.AccountIssuer, "account-issuer", "", "Require verified OIDC accounts for invitation activation and updates")
+	cmd.Flags().StringSliceVar(&opts.AccountClients, "account-client", nil, "Allowed mobile OIDC client IDs")
 	cmd.Flags().StringVar(&opts.Listen, "listen", "127.0.0.1:8088", "Subscription HTTP listen address; non-loopback requires TLS")
 	cmd.Flags().StringVar(&opts.CertFile, "tls-cert", "", "TLS certificate chain file")
 	cmd.Flags().StringVar(&opts.KeyFile, "tls-key", "", "TLS private key file")

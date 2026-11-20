@@ -88,3 +88,17 @@ Revoking or rotating a subscription token stops future downloads. Already import
 ## Compatibility
 
 The Base64 link-list format is consumed by [v2rayN](https://github.com/2dust/v2rayN/blob/master/v2rayN/ServiceLib/Handler/SubscriptionHandler.cs) and documented by [Xray Checker](https://xray-checker.kutovoy.dev/configuration/subscription/). Add the URL as a subscription rather than as one VLESS node. The automated regression covers HTTPS delivery, Base64 decoding and native Xray traffic for REALITY/TCP and self-SNI TLS; import in individual GUI app versions still needs verification. Existing [transport compatibility limits](transports.md) apply, especially to experimental profiles. Automatic failover depends on the client configuration and is not provided by a link list alone.
+
+## Account-based delivery
+
+Use an OpenID Connect provider to offer verified email registration and Google sign-in. Register public clients for Android and iOS with Authorization Code and PKCE. Configure both clients to receive the same stable subject for an account. The service verifies the issuer, allowed client ID, signature, expiration and verified-email claim. It uses an issuer-scoped account identifier and keeps email addresses out of invitation records.
+
+```sh
+ovpn subscription serve --bundle-dir ./subscription-bundles --invite-dir ./invites \
+  --account-issuer https://login.example.net/realms/tunnel \
+  --account-client ovpn-android,ovpn-ios
+```
+
+Expose `/account`, `/account/profiles` and `/activate` over HTTPS alongside the existing delivery paths. Use a dedicated invitation directory and one delivery process per directory for account-based clients. Keep the paths, access tokens and activation bodies out of request logging. Publish the intended OVPN user's compatible profiles with `--all-profiles` and issue a code with `ovpn subscription invite`. Assign one OVPN user per customer if you want to identify them individually in Desk presence and quota views.
+
+The code binds the published profile list to one verified account. The account can retrieve that list again after signing in. Rotating or revoking the subscription stops delivery. To stop a saved profile from connecting, also disable the VPN user on the server. Legacy direct subscription URLs retain their existing URL-token behavior.

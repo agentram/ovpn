@@ -1,3 +1,5 @@
+//go:build android || ios
+
 package androidbridge
 
 import (
@@ -38,15 +40,6 @@ func init() { internet.UseAlternativeSystemDialer(&dialer) }
 
 // CoreVersion reports the embedded Xray engine version.
 func CoreVersion() string { return core.Version() }
-
-// InterfaceName identifies the service-owned TUN for VPN-bound health checks.
-func InterfaceName(fd int32) string {
-	ifr, err := unix.NewIfreq("")
-	if err != nil || unix.IoctlIfreq(int(fd), unix.TUNGETIFF, ifr) != nil {
-		return ""
-	}
-	return ifr.Name()
-}
 
 // Start duplicates the service-owned TUN FD. Kotlin retains the original across
 // reconnects. Start and Stop return only stable codes, never engine log strings.
