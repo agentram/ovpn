@@ -134,7 +134,8 @@ private struct Home: View {
                 primary("Disconnect", icon: "stop", disabled: model.phase == .disconnecting) { model.stop() }
             }
             Button { sheet = .profiles } label: {
-                Label(model.selected == nil ? "Choose profile" : "Change profile", systemImage: "arrow.left.arrow.right")
+                Label(LocalizedStringKey(model.selected == nil ? "Choose profile" : "Change profile"),
+                      systemImage: "arrow.left.arrow.right")
                     .frame(maxWidth: .infinity, minHeight: 46)
             }
             .buttonStyle(.bordered)

@@ -39,8 +39,24 @@ jobs:
           go-version-file: go.mod
       - name: Install project generator
         run: brew install xcodegen
+      - name: Identify the Xcode toolchain
+        id: xcode
+        run: echo "digest=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Restore the iOS core
+        id: core-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: apps/ios/Frameworks/MobileCore.xcframework
+          key: ios-core-${{ runner.arch }}-${{ steps.xcode.outputs.digest }}-${{ hashFiles('apps/ios/build-core.sh', 'go.mod', 'go.sum', 'internal/**', 'mobile/**') }}
       - name: Build Xray for iOS and the simulator
+        if: steps.core-cache.outputs.cache-hit != 'true'
         run: apps/ios/build-core.sh
+      - name: Cache the built iOS core
+        if: steps.core-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: apps/ios/Frameworks/MobileCore.xcframework
+          key: ${{ steps.core-cache.outputs.cache-primary-key }}
       - name: Build the unsigned simulator app
         working-directory: apps/ios
         run: |

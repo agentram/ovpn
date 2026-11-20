@@ -55,9 +55,9 @@ final class AccountClient {
         return URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
     }()
 
-    private let issuer = Self.setting("OVPNAccountIssuer")
+    private let issuer = AccountClient.setting("OVPNAccountIssuer")
     private let client = Bundle.main.object(forInfoDictionaryKey: "OVPNAccountClient") as? String ?? ""
-    let origin = Self.setting("OVPNAccountOrigin")
+    let origin = AccountClient.setting("OVPNAccountOrigin")
 
     var configured: Bool { issuer != nil && origin != nil && !client.isEmpty }
 

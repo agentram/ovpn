@@ -9,6 +9,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: '5.0'
+    OTHER_LDFLAGS: '$(inherited) -lresolv'
     MARKETING_VERSION: '0.3.0'
     CURRENT_PROJECT_VERSION: '3'
     OVPN_ACCOUNT_ISSUER: ''

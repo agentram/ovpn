@@ -3,6 +3,7 @@ import Foundation
 import MobileCore
 import NetworkExtension
 import SwiftUI
+import UIKit
 
 struct MobileProfile: Codable, Identifiable, Equatable {
     let id: String
