@@ -18,7 +18,7 @@ mkdir "$work/source"
 cp go.mod go.sum "$work/source/"
 ln -s "$repo/mobile" "$repo/internal" "$work/source/"
 cp -R "$xray_dir" "$work/xray"
-chmod u+w "$work/xray/proxy/tun/tun_darwin.go"
+chmod -R u+w "$work/xray"
 # The pinned Darwin TUN wraps the supplied fd in os.File without owning it.
 # Give Xray its own duplicate so Close cancels Go reads and releases it safely.
 python3 - "$work/xray/proxy/tun/tun_darwin.go" <<'PY'

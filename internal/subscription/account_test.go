@@ -61,6 +61,8 @@ func TestAccountProviderVerifiesIssuerAudienceSignatureAndEmail(t *testing.T) {
 	}{
 		{"android", issuer, jwt.Audience{"android"}, "", now.Add(time.Minute), true, false, true},
 		{"ios", issuer, jwt.Audience{"ios"}, "", now.Add(time.Minute), true, false, true},
+		{"ios as authorized party", issuer, jwt.Audience{"android", "ios"}, "ios", now.Add(time.Minute), true, false, true},
+		{"ambiguous client", issuer, jwt.Audience{"android", "ios"}, "", now.Add(time.Minute), true, false, false},
 		{"foreign audience", issuer, jwt.Audience{"other"}, "", now.Add(time.Minute), true, false, false},
 		{"foreign issuer", "https://other.example", jwt.Audience{"android"}, "", now.Add(time.Minute), true, false, false},
 		{"different party", issuer, jwt.Audience{"android"}, "other", now.Add(time.Minute), true, false, false},

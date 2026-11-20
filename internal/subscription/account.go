@@ -50,9 +50,11 @@ func discoverAccountVerifier(ctx context.Context, issuer string, clients []strin
 				Party         string `json:"azp"`
 			}
 			if token.Subject == "" || len(token.Subject) > 255 || token.Claims(&claims) != nil ||
-				!claims.EmailVerified || (claims.Party != "" && claims.Party != clients[i]) ||
-				(len(token.Audience) != 1 && claims.Party == "") {
+				!claims.EmailVerified || (len(token.Audience) != 1 && claims.Party == "") {
 				break
+			}
+			if claims.Party != "" && claims.Party != clients[i] {
+				continue
 			}
 			// Separate subjects from different issuers without persisting identity data.
 			return tokenHash(issuer + "\x00" + token.Subject), nil
