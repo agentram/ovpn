@@ -20,11 +20,11 @@ func TestAuthenticatedActivationBindsProfilesToTheAccount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler.verifyAccount = func(_ context.Context, token string) (string, error) {
+	handler.verifyAccount = func(_ context.Context, token string) (accountIdentity, error) {
 		if token == "first" || token == "second" {
-			return tokenHash(token), nil
+			return accountIdentity{subject: tokenHash(token), email: token + "@example.test"}, nil
 		}
-		return "", ErrNotFound
+		return accountIdentity{}, ErrNotFound
 	}
 	id, _, err := store.Publish("", "alice", "", []Entry{{Link: fixtureLink}}, false)
 	if err != nil {
@@ -221,8 +221,8 @@ func TestLegacyReceiptSurvivesSeparateAccountRollout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	account.verifyAccount = func(context.Context, string) (string, error) {
-		return tokenHash("fixture-account"), nil
+	account.verifyAccount = func(context.Context, string) (accountIdentity, error) {
+		return accountIdentity{subject: tokenHash("fixture-account"), email: "fixture@example.test"}, nil
 	}
 	if response := request(account, http.MethodGet, path); response.Code != http.StatusUnauthorized {
 		t.Fatal("legacy receipt was accepted by the account origin", response.Code)
@@ -236,5 +236,173 @@ func TestLegacyReceiptSurvivesSeparateAccountRollout(t *testing.T) {
 	}
 	if response := request(legacy, http.MethodGet, path); response.Code != http.StatusOK {
 		t.Fatal("legacy installation cannot refresh on its original origin", response.Code)
+	}
+}
+
+func TestVerifiedRecipientAndUniqueEmailAcrossAccounts(t *testing.T) {
+	_, store, handler := openFixture(t)
+	dir := t.TempDir()
+	invites, err := OpenInvites(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.invites = invites
+	handler.requireInviteEmail = true
+	handler.verifyAccount = func(_ context.Context, token string) (accountIdentity, error) {
+		switch token {
+		case "first", "second-device":
+			return accountIdentity{subject: tokenHash("first"), email: " Recipient@Example.Test "}, nil
+		case "other-provider":
+			return accountIdentity{subject: tokenHash("other-provider"), email: "recipient@example.test"}, nil
+		case "wrong-recipient":
+			return accountIdentity{subject: tokenHash("wrong"), email: "wrong@example.test"}, nil
+		case "changed-email":
+			return accountIdentity{subject: tokenHash("first"), email: "moved@example.test"}, nil
+		default:
+			return accountIdentity{}, ErrNotFound
+		}
+	}
+	id, _, err := store.Publish("", "fixture", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := invites.IssueForEmail(bundle, "https://subscriptions.example.net", time.Now(), time.Hour, "recipient@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, code, _ := strings.Cut(raw, "#")
+	receipt := newToken()
+	body, _ := json.Marshal(map[string]string{"code": code, "session": receipt})
+	hit := func(method, path, access string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(string(body)))
+		if access != "" {
+			req.Header.Set("Authorization", "Bearer "+access)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		return w
+	}
+	if status := hit(http.MethodPost, "/activate", "wrong-recipient").Code; status != http.StatusNotFound {
+		t.Fatalf("forwarded invitation: HTTP %d", status)
+	}
+	if status := hit(http.MethodPost, "/activate", "").Code; status != http.StatusUnauthorized {
+		t.Fatalf("anonymous recipient: HTTP %d", status)
+	}
+	if status := hit(http.MethodPost, "/activate", "first").Code; status != http.StatusNoContent {
+		t.Fatalf("verified recipient: HTTP %d", status)
+	}
+	if status := hit(http.MethodGet, "/account/profiles", "second-device").Code; status != http.StatusOK {
+		t.Fatalf("second device: HTTP %d", status)
+	}
+	if status := hit(http.MethodGet, "/account", "other-provider").Code; status != http.StatusConflict {
+		t.Fatalf("different subject using the same mailbox: HTTP %d", status)
+	}
+	if status := hit(http.MethodGet, "/account/profiles", "changed-email").Code; status != http.StatusConflict {
+		t.Fatalf("different mailbox using the same subject: HTTP %d", status)
+	}
+	if token := hit(http.MethodGet, "/account", "first").Header().Get("X-OVPN-Account"); token != tokenHash("first") {
+		t.Fatal("missing stable account identifier")
+	}
+	for _, path := range []string{tokenHash(code) + ".invite", "accounts.db"} {
+		data, err := os.ReadFile(dir + "/" + path)
+		if err != nil || strings.Contains(string(data), "recipient@example.test") {
+			t.Fatal("email was persisted in plaintext")
+		}
+	}
+	if err := invites.Close(); err != nil {
+		t.Fatal(err)
+	}
+	handler.invites, err = OpenInvites(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := hit(http.MethodGet, "/account/profiles", "second-device").Code; status != http.StatusOK {
+		t.Fatalf("assignment was lost after restart: HTTP %d", status)
+	}
+}
+
+func TestStrictActivationLimitsFailuresAndLeavesExistingReceiptUnchanged(t *testing.T) {
+	_, store, handler := openFixture(t)
+	var err error
+	handler.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.requireInviteEmail = true
+	handler.verifyAccount = func(_ context.Context, token string) (accountIdentity, error) {
+		return accountIdentity{subject: tokenHash(token), email: token + "@example.test"}, nil
+	}
+	id, _, err := store.Publish("", "fixture", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	handler.now = func() time.Time { return now }
+	code := issueFixture(t, handler.invites, bundle, now)
+	receipt := newToken()
+	activate := func(token, code string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"code": code, "session": receipt})
+		r := httptest.NewRequest(http.MethodPost, "/activate", strings.NewReader(string(body)))
+		r.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	for range activationLimit {
+		if status := activate("first", code).Code; status != http.StatusNotFound {
+			t.Fatalf("strict mode allowed an untargeted code: HTTP %d", status)
+		}
+	}
+	limited := activate("first", code)
+	if limited.Code != http.StatusTooManyRequests || limited.Header().Get("Retry-After") == "" {
+		t.Fatal("activation was not throttled")
+	}
+	if status := activate("second", code).Code; status != http.StatusNotFound {
+		t.Fatalf("another subject was affected by the limiter: HTTP %d", status)
+	}
+	now = now.Add(activationWindow)
+	if status := activate("first", code).Code; status != http.StatusNotFound {
+		t.Fatalf("activation window did not reset: HTTP %d", status)
+	}
+}
+
+func TestLegacyAccountBindingIsMigratedWithoutReissuingItsCode(t *testing.T) {
+	_, store, handler := openFixture(t)
+	var err error
+	handler.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := tokenHash("legacy")
+	handler.verifyAccount = func(context.Context, string) (accountIdentity, error) {
+		return accountIdentity{subject: subject, email: "legacy@example.test"}, nil
+	}
+	handler.requireInviteEmail = true
+	id, _, err := store.Publish("", "fixture", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := issueFixture(t, handler.invites, bundle, time.Now())
+	if err := handler.invites.create(subject+".account", []byte(tokenHash(code))); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "/account/profiles", nil)
+	r.Header.Set("Authorization", "Bearer legacy")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("legacy profile was not preserved: HTTP %d", w.Code)
 	}
 }

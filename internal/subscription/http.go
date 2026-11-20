@@ -10,19 +10,23 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type Handler struct {
-	store         *Store
-	invites       *Invites
-	now           func() time.Time
-	verifyAccount accountVerifier
+	store              *Store
+	invites            *Invites
+	now                func() time.Time
+	verifyAccount      accountVerifier
+	requireInviteEmail bool
+	activationAttempts activationLimiter
 }
 
 func NewHandler(dir string) (*Handler, error) {
@@ -62,20 +66,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == "/account" && h.verifyAccount != nil {
-		if _, ok := h.account(w, r); ok {
+		if account, ok := h.account(w, r); ok {
+			w.Header().Set("X-OVPN-Account", account.subject)
 			w.WriteHeader(http.StatusNoContent)
 		}
 		return
 	}
-	var subject string
+	var account verifiedAccount
 	if (strings.HasPrefix(r.URL.Path, "/device/") || r.URL.Path == "/account/profiles") && h.invites != nil {
 		var ok bool
-		subject, ok = h.account(w, r)
+		account, ok = h.account(w, r)
 		if !ok {
 			return
 		}
 	}
-	bundle, err := h.lookup(r.URL.Path, subject)
+	bundle, err := h.lookup(r.URL.Path, account)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -93,9 +98,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) lookup(path, subject string) (Bundle, error) {
-	if path == "/account/profiles" && h.invites != nil && subject != "" {
-		return h.invites.accountBundle(h.store, subject)
+func (h *Handler) lookup(path string, account verifiedAccount) (Bundle, error) {
+	if path == "/account/profiles" && h.invites != nil && account.invitation != "" {
+		bundle, _, err := h.invites.bundle(account.invitation, h.store)
+		return bundle, err
 	}
 	parts := strings.Split(path, "/")
 	if len(parts) != 4 || parts[0] != "" {
@@ -103,8 +109,8 @@ func (h *Handler) lookup(path, subject string) (Bundle, error) {
 	}
 	switch parts[1] {
 	case "device":
-		if h.invites != nil {
-			return h.invites.deviceBundle(h.store, parts[2], parts[3], subject)
+		if h.invites != nil && (account.subject == "" || account.invitation == parts[2]) {
+			return h.invites.deviceBundle(h.store, parts[2], parts[3], account.subject)
 		}
 	case "sub":
 		if !validToken(parts[3]) {
@@ -124,7 +130,7 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	subject, ok := h.account(w, r)
+	account, ok := h.account(w, r)
 	if !ok {
 		return
 	}
@@ -137,20 +143,35 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	switch err := h.invites.redeem(h.store, request.Code, request.Session, subject, h.now()); {
-	case errors.Is(err, ErrNotFound):
-		w.WriteHeader(http.StatusNotFound)
-	case err != nil:
-		w.WriteHeader(http.StatusServiceUnavailable)
-	default:
-		w.WriteHeader(http.StatusNoContent)
+	now := h.now()
+	if account.subject != "" && !h.activationAttempts.allow(account.subject, now) {
+		slog.Info("account activation", "outcome", "rate_limited")
+		w.Header().Set("Retry-After", strconv.Itoa(int(activationWindow.Seconds())))
+		w.WriteHeader(http.StatusTooManyRequests)
+		return
 	}
+	outcome := "accepted"
+	status := http.StatusNoContent
+	err := h.invites.redeem(r.Context(), h.store, request.Code, request.Session, account.subject, account.emailTag, h.requireInviteEmail, now)
+	switch {
+	case errors.Is(err, ErrAccountConflict):
+		status, outcome = http.StatusConflict, "identity_conflict"
+	case errors.Is(err, ErrNotFound):
+		status, outcome = http.StatusNotFound, "unavailable_invitation"
+	case err != nil:
+		status, outcome = http.StatusServiceUnavailable, "unavailable"
+	}
+	if account.subject != "" {
+		slog.Info("account activation", "outcome", outcome)
+	}
+	w.WriteHeader(status)
 }
 
 type ServeOptions struct {
 	Dir, InviteDir, Listen, CertFile, KeyFile string
 	AccountIssuer                             string
 	AccountClients                            []string
+	RequireInviteEmail                        bool
 }
 
 func (o ServeOptions) Validate() error {
@@ -164,7 +185,7 @@ func (o ServeOptions) Validate() error {
 	if (o.CertFile == "") != (o.KeyFile == "") {
 		return fmt.Errorf("--tls-cert and --tls-key must be supplied together")
 	}
-	if o.AccountIssuer != "" || len(o.AccountClients) != 0 {
+	if o.AccountIssuer != "" || len(o.AccountClients) != 0 || o.RequireInviteEmail {
 		issuer, err := url.Parse(o.AccountIssuer)
 		if err != nil || issuer.Scheme != "https" || issuer.Hostname() == "" ||
 			issuer.User != nil || issuer.RawQuery != "" || issuer.ForceQuery || strings.Contains(o.AccountIssuer, "#") ||
@@ -201,6 +222,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 	}
 	if opts.AccountIssuer != "" {
+		handler.requireInviteEmail = opts.RequireInviteEmail
 		handler.verifyAccount, err = openAccountVerifier(ctx, opts.AccountIssuer, opts.AccountClients)
 		if err != nil {
 			return err

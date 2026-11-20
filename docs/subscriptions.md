@@ -91,12 +91,14 @@ The Base64 link-list format is consumed by [v2rayN](https://github.com/2dust/v2r
 
 ## Account-based delivery
 
+See [mobile account onboarding](account-onboarding.md) for verified email, passwordless sign-in and operator setup.
+
 Use an OpenID Connect provider to offer verified email registration and Google sign-in. Register public clients for Android and iOS with Authorization Code and PKCE. Configure both clients to receive the same stable subject for an account. The service verifies the issuer, allowed client ID, signature, expiration and verified-email claim. It uses an issuer-scoped account identifier and keeps email addresses out of invitation records.
 
 ```sh
 ovpn subscription serve --bundle-dir ./subscription-bundles --invite-dir ./invites \
   --account-issuer https://login.example.net/realms/tunnel \
-  --account-client ovpn-android,ovpn-ios
+  --account-client ovpn-android,ovpn-ios --account-require-invite-email
 ```
 
 Expose `/account`, `/account/profiles` and `/activate` over HTTPS alongside the existing delivery paths. Use a dedicated invitation directory and one delivery process per directory for account-based clients. Keep the paths, access tokens and activation bodies out of request logging. Publish the intended OVPN user's compatible profiles with `--all-profiles` and issue a code with `ovpn subscription invite`. Assign one OVPN user per customer if you want to identify them individually in Desk presence and quota views.

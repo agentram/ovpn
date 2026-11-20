@@ -13,7 +13,7 @@ import (
 
 func (a *App) newUserInviteCmd() *cobra.Command {
 	var selection subscriptionSelection
-	var origin, dir, inviteDir string
+	var origin, dir, inviteDir, recipient string
 	cmd := &cobra.Command{Use: "invite", Short: "Create a one-time setup code with verified HTTPS delivery", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, _ []string) error {
 		if a.dryRun {
 			return fmt.Errorf("issuing access sends traffic and writes credentials; --dry-run is not supported")
@@ -66,7 +66,7 @@ func (a *App) newUserInviteCmd() *cobra.Command {
 			return err
 		}
 		defer invites.Close()
-		code, err := invites.Issue(bundle, origin, time.Now(), 30*time.Minute)
+		code, err := invites.IssueForEmail(bundle, origin, time.Now(), 30*time.Minute, recipient)
 		if err != nil {
 			return err
 		}
@@ -81,6 +81,7 @@ func (a *App) newUserInviteCmd() *cobra.Command {
 	cmd.Flags().Lookup("all-profiles").DefValue = "true"
 	cmd.Flags().StringVar(&origin, "base-url", "", "HTTPS address of the prepared profile delivery service")
 	cmd.Flags().StringVar(&dir, "bundle-dir", "", "Prepared bundle directory (default: workspace/delivery/bundles)")
+	cmd.Flags().StringVar(&recipient, "recipient-email", "", "Require the recipient to sign in with this verified email")
 	cmd.Flags().StringVar(&inviteDir, "invite-dir", "", "Invitation directory (default: workspace/delivery/invites)")
 	_ = cmd.MarkFlagRequired("base-url")
 	return cmd

@@ -11,6 +11,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 Move the desktop, Android and iOS application source and build pipelines into separate repositories. Keep the CLI, server components and client-compatible VPN access APIs here. Replace deployment-specific test fixture values with synthetic data.
 
 ### Added
+- Bind account invitations to a verified recipient email, enforce unique mailbox ownership, and rate-limit activation attempts. Document Google and email OTP onboarding and account migration.
 - Add proxy/backend topology, direct-routing presets, agent-collected HAProxy health and backend-first HA application with verified backups and dependency failure blocking. Include entry-server setup and actual HAProxy Docker failover/recovery acceptance in CI.
 - Add user creation, enable/disable, expiry and rolling quota changes, explicit QR/link delivery, and one-time setup codes that verify trusted HTTPS delivery and the published profile snapshot before issue.
 - Expose the CLI command catalog through additive machine protocol 1 methods. Review affected servers and input values before writes; deletion, restore and cleanup require a separate typed confirmation.

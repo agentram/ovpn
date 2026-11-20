@@ -74,7 +74,7 @@ func TestAccountProviderVerifiesIssuerAudienceSignatureAndEmail(t *testing.T) {
 			token, err := jwt.Signed(signer).Claims(jwt.Claims{
 				Issuer: r.issuer, Subject: "fixture-account", Audience: r.audience,
 				IssuedAt: jwt.NewNumericDate(now), Expiry: jwt.NewNumericDate(r.expires),
-			}).Claims(map[string]any{"email_verified": r.verified, "azp": r.party}).Serialize()
+			}).Claims(map[string]any{"email": "Fixture@Example.Test", "email_verified": r.verified, "azp": r.party}).Serialize()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -84,7 +84,7 @@ func TestAccountProviderVerifiesIssuerAudienceSignatureAndEmail(t *testing.T) {
 			}
 			subject, err := verify(t.Context(), token)
 			if r.want {
-				if err != nil || subject != tokenHash(issuer+"\x00fixture-account") {
+				if err != nil || subject.subject != tokenHash(issuer+"\x00fixture-account") || subject.email != "fixture@example.test" {
 					t.Fatal("verified identity did not map to the expected account")
 				}
 			} else if err == nil {

@@ -36,6 +36,7 @@ func (a *App) subscriptionServeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.InviteDir, "invite-dir", "", "Private writable invitation directory")
 	cmd.Flags().StringVar(&opts.AccountIssuer, "account-issuer", "", "Require verified OIDC accounts for invitation activation and updates")
 	cmd.Flags().StringSliceVar(&opts.AccountClients, "account-client", nil, "Allowed mobile OIDC client IDs")
+	cmd.Flags().BoolVar(&opts.RequireInviteEmail, "account-require-invite-email", false, "Require account invitations issued to a verified email address")
 	cmd.Flags().StringVar(&opts.Listen, "listen", "127.0.0.1:8088", "Subscription HTTP listen address; non-loopback requires TLS")
 	cmd.Flags().StringVar(&opts.CertFile, "tls-cert", "", "TLS certificate chain file")
 	cmd.Flags().StringVar(&opts.KeyFile, "tls-key", "", "TLS private key file")
@@ -72,7 +73,7 @@ func (a *App) subscriptionRevokeCmd() *cobra.Command {
 }
 
 func (a *App) subscriptionInviteCmd() *cobra.Command {
-	var dir, inviteDir, id, origin, out string
+	var dir, inviteDir, id, origin, out, recipient string
 	var ttl time.Duration
 	var checkService bool
 	cmd := &cobra.Command{
@@ -101,7 +102,7 @@ func (a *App) subscriptionInviteCmd() *cobra.Command {
 					return err
 				}
 			}
-			code, err := invites.Issue(bundle, origin, time.Now(), ttl)
+			code, err := invites.IssueForEmail(bundle, origin, time.Now(), ttl, recipient)
 			if err != nil {
 				return err
 			}
@@ -117,6 +118,7 @@ func (a *App) subscriptionInviteCmd() *cobra.Command {
 	cmd.Flags().StringVar(&inviteDir, "invite-dir", "", "Private writable invitation directory")
 	cmd.Flags().StringVar(&id, "id", "", "Published subscription ID")
 	cmd.Flags().StringVar(&origin, "base-url", "", "HTTPS origin of the subscription service")
+	cmd.Flags().StringVar(&recipient, "recipient-email", "", "Require the recipient to sign in with this verified email")
 	cmd.Flags().StringVar(&out, "out", "", "Save a private QR PNG instead of printing the code")
 	cmd.Flags().BoolVar(&checkService, "check-service", false, "Verify HTTPS delivery before issuing a setup code")
 	cmd.Flags().DurationVar(&ttl, "ttl", 30*time.Minute, "Time allowed to activate the invitation")

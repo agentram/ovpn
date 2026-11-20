@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-type accountVerifier func(context.Context, string) (string, error)
+type accountVerifier func(context.Context, string) (accountIdentity, error)
 
 func openAccountVerifier(ctx context.Context, issuer string, clients []string) (accountVerifier, error) {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -39,13 +40,14 @@ func discoverAccountVerifier(ctx context.Context, issuer string, clients []strin
 			ClientID: client, SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
 		}))
 	}
-	return func(ctx context.Context, raw string) (string, error) {
+	return func(ctx context.Context, raw string) (accountIdentity, error) {
 		for i, verifier := range verifiers {
 			token, err := verifier.Verify(ctx, raw)
 			if err != nil {
 				continue
 			}
 			var claims struct {
+				Email         string `json:"email"`
 				EmailVerified bool   `json:"email_verified"`
 				Party         string `json:"azp"`
 			}
@@ -57,24 +59,49 @@ func discoverAccountVerifier(ctx context.Context, issuer string, clients []strin
 				continue
 			}
 			// Separate subjects from different issuers without persisting identity data.
-			return tokenHash(issuer + "\x00" + token.Subject), nil
+			email, err := canonicalEmail(claims.Email)
+			if err != nil {
+				break
+			}
+			return accountIdentity{subject: tokenHash(issuer + "\x00" + token.Subject), email: email}, nil
 		}
-		return "", errors.New("account verification failed")
+		return accountIdentity{}, errors.New("account verification failed")
 	}, nil
 }
 
-func (h *Handler) account(w http.ResponseWriter, r *http.Request) (string, bool) {
+type verifiedAccount struct {
+	subject    string
+	emailTag   string
+	invitation string
+}
+
+func (h *Handler) account(w http.ResponseWriter, r *http.Request) (verifiedAccount, bool) {
 	if h.verifyAccount == nil {
-		return "", true
+		return verifiedAccount{}, true
 	}
 	fields := strings.Fields(r.Header.Get("Authorization"))
 	if len(fields) == 2 && strings.EqualFold(fields[0], "Bearer") && len(fields[1]) <= 7168 {
-		subject, err := h.verifyAccount(r.Context(), fields[1])
-		if err == nil && validDigest(subject) {
-			return subject, true
+		identity, err := h.verifyAccount(r.Context(), fields[1])
+		if err == nil && validDigest(identity.subject) {
+			tag, err := h.invites.emailTag(identity.email)
+			if err != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return verifiedAccount{}, false
+			}
+			invite, err := h.invites.accountInvitation(r.Context(), identity.subject, tag)
+			switch {
+			case errors.Is(err, ErrAccountConflict):
+				slog.Info("account authorization", "outcome", "identity_conflict")
+				w.WriteHeader(http.StatusConflict)
+			case err != nil:
+				w.WriteHeader(http.StatusServiceUnavailable)
+			default:
+				return verifiedAccount{subject: identity.subject, emailTag: tag, invitation: invite}, true
+			}
+			return verifiedAccount{}, false
 		}
 	}
 	w.Header().Set("WWW-Authenticate", "Bearer")
 	w.WriteHeader(http.StatusUnauthorized)
-	return "", false
+	return verifiedAccount{}, false
 }
