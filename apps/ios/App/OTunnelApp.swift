@@ -25,7 +25,7 @@ private struct Home: View {
     @State private var sheet: Panel?
 
     private enum Panel: String, Identifiable {
-        case settings, profiles, report
+        case settings, profiles, report, access
         var id: String { rawValue }
     }
 
@@ -66,6 +66,8 @@ private struct Home: View {
                         case .profiles: profileList
                         case .report: diagnostics
                         case .settings: settings
+                        case .access:
+                            ScrollView { activate.padding(20) }.navigationTitle("Set up access")
                         }
                     }
                     .toolbar { ToolbarItem(placement: .confirmationAction) {
@@ -186,6 +188,8 @@ private struct Home: View {
                 Text("简体中文").tag("zh-Hans")
             }
             if model.signedIn {
+                Button("Enter a new code") { sheet = .access }
+                    .disabled(model.busy)
                 Button("Update profiles") { Task { await model.refresh(); sheet = nil } }
                     .disabled(model.profiles.isEmpty || model.busy)
                 Button("Sign out", role: .destructive) { Task { await model.signOut(); sheet = nil } }

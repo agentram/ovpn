@@ -9,6 +9,7 @@ export GOBIN="$work"
 export PATH="$work:$PATH"
 go install golang.org/x/mobile/cmd/gomobile golang.org/x/mobile/cmd/gobind
 mkdir -p apps/ios/Frameworks
+go mod download github.com/xtls/xray-core
 xray_dir="$(go list -m -f '{{.Dir}}' github.com/xtls/xray-core)"
 # The pinned Darwin TUN wraps the supplied fd in os.File without owning it.
 # Give Xray its own duplicate so Close cancels Go reads and releases it safely.

@@ -120,6 +120,7 @@ final class TunnelModel: ObservableObject {
                 throw Issue.used
             }
             let profiles = try await fetch(token: token)
+            stop()
             try store(Snapshot(profiles: profiles, selected: profiles.first?.id))
             code = ""
         }

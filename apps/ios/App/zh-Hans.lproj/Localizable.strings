@@ -33,3 +33,4 @@
 "No compatible profiles were found." = "未找到兼容的方案。";
 "Could not open or save access on this phone." = "无法在此设备上打开或保存访问权限。";
 "Could not connect. Try another profile." = "无法连接，请尝试其他方案。";
+"Enter a new code" = "输入新的访问码";
