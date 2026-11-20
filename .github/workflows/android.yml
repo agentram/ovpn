@@ -52,11 +52,21 @@ jobs:
         run: |
           go test ./mobile/androidbridge
           apps/android/build-core.sh
-      - name: Test and package Android
+      - name: Run JVM tests and build the development APK
         working-directory: apps/android
         run: |
-          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:bundleRelease
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
           ./check-alignment.sh app/build/outputs/apk/debug/app-debug.apk
+      - name: Preserve the JVM test report on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: android-package-jvm-test-results
+          path: apps/android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+          if-no-files-found: ignore
+      - name: Lint and package the release bundle
+        working-directory: apps/android
+        run: ./gradlew --no-daemon :app:lintDebug :app:bundleRelease
       - name: Upload development artifacts
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
