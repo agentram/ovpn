@@ -116,11 +116,11 @@ func TestRepeatedSubmissionKeepsOneOperationAndPrivateJournal(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer root.Close()
-	raw, e := root.ReadFile(p.ID + ".json.enc")
+	raw, e := root.ReadFile("journal.db")
 	if e != nil || strings.Contains(string(raw), "private-fixture-value") {
 		t.Fatal("plaintext intent in the journal", e)
 	}
-	info, e := os.Stat(filepath.Join(directory(s.workspace), p.ID+".json.enc"))
+	info, e := os.Stat(filepath.Join(directory(s.workspace), "journal.db"))
 	if e != nil || info.Mode().Perm() != 0o600 {
 		t.Fatal("journal permissions", e)
 	}
@@ -196,6 +196,14 @@ func TestWriterLockBlocksAnotherEntryPoint(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("writer did not enter")
 	}
+	other := New(context.Background(), s.workspace, b)
+	defer other.Close()
+	if row, err := s.Job(job.ID); err != nil || !row.Cancellable {
+		t.Fatal("owner cannot cancel its running job", err)
+	}
+	if row, err := other.Job(job.ID); err != nil || row.Cancellable || row.State != "running" {
+		t.Fatal("external worker was offered control of the job", row, err)
+	}
 	if e := WithWriter(s.workspace, func() error { t.Fatal("parallel writer entered"); return nil }); !errors.Is(e, ErrBusy) {
 		t.Fatal(e)
 	}
@@ -264,5 +272,86 @@ func TestDependentApplyNeverTouchesProxyAfterBackendOrBackupFailure(t *testing.T
 				t.Fatal("proxy applied after a failed prerequisite")
 			}
 		})
+	}
+}
+
+func TestJournalIndexesRecentActivityAndKeepsRecoverableJobs(t *testing.T) {
+	s, _ := fixtureService(t)
+	j, err := s.open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	tOld := now.Add(-24 * time.Hour)
+	save := func(value record) string {
+		value.Plan.ID = token()
+		if value.Job != nil {
+			value.Job.ID = value.Plan.ID
+			value.Key = token()
+		}
+		if err := j.save(value); err != nil {
+			t.Fatal(err)
+		}
+		return value.Plan.ID
+	}
+	expired := save(record{Plan: Plan{CreatedAt: tOld}})
+	unused := save(record{Plan: Plan{CreatedAt: now}})
+	recovery := save(record{Plan: Plan{CreatedAt: tOld}, Job: &Job{StartedAt: tOld, FinishedAt: &tOld, State: "partial"}})
+	oldDone := save(record{Plan: Plan{CreatedAt: tOld}, Job: &Job{StartedAt: tOld, FinishedAt: &tOld, State: "succeeded"}})
+	for n := range terminalRetention + 5 {
+		at := now.Add(-time.Duration(n) * time.Second)
+		save(record{Plan: Plan{CreatedAt: at}, Job: &Job{StartedAt: at, FinishedAt: &at, State: "succeeded"}})
+	}
+	// An unreadable unused plan must not be decrypted on every activity poll.
+	if _, err := j.db.Exec("UPDATE records SET payload = ? WHERE id = ?", []byte("fixture"), unused); err != nil {
+		t.Fatal(err)
+	}
+	if jobs, err := s.List(); err != nil || len(jobs) != activityLimit {
+		t.Fatal("activity did not use the bounded job index", len(jobs), err)
+	}
+	if err := s.pruneJournal(j); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{expired, oldDone} {
+		if _, err := j.read(id); err == nil {
+			t.Fatal("expired journal entry was retained")
+		}
+	}
+	if job, err := s.Job(recovery); err != nil || job.State != "partial" {
+		t.Fatal("pruning lost a recoverable operation", err)
+	}
+}
+
+func TestJournalMigrationPreservesAnInterruptedEncryptedJob(t *testing.T) {
+	dir := t.TempDir()
+	root, err := privateRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	box, err := envelope(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := token()
+	at := time.Now().UTC()
+	value := record{Version: 1, Plan: Plan{ID: id, CreatedAt: at}, Key: token(),
+		Job: &Job{ID: id, StartedAt: at, State: "running"}, Snapshot: json.RawMessage(`{"value":"private-fixture-value"}`)}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce := make([]byte, box.NonceSize())
+	if err := root.WriteFile(id+".json.enc", box.Seal(nonce, nonce, raw, []byte(id)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := New(context.Background(), dir, &testBackend{})
+	defer s.Close()
+	job, err := s.Job(id)
+	if err != nil || job.State != "recovery_required" || job.Cancellable {
+		t.Fatal("migration lost interrupted state", job, err)
+	}
+	if _, err := root.Stat(id + ".json.enc"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("legacy file remained after a committed migration", err)
 	}
 }

@@ -101,4 +101,16 @@ ovpn subscription serve --bundle-dir ./subscription-bundles --invite-dir ./invit
 
 Expose `/account`, `/account/profiles` and `/activate` over HTTPS alongside the existing delivery paths. Use a dedicated invitation directory and one delivery process per directory for account-based clients. Keep the paths, access tokens and activation bodies out of request logging. Publish the intended OVPN user's compatible profiles with `--all-profiles` and issue a code with `ovpn subscription invite`. Assign one OVPN user per customer if you want to identify them individually in Desk presence and quota views.
 
-The code binds the published profile list to one verified account. The account can retrieve that list again after signing in. Rotating or revoking the subscription stops delivery. To stop a saved profile from connecting, also disable the VPN user on the server. Legacy direct subscription URLs retain their existing URL-token behavior.
+The code binds the published profile list to one verified account. The account can retrieve that list again after signing in. Rotating or revoking the subscription stops delivery. To stop a saved profile from connecting, also disable the VPN user on the server. Direct subscription URLs keep their URL-token behavior.
+
+To migrate existing O Tunnel installations, keep the original HTTPS origin
+without account mode and keep its invitation directory, bundle directory and
+delivery process available. Activated Android installations use their existing
+device receipts at that origin. Enabling account mode there makes anonymous
+receipt refresh fail because the receipts have no account binding.
+
+Set up a separate HTTPS origin and separate bundle and invitation directories
+for account clients. Publish profiles and issue fresh account setup codes there.
+Have each user sign in, activate and verify refresh on the new build before
+retiring their legacy delivery. A failure during the rollout can be recovered
+by continuing to use the original origin and an existing activated installation.

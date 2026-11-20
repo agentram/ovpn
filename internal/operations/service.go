@@ -9,7 +9,6 @@ import (
 	"errors"
 	"ovpn/internal/observation"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 )
@@ -24,6 +23,7 @@ type Service struct {
 	failures  map[string]error
 	results   map[string]Result
 	wg        sync.WaitGroup
+	journal   *journal
 }
 
 func New(ctx context.Context, workspace string, backend Backend) *Service {
@@ -41,6 +41,18 @@ func validID(s string) bool {
 	return e == nil && len(v) == 16 && s == hex.EncodeToString(v)
 }
 func (s *Service) Catalog() []Action { return s.backend.Catalog() }
+
+// open is called with mu held.
+func (s *Service) open() (*journal, error) {
+	if s.journal == nil {
+		j, err := openJournal(s.workspace)
+		if err != nil {
+			return nil, ErrUnavailable
+		}
+		s.journal = j
+	}
+	return s.journal, nil
+}
 
 func (s *Service) Plan(ctx context.Context, request Request) (Plan, error) {
 	unlock, err := observation.Lock(filepath.Join(directory(s.workspace), "metadata"))
@@ -68,16 +80,30 @@ func (s *Service) Plan(ctx context.Context, request Request) (Plan, error) {
 	}
 	digest := sha256.Sum256(raw)
 	p.Digest = hex.EncodeToString(digest[:])
-	root, err := privateRoot(s.workspace)
+	journal, err := s.open()
 	if err != nil {
 		return Plan{}, ErrUnavailable
 	}
-	defer root.Close()
+	if err := s.pruneJournal(journal); err != nil {
+		return Plan{}, err
+	}
 	r := record{Plan: p, Request: p.Request, Revision: p.Revision, Snapshot: p.Snapshot}
-	if save(root, r) != nil {
+	if journal.save(r) != nil {
 		return Plan{}, ErrUnavailable
 	}
 	return p, nil
+}
+
+func (s *Service) pruneJournal(journal *journal) error {
+	removed, err := journal.prune(time.Now())
+	if err != nil {
+		return ErrUnavailable
+	}
+	for _, id := range removed {
+		delete(s.failures, id)
+		delete(s.results, id)
+	}
+	return nil
 }
 
 func (s *Service) Start(ctx context.Context, request Start) (Job, error) {
@@ -91,12 +117,11 @@ func (s *Service) Start(ctx context.Context, request Start) (Job, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, err := privateRoot(s.workspace)
+	journal, err := s.open()
 	if err != nil {
 		return Job{}, ErrUnavailable
 	}
-	defer root.Close()
-	r, err := read(root, request.PlanID)
+	r, err := journal.read(request.PlanID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -107,19 +132,20 @@ func (s *Service) Start(ctx context.Context, request Start) (Job, error) {
 		if r.Key != request.Key {
 			return Job{}, ErrInvalid
 		}
-		return *r.Job, nil
+		return s.jobState(*r.Job), nil
 	}
-	if time.Since(r.Plan.CreatedAt) > 15*time.Minute {
+	if time.Since(r.Plan.CreatedAt) > planLifetime {
 		return Job{}, ErrStale
 	}
-	all, err := records(root)
-	if err != nil {
+	if err := s.pruneJournal(journal); err != nil {
+		return Job{}, err
+	}
+	var duplicate bool
+	if err := journal.db.QueryRow("SELECT EXISTS(SELECT 1 FROM records WHERE request_key = ?)", request.Key).Scan(&duplicate); err != nil {
 		return Job{}, ErrUnavailable
 	}
-	for _, other := range all {
-		if other.Key == request.Key {
-			return Job{}, ErrInvalid
-		}
+	if duplicate {
+		return Job{}, ErrInvalid
 	}
 	j := Job{ID: r.Plan.ID, PlanID: r.Plan.ID, Action: r.Plan.Action, Title: r.Plan.Title, State: "queued", StartedAt: time.Now().UTC(), Steps: []Step{}}
 	for _, t := range r.Plan.Targets {
@@ -129,7 +155,7 @@ func (s *Service) Start(ctx context.Context, request Start) (Job, error) {
 	if err := s.launch(r, false); err != nil {
 		return Job{}, err
 	}
-	return j, nil
+	return s.jobState(j), nil
 }
 
 func (s *Service) launch(r record, recovering bool) error {
@@ -137,13 +163,12 @@ func (s *Service) launch(r record, recovering bool) error {
 	if err != nil {
 		return ErrBusy
 	}
-	root, err := privateRoot(s.workspace)
+	journal, err := s.open()
 	if err != nil {
 		owner()
 		return ErrUnavailable
 	}
-	err = save(root, r)
-	root.Close()
+	err = journal.save(r)
 	if err != nil {
 		owner()
 		return ErrUnavailable
@@ -160,7 +185,7 @@ func (s *Service) launch(r record, recovering bool) error {
 		defer s.wg.Done()
 		defer owner()
 		defer cancel()
-		s.execute(ctx, r, recovering)
+		s.execute(ctx, journal, r, recovering)
 		s.mu.Lock()
 		delete(s.running, r.Plan.ID)
 		s.mu.Unlock()
@@ -168,19 +193,14 @@ func (s *Service) launch(r record, recovering bool) error {
 	return nil
 }
 
-func (s *Service) execute(ctx context.Context, r record, recovering bool) {
+func (s *Service) execute(ctx context.Context, journal *journal, r record, recovering bool) {
 	defer func() {
 		if s.OnFinish != nil && r.Plan.Mutation {
 			s.OnFinish(r.Plan)
 		}
 	}()
 	run := func() error {
-		root, err := privateRoot(s.workspace)
-		if err != nil {
-			return ErrUnavailable
-		}
-		defer root.Close()
-		persist := func() error { s.mu.Lock(); defer s.mu.Unlock(); return save(root, r) }
+		persist := func() error { s.mu.Lock(); defer s.mu.Unlock(); return journal.save(r) }
 		if recovering {
 			if guard, ok := s.backend.(ResumeGuard); ok {
 				if e := guard.CanResume(ctx, r.Plan); e != nil {
@@ -276,11 +296,6 @@ func (s *Service) execute(ctx context.Context, r record, recovering bool) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, openErr := privateRoot(s.workspace)
-	if openErr != nil {
-		return
-	}
-	defer root.Close()
 	// Reload when another process owns the journal and preserve its durable state.
 	if errors.Is(err, ErrBusy) {
 		r.Job.State, r.Job.Code = "blocked", "WORKSPACE_BUSY"
@@ -306,7 +321,7 @@ func (s *Service) execute(ctx context.Context, r record, recovering bool) {
 	}
 	now := time.Now().UTC()
 	r.Job.FinishedAt = &now
-	_ = save(root, r)
+	_ = journal.save(r)
 }
 
 func safeCode(err error) string {
@@ -326,41 +341,51 @@ func safeCode(err error) string {
 	return "APPLY_UNVERIFIED"
 }
 
+// jobState projects ownership without putting worker-local state in the journal.
+func (s *Service) jobState(j Job) Job {
+	_, local := s.running[j.ID]
+	active := j.State == "running" || j.State == "queued"
+	j.Cancellable = local && active
+	if local && !active {
+		j.State = "running"
+	} else if !local && active {
+		if release, err := observation.Lock(filepath.Join(directory(s.workspace), "job-"+j.ID)); err == nil {
+			release()
+			j.State, j.Code = "recovery_required", "INTERRUPTED"
+		}
+	}
+	return j
+}
+
 func (s *Service) List() ([]Job, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, err := privateRoot(s.workspace)
+	journal, err := s.open()
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := journal.activity()
 	if err != nil {
 		return nil, ErrUnavailable
 	}
-	defer root.Close()
-	rows, err := records(root)
-	if err != nil {
-		return nil, ErrUnavailable
-	}
-	jobs := []Job{}
-	for _, r := range rows {
-		if r.Job == nil {
-			continue
-		}
-		j := *r.Job
-		if _, running := s.running[j.ID]; running && j.State != "queued" && j.State != "running" {
-			j.State = "running"
-		}
-		if _, running := s.running[j.ID]; !running && (j.State == "running" || j.State == "queued") {
-			if release, err := observation.Lock(filepath.Join(directory(s.workspace), "job-"+j.ID)); err == nil {
-				release()
-				j.State = "recovery_required"
-				j.Code = "INTERRUPTED"
-			}
-		}
-		jobs = append(jobs, j)
-	}
-	sort.Slice(jobs, func(i, j int) bool { return jobs[i].StartedAt.After(jobs[j].StartedAt) })
-	if len(jobs) > 100 {
-		jobs = jobs[:100]
+	for i, job := range jobs {
+		jobs[i] = s.jobState(job)
 	}
 	return jobs, nil
+}
+
+func (s *Service) Job(id string) (Job, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	journal, err := s.open()
+	if err != nil {
+		return Job{}, err
+	}
+	r, err := journal.read(id)
+	if err != nil || r.Job == nil {
+		return Job{}, ErrUnavailable
+	}
+	return s.jobState(*r.Job), nil
 }
 
 func (s *Service) Resume(id string) (Job, error) {
@@ -374,12 +399,11 @@ func (s *Service) Resume(id string) (Job, error) {
 	if _, ok := s.running[id]; ok {
 		return Job{}, ErrBusy
 	}
-	root, err := privateRoot(s.workspace)
+	journal, err := s.open()
 	if err != nil {
 		return Job{}, ErrUnavailable
 	}
-	defer root.Close()
-	r, err := read(root, id)
+	r, err := journal.read(id)
 	if err != nil || r.Job == nil {
 		return Job{}, ErrInvalid
 	}
@@ -394,7 +418,7 @@ func (s *Service) Resume(id string) (Job, error) {
 	if err := s.launch(r, true); err != nil {
 		return Job{}, err
 	}
-	return *r.Job, nil
+	return s.jobState(*r.Job), nil
 }
 func (s *Service) Cancel(id string) error {
 	s.mu.Lock()
@@ -422,6 +446,11 @@ func (s *Service) Close() {
 	}
 	s.mu.Unlock()
 	s.wg.Wait()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.journal != nil {
+		_ = s.journal.db.Close()
+	}
 }
 
 // Failure is private to the in-process CLI adapter; raw errors never cross the worker protocol.

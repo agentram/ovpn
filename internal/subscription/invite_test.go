@@ -192,3 +192,49 @@ func postActivation(handler http.Handler, code, session string) int {
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/activate", strings.NewReader(string(body))))
 	return w.Code
 }
+
+func TestLegacyReceiptSurvivesSeparateAccountRollout(t *testing.T) {
+	_, legacyStore, legacy := openFixture(t)
+	legacyDir := t.TempDir()
+	var err error
+	legacy.invites, err = OpenInvites(legacyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _, err := legacyStore.Publish("", "fixture-user", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := legacyStore.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := issueFixture(t, legacy.invites, bundle, time.Now())
+	receipt := newToken()
+	if postActivation(legacy, code, receipt) != http.StatusNoContent {
+		t.Fatal("legacy activation failed")
+	}
+	path := "/device/" + tokenHash(code) + "/" + receipt
+
+	_, _, account := openFixture(t)
+	account.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	account.verifyAccount = func(context.Context, string) (string, error) {
+		return tokenHash("fixture-account"), nil
+	}
+	if response := request(account, http.MethodGet, path); response.Code != http.StatusUnauthorized {
+		t.Fatal("legacy receipt was accepted by the account origin", response.Code)
+	}
+
+	// An existing installation refreshes with its original receipt after the
+	// legacy service restarts alongside the account origin.
+	legacy.invites, err = OpenInvites(legacyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response := request(legacy, http.MethodGet, path); response.Code != http.StatusOK {
+		t.Fatal("legacy installation cannot refresh on its original origin", response.Code)
+	}
+}

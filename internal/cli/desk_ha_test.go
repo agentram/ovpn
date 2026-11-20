@@ -3,12 +3,15 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"ovpn/internal/haproxy"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"ovpn/internal/ha"
 	"ovpn/internal/model"
 	"ovpn/internal/operations"
 )
@@ -35,11 +38,19 @@ func TestHAPlanOrdersReviewedBackendsBeforeProxyAndRejectsIncompatibleChanges(t 
 	if !plan.StopOnFailure || !plan.Mutation || len(plan.Targets) != 3 || plan.Targets[0].Name != second.Name || plan.Targets[1].Name != first.Name || plan.Targets[2].Name != proxy.Name {
 		t.Fatalf("unsafe HA order: %+v", plan.Targets)
 	}
+	second.Enabled = false
+	if err := a.store.UpdateServer(a.ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Prepare(a.ctx, request); !errors.Is(err, ha.ErrIncompatible) || !strings.Contains(err.Error(), second.Name) {
+		t.Fatal("disabled backend reached remote apply", err)
+	}
+	second.Enabled = true
 	second.RealityPublicKey = "different"
 	if err := a.store.UpdateServer(a.ctx, second); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := d.Prepare(a.ctx, request); err == nil || err.Error() != "HA_BACKENDS_INCOMPATIBLE" {
+	if _, err := d.Prepare(a.ctx, request); !errors.Is(err, ha.ErrIncompatible) {
 		t.Fatal("incompatible pool reached remote apply", err)
 	}
 	request.Arguments = []string{first.Name}

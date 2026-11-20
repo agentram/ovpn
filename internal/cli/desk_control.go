@@ -322,6 +322,11 @@ func (d *deskControl) Backup(ctx context.Context, p operations.Plan, target oper
 	if !p.Mutation || p.Action == "server.backup" || strings.HasPrefix(p.Action, "subscription.") || strings.HasPrefix(p.Action, "observe.") {
 		return nil
 	}
+	if p.Action == "server.restore" {
+		// The remote restore validates and stages its source before any remote backup.
+		_, _, err := backup.LocalBackup(d.dataDir, filepath.Join(d.dataDir, "backups"))
+		return err
+	}
 	if !remoteMutation(p.Action) {
 		if p.Action == "user.reconcile" || p.Action == "server.add" || strings.HasPrefix(p.Action, "server.profile.") || strings.HasPrefix(p.Action, "server.backend.") || strings.HasPrefix(p.Action, "server.set-") {
 			_, _, err := backup.LocalBackup(d.dataDir, filepath.Join(d.dataDir, "backups"))

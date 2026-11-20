@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"ovpn/internal/model"
 	"ovpn/internal/observation"
 
 	"github.com/spf13/cobra"
@@ -104,11 +106,74 @@ func (a *App) newServerTestCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		_, err = a.newRunner("server.test").Exec(a.ctx, sshFromServer(*server), "set -e; command -v sh >/dev/null; sudo -n true; test -r /etc/os-release; uname -m")
-		if err != nil {
-			return fmt.Errorf("SSH_ACCESS_FAILED")
+		if err := a.verifySSHAccess(*server); err != nil {
+			return err
 		}
 		fmt.Fprintln(a.output(), "SSH access verified. The server is ready for installation.")
 		return nil
 	}}
+}
+
+// A verified candidate replaces the saved SSH settings only after it works.
+func (a *App) newServerSetSSHCmd() *cobra.Command {
+	var user, identity, fingerprint string
+	var port int
+	cmd := &cobra.Command{Use: "set-ssh <server>", Short: "Update and verify SSH access", Args: cobra.ExactArgs(1)}
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		server, err := a.store.GetServerByName(a.ctx, args[0])
+		if err != nil {
+			return err
+		}
+		candidate := *server
+		if cmd.Flags().Changed("ssh-user") {
+			if strings.TrimSpace(user) == "" {
+				return fmt.Errorf("SSH user is required")
+			}
+			candidate.SSHUser = strings.TrimSpace(user)
+		}
+		if cmd.Flags().Changed("ssh-identity") {
+			candidate.SSHIdentityFile = identity
+		}
+		if cmd.Flags().Changed("ssh-port") {
+			if port < 1 || port > 65535 {
+				return fmt.Errorf("invalid SSH port")
+			}
+			candidate.SSHPort = port
+		}
+		if candidate.SSHPort != server.SSHPort && fingerprint == "" {
+			return fmt.Errorf("SSH_HOST_KEY_CHANGED")
+		}
+		if a.dryRun {
+			fmt.Fprintln(a.output(), "SSH settings unchanged in dry-run mode.")
+			return nil
+		}
+		if fingerprint != "" {
+			candidate.SSHKnownHostsFile, err = a.trustServerHost(cmd, candidate.Host, candidate.SSHPort, fingerprint)
+			if err != nil {
+				return err
+			}
+			candidate.SSHStrictHostKey = true
+		}
+		if err := a.verifySSHAccess(candidate); err != nil {
+			return err
+		}
+		if err := a.store.UpdateServer(a.ctx, &candidate); err != nil {
+			return err
+		}
+		fmt.Fprintln(a.output(), "SSH access verified and settings saved.")
+		return nil
+	}
+	cmd.Flags().StringVar(&user, "ssh-user", "", "SSH user")
+	cmd.Flags().IntVar(&port, "ssh-port", 0, "SSH port")
+	cmd.Flags().StringVar(&identity, "ssh-identity", "", "SSH identity path, or empty to use the agent")
+	cmd.Flags().StringVar(&fingerprint, "trust-fingerprint", "", "Reviewed SHA256 host fingerprint for a new SSH port")
+	return cmd
+}
+
+func (a *App) verifySSHAccess(server model.Server) error {
+	_, err := a.execRemote(a.newRunner("server.test"), sshFromServer(server), 20*time.Second, "set -e; command -v sh >/dev/null; sudo -n true; test -r /etc/os-release; uname -m")
+	if err != nil {
+		return fmt.Errorf("SSH_ACCESS_FAILED")
+	}
+	return nil
 }

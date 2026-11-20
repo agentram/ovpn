@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"ovpn/internal/ha"
 	"ovpn/internal/operations"
 )
 
@@ -31,13 +32,13 @@ func controlError(err error) error {
 	if err == nil {
 		return nil
 	}
-	for _, safe := range []error{operations.ErrBusy, operations.ErrStale, operations.ErrInvalid, operations.ErrUnavailable} {
+	for _, safe := range []error{operations.ErrBusy, operations.ErrStale, operations.ErrInvalid, operations.ErrUnavailable, ha.ErrIncompatible} {
 		if errors.Is(err, safe) {
 			return &Error{Code: safe.Error()}
 		}
 	}
 	switch err.Error() {
-	case "HA_BACKENDS_REQUIRED", "HA_BACKENDS_INCOMPATIBLE", "NO_ENABLED_SERVERS", "IDENTITY_CONFLICT", "USER_ASSIGNMENT_CONFLICT", "SSH_HOST_UNREACHABLE", "SSH_ACCESS_FAILED", "SSH_HOST_KEY_CHANGED", "DELIVERY_UNAVAILABLE":
+	case "HA_BACKENDS_REQUIRED", "NO_ENABLED_SERVERS", "IDENTITY_CONFLICT", "USER_ASSIGNMENT_CONFLICT", "SSH_HOST_UNREACHABLE", "SSH_ACCESS_FAILED", "SSH_HOST_KEY_CHANGED", "DELIVERY_UNAVAILABLE":
 		return &Error{Code: err.Error()}
 	}
 	return &Error{Code: "OPERATION_UNAVAILABLE"}

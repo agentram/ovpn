@@ -70,15 +70,16 @@ type Step struct {
 }
 
 type Job struct {
-	ID         string     `json:"id"`
-	PlanID     string     `json:"planId"`
-	Action     string     `json:"action"`
-	Title      string     `json:"title"`
-	State      string     `json:"state"`
-	Code       string     `json:"code,omitempty"`
-	StartedAt  time.Time  `json:"startedAt"`
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
-	Steps      []Step     `json:"steps"`
+	Cancellable bool       `json:"cancellable,omitempty"`
+	ID          string     `json:"id"`
+	PlanID      string     `json:"planId"`
+	Action      string     `json:"action"`
+	Title       string     `json:"title"`
+	State       string     `json:"state"`
+	Code        string     `json:"code,omitempty"`
+	StartedAt   time.Time  `json:"startedAt"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	Steps       []Step     `json:"steps"`
 }
 
 type Result struct {

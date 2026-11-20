@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"ovpn/internal/deploy"
 	"ovpn/internal/model"
 	"ovpn/internal/ssh"
 )
@@ -105,9 +107,9 @@ func TestBuildRemoteScripts(t *testing.T) {
 	t.Parallel()
 
 	backup := buildRemoteBackupScript("/opt/ovpn-backups/main-20260405T120000.tgz", "main")
-	restore := buildRemoteRestoreScript("/opt/ovpn-backups/main-20260405T120000.tgz")
+	restore := buildRemoteRestoreScript("/opt/ovpn-backups/main-20260405T120000.tgz", "/opt/ovpn-backups/example-before-restore.tgz", "example")
 
-	for _, want := range []string{"ovpn-agent-data", "sudo cp -a", "sudo rm -rf \"$TMP/stack/logs\"", "sudo tar -czf", "find /opt/ovpn-backups -maxdepth 1 -type f -name 'main-*.tgz'", "NR>7"} {
+	for _, want := range []string{"ovpn-agent-data", "sudo cp -a", "sudo rm -rf \"$TMP/stack/logs\"", "tar -czf", "umask 077", "mv -T", "find /opt/ovpn-backups -maxdepth 1 -type f -name 'main-*.tgz'", "NR>7"} {
 		if !strings.Contains(backup, want) {
 			t.Fatalf("backup script missing %q: %q", want, backup)
 		}
@@ -178,7 +180,7 @@ func TestRemoteBackupRestoreUseRunnerAndWrapErrors(t *testing.T) {
 	if !strings.HasPrefix(remotePath, "/opt/ovpn-backups/main-") {
 		t.Fatalf("unexpected remote backup path=%q", remotePath)
 	}
-	if err := RemoteRestore(ctx, runner, cfg, remotePath); err != nil {
+	if err := RemoteRestore(ctx, runner, cfg, server, remotePath); err != nil {
 		t.Fatalf("remote restore: %v", err)
 	}
 }
@@ -227,7 +229,7 @@ func TestLocalBackupCapturesCommittedWALAndNeverFollowsSymlinks(t *testing.T) {
 	}
 }
 func TestRemoteRestoreRejectsShellInput(t *testing.T) {
-	if err := RemoteRestore(context.Background(), &ssh.Runner{DryRun: true}, ssh.Config{}, "/opt/ovpn-backups/x.tgz;touch injected"); err == nil {
+	if err := RemoteRestore(context.Background(), &ssh.Runner{DryRun: true}, ssh.Config{}, model.Server{}, "/opt/ovpn-backups/x.tgz;touch injected"); err == nil {
 		t.Fatal("accepted shell input")
 	}
 }
@@ -239,12 +241,16 @@ func TestBackupNamesAndRestoreOrderingProtectExistingRuntime(t *testing.T) {
 			t.Fatal("server label escaped its archive name")
 		}
 	}
-	script := buildRemoteRestoreScript("/opt/ovpn-backups/main.tgz")
+	script := buildRemoteRestoreScript("/opt/ovpn-backups/main.tgz", "/opt/ovpn-backups/example-before-restore.tgz", "example")
 	verified := strings.Index(script, "sha256sum -c")
 	stopped := strings.Index(script, "docker-compose.yml down")
 	replaced := strings.Index(script, "sudo rm -rf /opt/ovpn")
+	staged := strings.Index(script, "sudo tar -xzf")
+	snapshot := strings.Index(script, "if sudo test -d /opt/ovpn; then snapshot ")
 	started := strings.Index(script, "up -d --force-recreate")
-	if verified < 0 || stopped <= verified || replaced <= stopped || started <= replaced {
+	pruned := strings.Index(script, "old_archives=")
+	if verified < 0 || staged <= verified || snapshot <= staged || stopped <= snapshot ||
+		replaced <= stopped || started <= replaced || pruned <= started {
 		t.Fatal("restore did not verify, stop, replace and restart in that order")
 	}
 	if !strings.Contains(script, "*.db-wal") {
@@ -256,11 +262,93 @@ func TestRemoteBackupAndRestoreScriptsParseBeforeExecution(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("requires a POSIX shell")
 	}
-	for _, script := range []string{buildRemoteBackupScript("/opt/ovpn-backups/example.tgz", "example"), buildRemoteRestoreScript("/opt/ovpn-backups/example.tgz")} {
+	for _, script := range []string{buildRemoteBackupScript("/opt/ovpn-backups/example.tgz", "example"), buildRemoteRestoreScript("/opt/ovpn-backups/example.tgz", "/opt/ovpn-backups/example-before-restore.tgz", "example")} {
 		command := exec.Command("sh", "-n")
 		command.Stdin = strings.NewReader(script)
 		if out, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("invalid backup script: %s", out)
 		}
+	}
+}
+
+// Run the rendered script with real tar and filesystem changes in an isolated
+// directory. Only privileged operations and platform-specific tools are stubbed.
+func TestRemoteRestoreHandlesMissingRuntimeAndKeepsOldestSourceUntilSuccess(t *testing.T) {
+	for _, live := range []bool{false, true} {
+		t.Run(fmt.Sprintf("existing-runtime-%t", live), func(t *testing.T) {
+			dir := t.TempDir()
+			runtime := filepath.Join(dir, "runtime")
+			backups := filepath.Join(dir, "backups")
+			bin := filepath.Join(dir, "bin")
+			source := filepath.Join(dir, "source")
+			for _, path := range []string{backups, bin, filepath.Join(source, "stack")} {
+				if err := os.MkdirAll(path, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			write := func(path, data string, mode os.FileMode) {
+				t.Helper()
+				if err := os.WriteFile(path, []byte(data), mode); err != nil {
+					t.Fatal(err)
+				}
+			}
+			write(filepath.Join(bin, "sudo"), `#!/bin/sh
+if [ "$1" = "-n" ]; then shift; fi
+case "$1 $2" in
+  "install -d") exec install -d -m 0700 "$9" ;;
+  "docker volume") exit 0 ;;
+  "docker compose") exit 0 ;;
+  *) exec "$@" ;;
+esac
+`, 0o700)
+			write(filepath.Join(bin, "find"), `#!/bin/sh
+set -e
+for archive in "$1"/fixture-*.tgz; do
+  [ -f "$archive" ] || continue
+  stamp=${archive##*/fixture-}
+  printf '%s %s\n' "${stamp%.tgz}" "$archive"
+done
+`, 0o700)
+			write(filepath.Join(bin, "mv"), `#!/bin/sh
+if [ "$1" = "-T" ]; then shift; fi
+exec /bin/mv "$@"
+`, 0o700)
+			write(filepath.Join(source, "stack", "docker-compose.yml"), "fixture restored version", 0o600)
+			if live {
+				if err := os.Mkdir(runtime, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				write(filepath.Join(runtime, "docker-compose.yml"), "fixture live version", 0o600)
+			}
+
+			selected := filepath.Join(backups, "fixture-1.tgz")
+			if out, err := exec.Command("tar", "-czf", selected, "-C", source, ".").CombinedOutput(); err != nil {
+				t.Fatalf("fixture tar: %v: %s", err, out)
+			}
+			for n := 2; n <= defaultRemoteBackupRetention; n++ {
+				write(filepath.Join(backups, fmt.Sprintf("fixture-%d.tgz", n)), "other retained archive", 0o600)
+			}
+			rollback := filepath.Join(backups, "fixture-8.tgz")
+			script := buildRemoteRestoreScript(selected, rollback, "fixture")
+			script = strings.NewReplacer(deploy.RemoteBackupDir, backups, deploy.RemoteDir, runtime).Replace(script)
+			command := exec.Command("sh", "-c", script)
+			command.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			if out, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("restore failed: %v: %s", err, out)
+			}
+			restored, err := os.ReadFile(filepath.Join(runtime, "docker-compose.yml"))
+			if err != nil || string(restored) != "fixture restored version" {
+				t.Fatal("oldest source archive was not applied", err)
+			}
+			for _, path := range []string{rollback, rollback + ".sha256"} {
+				info, err := os.Stat(path)
+				if live && (err != nil || info.Mode().Perm() != 0o600) {
+					t.Fatal("rollback file was not created privately", err)
+				}
+				if !live && !os.IsNotExist(err) {
+					t.Fatal("missing runtime unexpectedly produced a rollback archive", err)
+				}
+			}
+		})
 	}
 }

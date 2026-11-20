@@ -9,6 +9,7 @@ func (a *App) serverCmd() *cobra.Command {
 		a.newServerAddCmd(),
 		a.newServerInspectCmd(),
 		a.newServerTestCmd(),
+		a.newServerSetSSHCmd(),
 		a.newServerBackendCmd(),
 		a.newServerHAApplyCmd(),
 		a.newServerProfileCmd(),

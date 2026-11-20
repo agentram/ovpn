@@ -19,6 +19,12 @@ Move the desktop, Android and iOS application source and build pipelines into se
 - Refresh service/traffic data every 30 seconds and current Xray presence every 10 seconds while Desk is open. Show unknown readings explicitly and keep per-server rolling quotas separate.
 - Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
 
+### Fixed
+- Restore from a staged archive even if the runtime was lost. Snapshot existing state privately and prune only after recovery starts the services successfully.
+- Reject disabled nodes in HA plans and let the server wizard save corrected SSH settings only after validating them.
+- Index the encrypted operation journal, expire unused plans, bound completed history, and show Cancel only to the job's owner.
+- Document separate legacy and account delivery origins so existing Android installations can continue refreshing their receipts.
+
 ### Changed
 - Fix SQLite file URIs for Windows workspaces and observation history, including spaces and non-ASCII paths. Keep the version command independent of local state and check native workspace access in the packaging matrix.
 - Replace overflowing action button grids with compact primary actions and a searchable grouped catalog. Translate diagnostic task states and keep task completion separate from connection success.

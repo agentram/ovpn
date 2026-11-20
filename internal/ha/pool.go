@@ -4,8 +4,9 @@ package ha
 import (
 	"errors"
 	"fmt"
-	"ovpn/internal/model"
 	"strings"
+
+	"ovpn/internal/model"
 )
 
 var ErrInvalid = errors.New("INVALID_PARAMS")
@@ -20,8 +21,8 @@ func Plan(proxy model.Server, backends []model.Server) ([]model.Server, error) {
 	if len(backends) == 0 {
 		return nil, ErrRequired
 	}
-	if ValidatePool(backends) != nil {
-		return nil, ErrIncompatible
+	if err := ValidatePool(backends); err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrIncompatible, err)
 	}
 	for _, node := range backends {
 		if strings.TrimSpace(node.ProxyServiceUUID) == "" {
@@ -37,6 +38,9 @@ func ValidatePool(backends []model.Server) error {
 		return fmt.Errorf("proxy server has no attached backends")
 	}
 	for _, backend := range backends {
+		if !backend.Enabled {
+			return fmt.Errorf("vpn backend %s is disabled; enable or detach it", backend.Name)
+		}
 		if !backend.IsVPN() {
 			return fmt.Errorf("server %s is role %s, expected vpn backend", backend.Name, backend.NormalizedRole())
 		}

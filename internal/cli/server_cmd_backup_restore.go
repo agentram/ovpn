@@ -96,7 +96,7 @@ func (a *App) newServerRestoreCmd() *cobra.Command {
 			}()
 			runner := a.newRunner("server.restore")
 			a.log().Info("restoring backup", "server", srv.Name, "host", srv.Host, "remote_path", remotePath)
-			if err := backup.RemoteRestore(a.ctx, runner, sshFromServer(*srv), remotePath); err != nil {
+			if err := backup.RemoteRestore(a.ctx, runner, sshFromServer(*srv), *srv, remotePath); err != nil {
 				return fmt.Errorf("restore server %s on %s: %w", srv.Name, srv.Host, err)
 			}
 			fmt.Fprintln(a.output(), "restore complete")

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -104,8 +105,7 @@ func LocalRestore(dataDir, archive string) error {
 
 // RemoteBackup creates a timestamped archive of the remote runtime directory and returns its remote path.
 func RemoteBackup(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, server model.Server) (remotePath string, err error) {
-	ts := time.Now().UTC().Format("20060102T150405.000000000")
-	remotePath = fmt.Sprintf("%s/%s-%s.tgz", deploy.RemoteBackupDir, archiveName(server.Name, server.ID), ts)
+	remotePath = newRemoteArchive(server)
 	cmd := buildRemoteBackupScript(remotePath, archiveName(server.Name, server.ID))
 	_, err = runner.Exec(ctx, cfg, cmd)
 	if err != nil {
@@ -114,15 +114,27 @@ func RemoteBackup(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, serve
 	return remotePath, err
 }
 
-// buildRemoteBackupScript renders the shell script that archives the remote runtime directory.
-func buildRemoteBackupScript(remotePath string, serverName string) string {
-	return fmt.Sprintf(`set -e
-sudo mkdir -p %[1]s
+func newRemoteArchive(server model.Server) string {
+	ts := time.Now().UTC().Format("20060102T150405.000000000")
+	return fmt.Sprintf("%s/%s-%s.tgz", deploy.RemoteBackupDir, archiveName(server.Name, server.ID), ts)
+}
+
+func buildRemoteBackupScript(remotePath, serverName string) string {
+	return "set -e\n" + remoteSnapshotFunction() + "snapshot " + remotePath + "\n" + remotePruneScript(serverName)
+}
+
+// A subshell gives staging and container recovery their own cleanup traps.
+func remoteSnapshotFunction() string {
+	return fmt.Sprintf(`snapshot() (
+set -e
+archive=$1
+sudo install -d -m 0700 -o root -g root %[1]s
 VOLUME=$(sudo docker volume ls -q --filter label=com.docker.compose.project=ovpn --filter label=com.docker.compose.volume=ovpn-agent-data)
 TMP=$(mktemp -d)
 PAUSED=""
 WATCHDOG=""
-trap 'if [ -n "$PAUSED" ]; then sudo docker unpause "$PAUSED" >/dev/null 2>&1 || true; fi; if [ -n "$WATCHDOG" ]; then kill "$WATCHDOG" 2>/dev/null || true; fi; sudo rm -rf "$TMP"' EXIT HUP INT TERM
+trap 'if [ -n "$PAUSED" ]; then sudo docker unpause "$PAUSED" >/dev/null 2>&1 || true; fi; if [ -n "$WATCHDOG" ]; then kill "$WATCHDOG" 2>/dev/null || true; fi; sudo rm -rf "$TMP"' EXIT
+trap 'exit 1' HUP INT TERM
 sudo cp -a %[2]s "$TMP/stack"
 sudo rm -rf "$TMP/stack/logs"
 if [ -n "$VOLUME" ]; then
@@ -156,24 +168,38 @@ PYTHON
     if [ -n "$WATCHDOG" ]; then kill "$WATCHDOG" 2>/dev/null || true; WATCHDOG=""; fi
   fi
 fi
-sudo tar -czf %[3]s -C "$TMP" .
-sudo chmod 600 %[3]s
-sudo tar -tzf %[3]s >/dev/null
-sudo sha256sum %[3]s | sudo tee %[3]s.sha256 >/dev/null
-sudo rm -rf "$TMP"
-old_archives=$(find %[1]s -maxdepth 1 -type f -name '%[4]s-*.tgz' -printf '%%T@ %%p\n' | sort -nr | awk 'NR>%[5]d {print $2}')
-if [ -n "$old_archives" ]; then
-  printf '%%s\n' "$old_archives" | xargs -r sudo rm -f
-fi
-`, deploy.RemoteBackupDir, deploy.RemoteDir, remotePath, serverName, defaultRemoteBackupRetention)
+sudo sh -eu -c '
+  umask 077
+  archive=$1
+  source=$2
+  staging=$(mktemp -d "${archive}.stage.XXXXXXXX")
+  trap "rm -rf -- \"$staging\"" EXIT
+  trap "exit 1" HUP INT TERM
+  tar -czf "$staging/archive" -C "$source" .
+  tar -tzf "$staging/archive" >/dev/null
+  sum=$(sha256sum "$staging/archive")
+  printf "%%s  %%s\n" "${sum%%%% *}" "$archive" > "$staging/checksum"
+  mv -T "$staging/checksum" "$archive.sha256"
+  mv -T "$staging/archive" "$archive"
+' sh "$archive" "$TMP"
+)
+`, deploy.RemoteBackupDir, deploy.RemoteDir)
+}
+
+func remotePruneScript(serverName string) string {
+	return fmt.Sprintf(`old_archives=$(sudo find %[1]s -maxdepth 1 -type f -name '%[2]s-*.tgz' -printf '%%T@ %%p\n' | sort -nr | awk 'NR>%[3]d {print $2}')
+for old in $old_archives; do
+  sudo rm -f -- "$old" "$old.sha256"
+done
+`, deploy.RemoteBackupDir, serverName, defaultRemoteBackupRetention)
 }
 
 // RemoteRestore unpacks a previously created backup archive over the remote runtime directory.
-func RemoteRestore(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, archiveRemotePath string) error {
+func RemoteRestore(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, server model.Server, archiveRemotePath string) error {
 	if !safeArchivePath(archiveRemotePath) {
 		return fmt.Errorf("invalid remote archive path")
 	}
-	cmd := buildRemoteRestoreScript(archiveRemotePath)
+	cmd := buildRemoteRestoreScript(archiveRemotePath, newRemoteArchive(server), archiveName(server.Name, server.ID))
 	_, err := runner.Exec(ctx, cfg, cmd)
 	if err != nil {
 		return fmt.Errorf("remote restore on %s from %s: %w", cfg.Host, archiveRemotePath, err)
@@ -182,13 +208,18 @@ func RemoteRestore(ctx context.Context, runner *ssh.Runner, cfg ssh.Config, arch
 }
 
 // buildRemoteRestoreScript renders the shell script that restores a backup archive into the runtime directory.
-func buildRemoteRestoreScript(archiveRemotePath string) string {
-	return fmt.Sprintf(`set -e
+func buildRemoteRestoreScript(archiveRemotePath, snapshotPath, serverName string) string {
+	return "set -e\n" + remoteSnapshotFunction() + fmt.Sprintf(`
 if sudo test -f %[1]s.sha256; then sudo sha256sum -c %[1]s.sha256 >/dev/null; fi
 sudo tar -tzf %[1]s >/dev/null
 TMP=$(mktemp -d)
+trap 'sudo rm -rf -- "$TMP"' EXIT
+trap 'exit 1' HUP INT TERM
 sudo tar -xzf %[1]s -C "$TMP"
-if [ -f %[2]s/docker-compose.yml ]; then (cd %[2]s && sudo docker compose --env-file .env -f docker-compose.yml down); fi
+sudo test -f "$TMP/stack/docker-compose.yml"
+sudo -n true
+if sudo test -d %[2]s; then snapshot %[3]s; fi
+if sudo test -f %[2]s/docker-compose.yml; then (cd %[2]s && sudo docker compose --env-file .env -f docker-compose.yml down); fi
 sudo rm -rf %[2]s
 sudo mkdir -p %[2]s
 sudo cp -a "$TMP/stack/." %[2]s/
@@ -200,10 +231,9 @@ if [ -n "$VOLUME" ] && [ -d "$TMP/stats" ]; then
   sudo find "$MP" -maxdepth 1 -type f \( -name '*.db' -o -name '*.db-wal' -o -name '*.db-shm' \) -delete
   sudo cp -a "$TMP/stats/." "$MP/"
 fi
-sudo rm -rf "$TMP"
 cd %[2]s
 sudo docker compose --env-file .env -f docker-compose.yml up -d --force-recreate
-`, archiveRemotePath, deploy.RemoteDir)
+`, archiveRemotePath, deploy.RemoteDir, snapshotPath) + remotePruneScript(serverName)
 }
 
 // pruneMatchingBackups keeps only the newest keep archives matching pattern in dir.
@@ -227,16 +257,16 @@ func pruneMatchingBackups(dir, pattern string, keep int) error {
 	return nil
 }
 
-func safeArchivePath(path string) bool {
-	if !strings.HasPrefix(path, deploy.RemoteBackupDir+"/") || !strings.HasSuffix(path, ".tgz") {
+func safeArchivePath(archive string) bool {
+	if !strings.HasPrefix(archive, deploy.RemoteBackupDir+"/") || !strings.HasSuffix(archive, ".tgz") {
 		return false
 	}
-	for _, r := range path {
+	for _, r := range archive {
 		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && !strings.ContainsRune("/._-", r) {
 			return false
 		}
 	}
-	return filepath.Clean(path) == path
+	return path.Clean(archive) == archive
 }
 
 func archiveName(name string, id int64) string {

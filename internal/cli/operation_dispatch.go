@@ -2,10 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"ovpn/internal/operations"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -59,34 +59,29 @@ func attachOperationHandlers(root *cobra.Command, a *App) {
 						_ = service.Cancel(job.ID)
 						return command.Context().Err()
 					case <-ticker.C:
-						rows, err := service.List()
+						row, err := service.Job(job.ID)
 						if err != nil {
 							return err
 						}
-						for _, row := range rows {
-							if row.ID != job.ID {
-								continue
-							}
-							switch row.State {
-							case "queued", "running":
-								continue
-							}
-							if result, err := service.Result(job.ID); err == nil {
-								if result.Text != "" {
-									fmt.Fprintln(a.output(), result.Text)
-								}
-								if result.Content != "" {
-									fmt.Fprintln(a.output(), result.Content)
-								}
-							}
-							if row.State != "succeeded" {
-								if original := service.Failure(job.ID); original != nil {
-									return original
-								}
-								return fmt.Errorf("operation %s: %s (%s)", row.ID, row.State, row.Code)
-							}
-							return nil
+						switch row.State {
+						case "queued", "running":
+							continue
 						}
+						if result, err := service.Result(job.ID); err == nil {
+							if result.Text != "" {
+								fmt.Fprintln(a.output(), result.Text)
+							}
+							if result.Content != "" {
+								fmt.Fprintln(a.output(), result.Content)
+							}
+						}
+						if row.State != "succeeded" {
+							if original := service.Failure(job.ID); original != nil {
+								return original
+							}
+							return fmt.Errorf("operation %s: %s (%s)", row.ID, row.State, row.Code)
+						}
+						return nil
 					}
 				}
 			}
