@@ -75,6 +75,11 @@ func androidFixture(ctx context.Context, dir string) error {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			if r.URL.RawQuery == "browser=1" {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				_, _ = fmt.Fprintf(w, "<!doctype html><html lang=en><meta name=viewport content='width=device-width'><title>O Tunnel test</title><h1>Website opened through O Tunnel</h1><p>Source address: %s</p></html>", host)
+				return
+			}
 			_, _ = fmt.Fprintln(w, host)
 			return
 		}

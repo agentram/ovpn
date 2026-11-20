@@ -114,6 +114,14 @@ class Emulator:
     def egress(self, address):
         return self.shell("su", "shell", "/data/local/tmp/ovpn-egress", address).strip()
 
+    def check_browser(self):
+        self.shell("am", "start", "-a", "android.intent.action.VIEW",
+                   "-d", "https://www.gstatic.com/ovpn-egress-test?browser=1")
+        self.find("Website opened through O Tunnel")
+        self.find("Source address: ::1")
+        self.launch()
+        print("PASS Android browser opened the test website from the tunnel egress", flush=True)
+
 
 def build_android():
     android_dir = ROOT / "apps/android"
@@ -206,6 +214,8 @@ def tunnels(emulator, directory):
     first = until(emulator.vpn, "the real Android VPN network")
     check(hits.stat().st_size > 0, "Connected without reaching the private HTTPS responder through TUN")
     check(emulator.egress(via_tunnel) == "::1", "External HTTPS client did not use REALITY egress")
+    if os.environ.get("OVPN_E2E_ANDROID_BROWSER") == "1":
+        emulator.check_browser()
     before = hits.stat().st_size
     emulator.select("Backup")
     emulator.find("Backup")
