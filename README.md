@@ -8,8 +8,7 @@
 
 The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
-Use the CLI or [OVPN Desk](docs/desktop.md) to manage your own servers locally. Desk adds reviewed changes, user access, live per-server statistics, automatic connection checks and recovery controls.
-Desk development downloads are available as `ovpn-desk-...` artifacts in app-related GitHub Actions runs; they use the same OVPN version.
+Manage your own servers locally with the CLI. OVPN generates standard VLESS profiles for compatible clients.
 
 [Download a release](https://github.com/agentram/ovpn/releases/latest) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
 
@@ -89,7 +88,6 @@ For an optional HTTPS check from the operator machine, run `./ovpn user probe --
 - [Traffic probes and Xray Checker](docs/probes.md)
 - [Client subscriptions](docs/subscriptions.md)
 - [Automatic observation and Checker/Knife](docs/observation.md)
-- [Desktop development build](docs/desktop.md) · [Design proposal](docs/design/desktop/README.md)
 - [Documentation map](#documentation-map)
 
 ## Production model
@@ -500,7 +498,6 @@ By default, cleanup removes remote runtime files and disables local server metad
 
 ## VPN clients
 
-O Tunnel connects to OVPN over TCP/TLS or TCP/REALITY. Use the [Android app](apps/android/README.md) for direct QR import or [account-based access](docs/subscriptions.md#account-based-delivery). The [iOS development app](apps/ios/README.md) uses the same account and setup-code service.
 
 End-user setup instructions cover iOS, Android, Windows, and macOS:
 

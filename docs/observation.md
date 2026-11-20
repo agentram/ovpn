@@ -2,18 +2,6 @@
 
 OVPN can schedule native and Xray Checker HTTPS checks and run finite Xray Knife diagnostics. Observation reads existing client identities; it does not create users, deploy servers or change their policies. Select a dedicated existing monitoring identity where possible. Explicitly authorize checks charged to its traffic quota.
 
-## Desktop
-
-1. In **Integrations**, install the pinned Checker or Knife version if needed. Native checks need no extra tool.
-2. In **Monitoring**, choose **New policy**, select Native or Checker, add the exact server, profile and eligible user targets, review the cadence and daily attempt allowance, and enable the policy.
-3. Inspect latest samples, history, incidents and jobs. Users and Servers show automatic observations separately from manual checks.
-
-The default cadence is 300 seconds, with up to 10 explicit targets per policy and 10 policies. One workspace owner executes one job at a time; targets within a job run sequentially. Cycles do not overlap or catch up after sleep. Successful completion is followed by the configured interval plus up to 15 seconds of jitter. Enabling a duplicate source/target schedule is rejected.
-
-For Knife, select **Integrations**, choose Xray or sing-box, add targets and run the diagnostic. Native and sing-box selections are limited to the TCP profiles; use Checker or Knife/Xray for XHTTP. Knife/Xray rejects plain VLESS/XHTTP to public IP addresses. Use Checker for that combination. The result appears as a tool compatibility issue. Speed tests, IP lookup, direct prescan and extra failure diagnosis are disabled.
-
-Checks run while the application is open. A separate foreground observer runs independently. Saved policies do not resume simply because the application starts: use **Resume enabled policies**.
-
 ## CLI
 
 Install the optional tools:
@@ -56,7 +44,7 @@ For a separately obtained supported binary, `observe tool-set --engine <checker|
 - Three consecutive traffic failures open a traffic incident; two successful measurements recover it. Tool failure, invalid output, unsupported profiles, inactive local users and exhausted budgets have separate outcomes. They cannot establish a node outage.
 - A sample is bound to its selected identity/profile configuration and process session. Credential changes, source loss, restart, sleep, clock uncertainty and expiry prevent old results from remaining green. No sample certifies every user, assignment, runtime process, UDP, DNS, IPv6 or GUI-client import.
 - Third-party tools receive generated client-only profiles in private temporary jobs. Raw client links, provider errors, endpoint/IP metadata and response bodies are not stored in observations or sent to the UI. Tool stdout/stderr are discarded; execution time, result size and private job files are bounded. Executables are hash checked before use.
-- Tools execute as the current OS user; process separation is not an OS sandbox. The desktop owns their process lifecycle using a Unix process group or a Windows Job Object. Native Windows lifecycle and Linux desktop integration still require platform testing.
+- Tools execute as the current OS user; process separation is not an OS sandbox. The worker owns their process lifecycle using a Unix process group or a Windows Job Object. Native Windows lifecycle and Linux desktop integration still require platform testing.
 
 Checker runs one cycle with measured latency, finite concurrency and subscription updates disabled. A private tokenized loopback receiver ingests its metric result; its dashboard server is not started. No external IP lookup or geodata download is needed for these generated profiles. Knife returns allowlisted JSONL results bound to the exact prepared link, including all-failed jobs that exit nonzero.
 

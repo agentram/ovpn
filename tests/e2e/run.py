@@ -1,4 +1,4 @@
-"""Run isolated journeys through the built CLI, Desk, or O Tunnel."""
+"""Run isolated journeys through the built CLI and its diagnostics tools."""
 import argparse
 from contextlib import contextmanager
 import json
@@ -224,30 +224,13 @@ def cli(lab, tools):
                 env={**os.environ, "OVPN_TEST_TOOL_STATE": str(lab.workspace)}, timeout=180)
 
 
-def desktop(lab):
-    command("npm", "--prefix", "apps/desktop/frontend", "run", "build", timeout=120)
-    command("go", "-C", "apps/desktop", "test", "-v", "-run", "^TestDeskBrowserJourneys$", "-count=1",
-            env={**os.environ, "OVPN_E2E_WORKER": str(lab.worker), "OVPN_E2E_FIXTURE": str(lab.fixture)}, timeout=260)
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=("cli", "desktop", "android", "android-build"))
+    parser.add_argument("suite", choices=("cli",))
     parser.add_argument("--tools", action="store_true", help="install and exercise real pinned Checker and Knife binaries")
     args = parser.parse_args()
-    if args.suite == "android-build":
-        from android import build_android
-        build_android()
-        return
     with tempfile.TemporaryDirectory(prefix="ovpn-e2e-") as directory:
-        lab = Lab(Path(directory))
-        if args.suite == "cli":
-            cli(lab, args.tools)
-        elif args.suite == "desktop":
-            desktop(lab)
-        else:
-            from android import android
-            android(lab)
+        cli(Lab(Path(directory)), args.tools)
 
 
 if __name__ == "__main__":

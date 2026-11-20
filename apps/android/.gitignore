@@ -1,8 +1,0 @@
-.gradle/
-.kotlin/
-local.properties
-app/libs/*.aar
-*.apk
-*.aab
-*.jks
-*.keystore

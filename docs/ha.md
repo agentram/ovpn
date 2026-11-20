@@ -325,11 +325,9 @@ The backend doctor now verifies that the live runtime config contains `proxy-ser
 ./ovpn server monitor status <proxy>
 ```
 
-## OVPN Desk
+## Apply and verify the pool
 
-Desk can register an entry server, attach REALITY backends, review the topology
-and apply the pool through **Apply HA configuration**. The same reviewed CLI
-operation is available as:
+Back up and apply the attached backends and proxy as one reviewed operation:
 
 ```bash
 ovpn server ha-apply <proxy>
@@ -339,7 +337,7 @@ It backs up and applies attached backends before the proxy, stops on a failed
 dependency, and verifies that HAProxy sees every expected backend as available.
 A partial or interrupted application requires a new reviewed plan.
 
-Desk reads the authenticated agent `/ha/status` endpoint through its existing
+The CLI reads the authenticated agent `/ha/status` endpoint through the existing
 SSH transport. The agent fetches the internal HAProxy Prometheus endpoint; no
 additional public port is opened. Stable node labels avoid confusing desired
 pool order with the deployed order. Old agents/configs show unknown readings
