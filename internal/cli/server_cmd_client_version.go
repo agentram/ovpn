@@ -43,9 +43,7 @@ func (a *App) newServerSetRealityMinClientVersionCmd() *cobra.Command {
 	}
 }
 
-func printRealityMinClientVersion(version string, writers ...io.Writer) {
-	out := outputOrDefault(writers)
-
+func printRealityMinClientVersion(version string, out io.Writer) {
 	if version == "" {
 		fmt.Fprintln(out, "REALITY minimum client version: Xray default")
 		return

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -274,6 +275,12 @@ func TestRemoteBackupAndRestoreScriptsParseBeforeExecution(t *testing.T) {
 // Run the rendered script with real tar and filesystem changes in an isolated
 // directory. Only privileged operations and platform-specific tools are stubbed.
 func TestRemoteRestoreHandlesMissingRuntimeAndKeepsOldestSourceUntilSuccess(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires POSIX tools")
+	}
+	if _, err := exec.LookPath("sha256sum"); err != nil {
+		t.Skip("requires sha256sum")
+	}
 	for _, live := range []bool{false, true} {
 		t.Run(fmt.Sprintf("existing-runtime-%t", live), func(t *testing.T) {
 			dir := t.TempDir()

@@ -175,7 +175,7 @@ func (a *App) newServerAddCmd() *cobra.Command {
 			if srv.IsProxy() {
 				fmt.Fprintf(a.output(), "proxy preset: %s\n", srv.NormalizedProxyPreset())
 			}
-			printRealityMinClientVersion(srv.RealityMinClientVersion)
+			printRealityMinClientVersion(srv.RealityMinClientVersion, a.output())
 			fmt.Fprintf(a.output(), "reality public key: %s\n", srv.RealityPublicKey)
 			fmt.Fprintf(a.output(), "reality short id: %s\n", srv.RealityShortIDs)
 			if srv.ProxyServiceUUID != "" {

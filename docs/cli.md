@@ -45,6 +45,7 @@ Use `--debug` only for operator-side CLI troubleshooting; targeted per-user debu
 | Service logs | `./ovpn server logs <server> --service xray --tail 200` |
 | Restart runtime | `./ovpn restart <server>` |
 | Backup runtime | `./ovpn server backup <server>` |
+| Verify and update SSH settings | `./ovpn server set-ssh <server> --ssh-user <user> --ssh-identity <path>` |
 | Restore runtime | `./ovpn server restore <server> --remote-path /opt/ovpn-backups/<archive>.tgz` |
 | Cleanup runtime | `./ovpn server cleanup <server> --confirm CLEANUP` |
 
