@@ -500,7 +500,7 @@ By default, cleanup removes remote runtime files and disables local server metad
 
 ## VPN clients
 
-[O Tunnel](apps/android/README.md) is the OVPN client for Android with setup codes, QR import and TCP/TLS or TCP/REALITY profiles.
+O Tunnel connects to OVPN over TCP/TLS or TCP/REALITY. Use the [Android app](apps/android/README.md) for direct QR import or [account-based access](docs/subscriptions.md#account-based-delivery). The [iOS development app](apps/ios/README.md) uses the same account and setup-code service.
 
 End-user setup instructions cover iOS, Android, Windows, and macOS:
 
