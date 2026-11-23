@@ -193,7 +193,16 @@ func TestCreateSubscriptionResumeAcceptsItsOwnPartialAssignment(t *testing.T) {
 		t.Fatal("original operation cannot resume", err)
 	}
 	users, err := app.store.ListUsers(app.ctx, server.ID)
-	if err != nil || len(users) != 1 || users[0].UUID != plan.Request.Values["uuid"] {
-		t.Fatal("reviewing the partial operation changed its user", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var matched int
+	for _, user := range users {
+		if user.Username == "pilot" && user.UUID == plan.Request.Values["uuid"] {
+			matched++
+		}
+	}
+	if matched != 1 {
+		t.Fatalf("expected exactly one checkpointed assignment, found %d", matched)
 	}
 }

@@ -96,6 +96,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if definition == nil {
 		return operations.Plan{}, operations.ErrInvalid
 	}
+	request.Values = maps.Clone(request.Values)
 	if request.Values == nil {
 		request.Values = map[string]string{}
 	}
