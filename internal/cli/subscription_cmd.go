@@ -14,7 +14,7 @@ import (
 
 func (a *App) subscriptionCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "subscription", Short: "Deliver and revoke prepared client subscriptions"}
-	cmd.AddCommand(a.subscriptionServeCmd(), a.subscriptionRevokeCmd(), a.subscriptionInviteCmd())
+	cmd.AddCommand(a.subscriptionServeCmd(), a.subscriptionRevokeCmd(), a.subscriptionInviteCmd(), a.newSubscriptionSyncCmd(), a.newSubscriptionListCmd())
 	return cmd
 }
 

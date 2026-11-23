@@ -91,8 +91,9 @@ account-enabled distributions. Issue new email-bound codes before enabling
 strict mode. Existing claimed accounts can refresh. Keep legacy anonymous
 receipts on the original origin during the [cutover](subscriptions.md#account-based-delivery).
 
-The main mobile distribution uses account mode on both platforms. Android's
-direct-import build is an explicit alternative for unmanaged installations.
+The main mobile distribution uses managed subscription codes and HTTPS links.
+Account mode remains an opt-in deployment for installations that require a
+verified identity.
 The default unsigned iOS simulator build is for UI and build validation.
 Publish the matching stable OVPN core first, pin that release in each client,
 and then build and verify the independent artifacts.

@@ -14,6 +14,7 @@ func (a *App) serverCmd() *cobra.Command {
 		a.newServerHAApplyCmd(),
 		a.newServerProfileCmd(),
 		a.newServerInitCmd(),
+		a.newServerSubscriptionCmd(),
 		a.newServerListCmd(),
 		a.newServerSetXrayVersionCmd(),
 		a.newServerSetRealityTargetCmd(),

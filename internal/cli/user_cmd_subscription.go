@@ -85,7 +85,7 @@ func subscriptionSelectionFlags(cmd *cobra.Command, opts *subscriptionSelection)
 
 func (a *App) newUserSubscriptionCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "subscription", Short: "Export and publish a user's subscription snapshots"}
-	cmd.AddCommand(a.newUserSubscriptionExportCmd(), a.newUserSubscriptionPublishCmd())
+	cmd.AddCommand(a.newUserSubscriptionExportCmd(), a.newUserSubscriptionPublishCmd(), a.newManagedSubscriptionCmd(true), a.newManagedSubscriptionCmd(false), a.newManagedSubscriptionDisableCmd())
 	return cmd
 }
 

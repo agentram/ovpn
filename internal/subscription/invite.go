@@ -130,7 +130,7 @@ func (s *Invites) redeem(ctx context.Context, bundles *Store, code, session, sub
 	}
 	id := tokenHash(code)
 	bundle, record, err := s.bundle(id, bundles)
-	if err != nil || (requireEmail && record.EmailTag == "") ||
+	if err != nil || bundle.Disabled || (requireEmail && record.EmailTag == "") ||
 		(record.EmailTag != "" && subtle.ConstantTimeCompare([]byte(record.EmailTag), []byte(tag)) != 1) {
 		return ErrNotFound
 	}

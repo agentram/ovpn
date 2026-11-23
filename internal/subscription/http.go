@@ -85,10 +85,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	if bundle.ManagedKey != "" {
+		if bundle.Disabled {
+			w.Header().Set("OVPN-Subscription-State", "disabled")
+			w.WriteHeader(http.StatusGone)
+			return
+		}
+		// IDs and revisions are for correlating a report with the publisher.
+		// Neither value grants access to any delivery endpoint.
+		w.Header().Set("OVPN-Subscription-ID", bundle.ID)
+	}
 	data, err := Encode(bundle.Entries, h.now(), "base64")
 	if err != nil {
+		if bundle.ManagedKey != "" {
+			w.Header().Set("OVPN-Subscription-State", "empty")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		w.WriteHeader(http.StatusNotFound)
 		return
+	}
+	if bundle.ManagedKey != "" {
+		w.Header().Set("OVPN-Subscription-Revision", ProfileRevision(string(data)))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(bundle.Title)))

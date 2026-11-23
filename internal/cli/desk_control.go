@@ -105,7 +105,8 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 	if request.Action == "user.link" {
 		request.Values["qr"] = "false"
 	}
-	if request.Action == "user.add" && request.Values["uuid"] == "" {
+	action := subscriptionUserAction(request.Action)
+	if request.Action == createSubscription || action == "user.add" && request.Values["uuid"] == "" {
 		request.Values["uuid"] = uuid.NewString()
 	}
 	instance := &App{internal: true, ctx: ctx, dataDir: d.dataDir, writer: io.Discard}
@@ -117,7 +118,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 		return operations.Plan{}, operations.ErrUnavailable
 	}
 	targets := []operations.Target{}
-	global := userGlobalMutation(request.Action)
+	global := userGlobalMutation(action)
 	name := request.Values["server"]
 	if name == "" && len(request.Arguments) > 0 {
 		name = request.Arguments[0]
@@ -151,7 +152,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 		}
 	}
 	for _, server := range snap.Servers {
-		if request.Action != "user.reconcile" && ((global && server.Enabled) || (!global && name == server.Name)) {
+		if request.Action != "user.reconcile" && ((global && (server.Enabled || request.Action == disableSubscription && hasSubscriptionUser(snap.Users, server.ID, request.Values["username"]))) || (!global && name == server.Name)) {
 			targets = append(targets, operations.Target{ID: fmt.Sprintf("node-%d", server.ID), Name: server.Name})
 		}
 	}
@@ -207,7 +208,7 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 					break
 				}
 			}
-			if (request.Action == "user.add" && exists) || (request.Action != "user.add" && !exists) {
+			if (action == "user.add" && exists) || (action != "user.add" && !exists && request.Action != disableSubscription) {
 				return operations.Plan{}, errors.New("USER_ASSIGNMENT_CONFLICT")
 			}
 		}
@@ -238,6 +239,13 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 				seenUUID = user.UUID
 			}
 		}
+	}
+	switch request.Action {
+	case createSubscription:
+		targets = append(targets, operations.Target{ID: "workspace", Name: "Publish subscription"})
+	case disableSubscription:
+		targets = append([]operations.Target{{ID: "workspace", Name: "Stop subscription delivery"}}, targets...)
+		stopOnFailure = false
 	}
 	if len(targets) == 0 {
 		targets = append(targets, operations.Target{ID: "workspace", Name: "Local workspace"})
@@ -319,6 +327,9 @@ func (d *deskControl) instance(ctx context.Context, target operations.Target, ac
 }
 
 func (d *deskControl) Backup(ctx context.Context, p operations.Plan, target operations.Target) error {
+	if target.ID == "workspace" && (p.Action == createSubscription || p.Action == disableSubscription) {
+		return nil
+	}
 	if !p.Mutation || p.Action == "server.backup" || strings.HasPrefix(p.Action, "subscription.") || strings.HasPrefix(p.Action, "observe.") {
 		return nil
 	}
@@ -410,6 +421,33 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 	output := &boundedOutput{}
 	a.writer = output
 	request := p.Request
+	managedAction := request.Action
+	if target.ID != "workspace" && subscriptionUserAction(request.Action) != request.Action {
+		request.Action = subscriptionUserAction(request.Action)
+		request.Values = maps.Clone(request.Values)
+		delete(request.Values, "base-url")
+		delete(request.Values, "format")
+		p.Action, p.Request = request.Action, request
+		if managedAction == disableSubscription {
+			if _, err := a.store.GetUser(ctx, a.operationTarget, request.Values["username"]); isNotFoundErr(err) {
+				return operations.Result{}, nil
+			} else if err != nil {
+				return operations.Result{}, err
+			}
+		}
+	}
+	if target.ID == "workspace" && managedAction == createSubscription {
+		for _, node := range p.Targets {
+			if node.ID == "workspace" {
+				continue
+			}
+			a.operationTarget, _ = strconv.ParseInt(strings.TrimPrefix(node.ID, "node-"), 10, 64)
+			if err := a.verifyUserOperation(p); err != nil {
+				return operations.Result{}, err
+			}
+		}
+		a.operationTarget = 0
+	}
 	if request.Action == "user.reconcile" {
 		request.Values = maps.Clone(request.Values)
 		request.Values["to-server"] = target.Name
@@ -419,7 +457,7 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 	if err != nil {
 		return operations.Result{}, err
 	}
-	if recovering && p.Mutation && !userGlobalMutation(request.Action) {
+	if recovering && p.Mutation && !userGlobalMutation(request.Action) && managedAction != createSubscription && managedAction != disableSubscription {
 		return operations.Result{}, operations.ErrStale
 	}
 	if recovering && userGlobalMutation(request.Action) {
@@ -434,7 +472,7 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 	err = cmd.RunE(cmd, request.Arguments)
 	text := strings.TrimSpace(output.String())
 	result := operations.Result{Text: logx.Sanitize(text), Data: a.sharedData}
-	if request.Action == "user.invite" || request.Action == "user.link" || request.Action == "subscription.invite" || request.Action == "user.subscription.publish" {
+	if request.Action == "user.invite" || request.Action == "user.link" || request.Action == "subscription.invite" || request.Action == "user.subscription.publish" || request.Action == createSubscription || request.Action == "user.subscription.issue" {
 		metadata := strings.TrimSpace(strings.ReplaceAll(text, a.sharedContent, ""))
 		result = operations.Result{Text: logx.Sanitize(metadata), Content: a.sharedContent, Data: a.sharedData, MediaType: "text/plain"}
 		if a.sharedContent != "" {
@@ -461,6 +499,24 @@ func (d *deskControl) Apply(ctx context.Context, p operations.Plan, target opera
 		if err := a.verifyUserOperation(p); err != nil {
 			return result, err
 		}
+	}
+	switch request.Action {
+	case "server.ha-apply", "server.init", "deploy":
+		srv, err := a.store.GetServerByID(ctx, a.operationTarget)
+		if err != nil {
+			return result, err
+		}
+		if err := a.store.SaveAppliedSubscriptionNode(ctx, *srv); err != nil {
+			return result, err
+		}
+		a.refreshManagedAfterOperation()
+	case "server.restore", "server.cleanup":
+		if err := a.store.ClearAppliedSubscriptionNode(ctx, a.operationTarget); err != nil {
+			return result, err
+		}
+		a.refreshManagedAfterOperation()
+	case "user.disable", "user.enable", "user.rm", "user.expiry-set", "user.expiry-clear", "user.quota-set", "user.quota-reset":
+		a.refreshManagedAfterOperation()
 	}
 	return result, nil
 }
@@ -659,6 +715,7 @@ func (d *deskControl) CanResume(ctx context.Context, p operations.Plan) error {
 	if !p.Mutation {
 		return nil
 	}
+	p.Action = subscriptionUserAction(p.Action)
 	if !userGlobalMutation(p.Action) {
 		return operations.ErrStale
 	}
@@ -666,7 +723,7 @@ func (d *deskControl) CanResume(ctx context.Context, p operations.Plan) error {
 }
 
 func remoteMutation(action string) bool {
-	if userGlobalMutation(action) {
+	if userGlobalMutation(subscriptionUserAction(action)) {
 		return true
 	}
 	switch action {

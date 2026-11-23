@@ -2,6 +2,18 @@
 
 A subscription groups a user's active server profiles behind one URL. Publish a new snapshot after deploying endpoint or profile changes; clients receive it when they refresh the subscription. Publishing changes delivery files only.
 
+## Managed subscriptions
+
+In Desk, open **Users → Create subscription** to create a VPN user and issue either a one-time setup code or a personal HTTPS link. The user imports it from **Add subscription** in O Tunnel. The same link works in clients that accept a Base64 list of VLESS links. Subscriptions use the existing per-server traffic quotas.
+
+1. Run the delivery service with access to the workspace's `delivery/bundles` and `delivery/invites` directories behind HTTPS. Use the service without account flags for these codes.
+2. Opt in each public entrypoint with `ovpn server subscription <server>`, then deploy it. Pass `--publish=false` to remove a server from managed subscriptions. For HA, opt in to the proxy and any backends you intend to offer as separate direct connections.
+3. Create a subscription with `ovpn user subscription create --username <user> --base-url https://subscriptions.example.net`. Add `--format link` for a reusable HTTPS link.
+
+OVPN publishes profiles from the most recent verified deploy. A new or changed provider endpoint is published after deployment, and O Tunnel refreshes when it opens and the saved list is stale. Its background schedule is subject to the operating system. Desk retries transient failures and reconciles quota state every five minutes while open. To keep reconciliation running on a headless control host, schedule `ovpn subscription sync` every five minutes in that workspace. The HTTP delivery service can continue serving existing files while the publisher is offline.
+
+Use `ovpn subscription list --username <user>` to compare the support ID and profile revision in a problem report with the published list. Use `ovpn user subscription issue` to give another phone a code. With `--format link`, issuing a new link also stops updates for earlier device codes. Use `ovpn user subscription disable --username <user>` to stop both delivery and VPN access. Check the operation's per-node results and retry any failed step. Keep the bundles and invitation directory private and exclude them from backups that are shared publicly.
+
 ## Export a file
 
 ```bash

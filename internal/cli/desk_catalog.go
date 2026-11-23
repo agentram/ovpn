@@ -13,11 +13,16 @@ import (
 
 var deskAreas = map[string]string{"user": "users", "subscription": "users", "server": "servers", "deploy": "servers", "restart": "servers", "config": "servers", "stats": "overview", "doctor": "servers", "observe": "activity", "version": "settings"}
 var deskRead = map[string]bool{
-	"server.inspect": true, "server.test": true, "server.list": true, "server.status": true, "server.profile.list": true, "server.backend.list": true, "server.logs": true, "server.monitor.status": true,
+	"subscription.list": true,
+	"server.inspect":    true, "server.test": true, "server.list": true, "server.status": true, "server.profile.list": true, "server.backend.list": true, "server.logs": true, "server.monitor.status": true,
 	"user.list": true, "user.show": true, "user.top": true, "user.link": true, "user.diagnose": true, "user.debug.list": true, "user.debug.show": true, "user.plan": true, "user.probe": true,
 	"stats": true, "stats.user": true, "config.render": true, "config.validate": true, "doctor": true, "observe.status": true, "version": true, "subscription.serve": true, "observe.run": true,
 }
 var deskTitles = map[string]string{
+	"server.subscription": "Publish server in subscriptions", "subscription.sync": "Refresh subscriptions",
+	"user.subscription.create": "Create subscription", "user.subscription.disable": "Disable VPN and subscription",
+	"user.subscription.issue": "Issue subscription access", "subscription.list": "Subscription status",
+
 	"user.invite": "Create setup code", "user.add": "Add user", "user.rm": "Delete user", "user.enable": "Enable access", "user.disable": "Disable access", "user.quota-set": "Change traffic limit", "user.quota-reset": "Remove traffic block", "user.expiry-set": "Set access end date", "user.expiry-clear": "Remove access end date",
 	"user.link": "Show connection link", "user.qr": "Save QR image", "user.export": "Export access", "user.reconcile": "Repair user records", "user.plan": "Review access change", "user.show": "User details", "user.list": "Users", "user.top": "Traffic leaders", "user.probe": "Check connection", "user.diagnose": "Explain connection problem",
 	"user.debug.start": "Start detailed recording", "user.debug.stop": "Stop detailed recording", "user.debug.list": "Active recordings", "user.debug.show": "Connection recording",
@@ -54,9 +59,9 @@ func commandCatalog(root *cobra.Command) []operations.Action {
 			if title == "" {
 				title = cmd.Short
 			}
-			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "server.backend.detach" || id == "user.reconcile" || id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke", Fields: []operations.Field{}, Arguments: []operations.Field{}}
+			a := operations.Action{ID: id, Title: title, Area: deskAreas[strings.Split(id, ".")[0]], Description: cmd.Short, Mutation: !deskRead[id], Destructive: id == "server.backend.detach" || id == "user.reconcile" || id == "user.rm" || id == "server.cleanup" || id == "server.restore" || id == "subscription.revoke" || id == disableSubscription, Fields: []operations.Field{}, Arguments: []operations.Field{}}
 			cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-				if flag.Name == "help" {
+				if flag.Name == "help" || flag.Hidden {
 					return
 				}
 				required := len(flag.Annotations[cobra.BashCompOneRequiredFlag]) > 0
@@ -66,6 +71,14 @@ func commandCatalog(root *cobra.Command) []operations.Action {
 					value = ""
 				}
 				a.Fields = append(a.Fields, operations.Field{Name: flag.Name, Label: flag.Usage, Type: flag.Value.Type(), Options: fieldOptions(flag.Name), Default: value, Required: required, Secret: secret, Advanced: !required && flag.Name != "ssh-user" && flag.Name != "ssh-identity" && flag.Name != "ssh-port" && flag.Name != "expiry" && flag.Name != "quota-bytes" && flag.Name != "monthly-gb" && flag.Name != "date" && flag.Name != "confirm-traffic" && flag.Name != "engine" && flag.Name != "profile"})
+				if flag.Name == "format" && (id == createSubscription || id == "user.subscription.issue") {
+					field := &a.Fields[len(a.Fields)-1]
+					field.Options = []string{"code", "link"}
+					field.Advanced = false
+				}
+				if id == "server.subscription" && flag.Name == "publish" {
+					a.Fields[len(a.Fields)-1].Advanced = false
+				}
 			})
 			for _, arg := range strings.Fields(cmd.Use)[1:] {
 				if strings.HasPrefix(arg, "<") {
