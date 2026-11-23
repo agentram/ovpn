@@ -10,23 +10,17 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
 
 type Handler struct {
-	store              *Store
-	invites            *Invites
-	now                func() time.Time
-	verifyAccount      accountVerifier
-	requireInviteEmail bool
-	activationAttempts activationLimiter
+	store   *Store
+	invites *Invites
+	now     func() time.Time
 }
 
 func NewHandler(dir string) (*Handler, error) {
@@ -65,22 +59,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if r.URL.Path == "/account" && h.verifyAccount != nil {
-		if account, ok := h.account(w, r); ok {
-			w.Header().Set("X-OVPN-Account", account.subject)
-			w.WriteHeader(http.StatusNoContent)
-		}
-		return
+	if strings.HasPrefix(r.URL.Path, "/sub/") {
+		w.Header().Set(deliveryHeader, deliveryVersion)
 	}
-	var account verifiedAccount
-	if (strings.HasPrefix(r.URL.Path, "/device/") || r.URL.Path == "/account/profiles") && h.invites != nil {
-		var ok bool
-		account, ok = h.account(w, r)
-		if !ok {
-			return
-		}
+	if h.invites != nil && strings.HasPrefix(r.URL.Path, "/device/") {
+		w.Header().Set(deviceHeader, deliveryVersion)
 	}
-	bundle, err := h.lookup(r.URL.Path, account)
+	bundle, err := h.lookup(r.URL.Path)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -116,19 +101,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) lookup(path string, account verifiedAccount) (Bundle, error) {
-	if path == "/account/profiles" && h.invites != nil && account.invitation != "" {
-		bundle, _, err := h.invites.bundle(account.invitation, h.store)
-		return bundle, err
-	}
+func (h *Handler) lookup(path string) (Bundle, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) != 4 || parts[0] != "" {
 		return Bundle{}, ErrNotFound
 	}
 	switch parts[1] {
 	case "device":
-		if h.invites != nil && (account.subject == "" || account.invitation == parts[2]) {
-			return h.invites.deviceBundle(h.store, parts[2], parts[3], account.subject)
+		if h.invites != nil {
+			return h.invites.deviceBundle(h.store, parts[2], parts[3])
 		}
 	case "sub":
 		if !validToken(parts[3]) {
@@ -142,16 +123,20 @@ func (h *Handler) lookup(path string, account verifiedAccount) (Bundle, error) {
 	return Bundle{}, ErrNotFound
 }
 
+const (
+	deliveryHeader   = "OVPN-Delivery-Version"
+	deviceHeader     = "OVPN-Device-Version"
+	activationHeader = "OVPN-Activation-Version"
+	deliveryVersion  = "1"
+)
+
 func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	account, ok := h.account(w, r)
-	if !ok {
-		return
-	}
+	w.Header().Set(activationHeader, deliveryVersion)
 	var request struct {
 		Code    string `json:"code"`
 		Session string `json:"session"`
@@ -161,35 +146,19 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	now := h.now()
-	if account.subject != "" && !h.activationAttempts.allow(account.subject, now) {
-		slog.Info("account activation", "outcome", "rate_limited")
-		w.Header().Set("Retry-After", strconv.Itoa(int(activationWindow.Seconds())))
-		w.WriteHeader(http.StatusTooManyRequests)
-		return
-	}
-	outcome := "accepted"
 	status := http.StatusNoContent
-	err := h.invites.redeem(r.Context(), h.store, request.Code, request.Session, account.subject, account.emailTag, h.requireInviteEmail, now)
+	err := h.invites.redeem(h.store, request.Code, request.Session, h.now())
 	switch {
-	case errors.Is(err, ErrAccountConflict):
-		status, outcome = http.StatusConflict, "identity_conflict"
 	case errors.Is(err, ErrNotFound):
-		status, outcome = http.StatusNotFound, "unavailable_invitation"
+		status = http.StatusNotFound
 	case err != nil:
-		status, outcome = http.StatusServiceUnavailable, "unavailable"
-	}
-	if account.subject != "" {
-		slog.Info("account activation", "outcome", outcome)
+		status = http.StatusServiceUnavailable
 	}
 	w.WriteHeader(status)
 }
 
 type ServeOptions struct {
 	Dir, InviteDir, Listen, CertFile, KeyFile string
-	AccountIssuer                             string
-	AccountClients                            []string
-	RequireInviteEmail                        bool
 }
 
 func (o ServeOptions) Validate() error {
@@ -202,19 +171,6 @@ func (o ServeOptions) Validate() error {
 	}
 	if (o.CertFile == "") != (o.KeyFile == "") {
 		return fmt.Errorf("--tls-cert and --tls-key must be supplied together")
-	}
-	if o.AccountIssuer != "" || len(o.AccountClients) != 0 || o.RequireInviteEmail {
-		issuer, err := url.Parse(o.AccountIssuer)
-		if err != nil || issuer.Scheme != "https" || issuer.Hostname() == "" ||
-			issuer.User != nil || issuer.RawQuery != "" || issuer.ForceQuery || strings.Contains(o.AccountIssuer, "#") ||
-			o.InviteDir == "" || len(o.AccountClients) == 0 || len(o.AccountClients) > 4 {
-			return errors.New("account mode requires an HTTPS issuer, account client IDs and an invitation directory")
-		}
-		for _, client := range o.AccountClients {
-			if client == "" || strings.TrimSpace(client) != client {
-				return errors.New("invalid account client ID")
-			}
-		}
 	}
 	ip, err := netip.ParseAddr(host)
 	if o.CertFile == "" && (err != nil || !ip.IsLoopback()) {
@@ -235,13 +191,6 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	defer handler.Close()
 	if opts.InviteDir != "" {
 		handler.invites, err = OpenInvites(opts.InviteDir)
-		if err != nil {
-			return err
-		}
-	}
-	if opts.AccountIssuer != "" {
-		handler.requireInviteEmail = opts.RequireInviteEmail
-		handler.verifyAccount, err = openAccountVerifier(ctx, opts.AccountIssuer, opts.AccountClients)
 		if err != nil {
 			return err
 		}

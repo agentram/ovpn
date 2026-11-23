@@ -6,7 +6,7 @@ A subscription groups a user's active server profiles behind one URL. Publish a 
 
 In Desk, open **Users → Create subscription** to create a VPN user and issue either a one-time setup code or a personal HTTPS link. The user imports it from **Add subscription** in O Tunnel. The same link works in clients that accept a Base64 list of VLESS links. Subscriptions use the existing per-server traffic quotas.
 
-1. Run the delivery service with access to the workspace's `delivery/bundles` and `delivery/invites` directories behind HTTPS. Use the service without account flags for these codes.
+1. Run the delivery service with access to the workspace's `delivery/bundles` and `delivery/invites` directories behind HTTPS.
 2. Opt in each public entrypoint with `ovpn server subscription <server>`, then deploy it. Pass `--publish=false` to remove a server from managed subscriptions. For HA, opt in to the proxy and any backends you intend to offer as separate direct connections.
 3. Create a subscription with `ovpn user subscription create --username <user> --base-url https://subscriptions.example.net`. Add `--format link` for a reusable HTTPS link.
 
@@ -101,30 +101,10 @@ Revoking or rotating a subscription token stops future downloads. Already import
 
 The Base64 link-list format is consumed by [v2rayN](https://github.com/2dust/v2rayN/blob/master/v2rayN/ServiceLib/Handler/SubscriptionHandler.cs) and documented by [Xray Checker](https://xray-checker.kutovoy.dev/configuration/subscription/). Add the URL as a subscription rather than as one VLESS node. The automated regression covers HTTPS delivery, Base64 decoding and native Xray traffic for REALITY/TCP and self-SNI TLS; import in individual GUI app versions still needs verification. Existing [transport compatibility limits](transports.md) apply, especially to experimental profiles. Automatic failover depends on the client configuration and is not provided by a link list alone.
 
-## Account-based delivery
+## Upgrading from account-based delivery
 
-See [mobile account onboarding](account-onboarding.md) for verified email, passwordless sign-in and operator setup.
-
-Use an OpenID Connect provider to offer verified email registration and Google sign-in. Register public clients for Android and iOS with Authorization Code and PKCE. Configure both clients to receive the same stable subject for an account. The service verifies the issuer, allowed client ID, signature, expiration and verified-email claim. It uses an issuer-scoped account identifier and keeps email addresses out of invitation records.
-
-```sh
-ovpn subscription serve --bundle-dir ./subscription-bundles --invite-dir ./invites \
-  --account-issuer https://login.example.net/realms/tunnel \
-  --account-client ovpn-android,ovpn-ios --account-require-invite-email
-```
-
-Expose `/account`, `/account/profiles` and `/activate` over HTTPS alongside the existing delivery paths. Use a dedicated invitation directory and one delivery process per directory for account-based clients. Keep the paths, access tokens and activation bodies out of request logging. Publish the intended OVPN user's compatible profiles with `--all-profiles` and issue a code with `ovpn subscription invite`. Assign one OVPN user per customer if you want to identify them individually in Desk presence and quota views.
-
-The code binds the published profile list to one verified account. The account can retrieve that list again after signing in. Rotating or revoking the subscription stops delivery. To stop a saved profile from connecting, also disable the VPN user on the server. Direct subscription URLs keep their URL-token behavior.
-
-To migrate existing O Tunnel installations, keep the original HTTPS origin
-without account mode and keep its invitation directory, bundle directory and
-delivery process available. Activated Android installations use their existing
-device receipts at that origin. Enabling account mode there makes anonymous
-receipt refresh fail because the receipts have no account binding.
-
-Set up a separate HTTPS origin and separate bundle and invitation directories
-for account clients. Publish profiles and issue fresh account setup codes there.
-Have each user sign in, activate and verify refresh on the new build before
-retiring their legacy delivery. A failure during the rollout can be recovered
-by continuing to use the original origin and an existing activated installation.
+Remove the legacy account flags from the delivery service configuration before restarting it.
+Update the HTTPS delivery service before issuing access. Keep the bundle and invitation directories in place. HTTPS subscription URLs and already
+claimed anonymous device subscriptions continue to refresh. Issue a fresh code for any
+unclaimed legacy invitation or device previously enrolled through account sign-in.
+Cached profiles can remain usable until access expires or is revoked on the VPN servers.

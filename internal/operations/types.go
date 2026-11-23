@@ -41,3 +41,8 @@ type TargetLocker interface {
 type ResumeGuard interface {
 	CanResume(context.Context, Plan) error
 }
+
+// ApplyGuard checks external prerequisites before any step runs under the writer lock.
+type ApplyGuard interface {
+	BeforeApply(context.Context, Plan) error
+}

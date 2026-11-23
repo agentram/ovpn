@@ -267,12 +267,43 @@ func (a *App) newManagedSubscriptionCmd(create bool) *cobra.Command {
 	return cmd
 }
 
-func (a *App) issueManagedSubscription(username, uuid, origin, format string, create bool) error {
-	if !strings.HasPrefix(strings.ToLower(origin), "https://") ||
-		subscription.ValidateBaseURL(origin) != nil || (format != "code" && format != "link") {
+func (d *deskControl) BeforeApply(ctx context.Context, plan operations.Plan) error {
+	if plan.Action != createSubscription {
+		return nil
+	}
+	a, err := d.instance(ctx, operations.Target{ID: "workspace"}, plan.Action)
+	if err != nil {
+		return err
+	}
+	defer a.store.Close()
+	if err := verifyManagedDelivery(ctx, plan.Request.Values["base-url"], plan.Request.Values["format"]); err != nil {
+		return err
+	}
+	nodes, err := a.loadSubscriptionNodes()
+	if err != nil {
+		return err
+	}
+	for _, node := range nodes {
+		if node.known && len(deployableEnabledProfiles(node.server)) > 0 {
+			return nil
+		}
+	}
+	return errors.New("SUBSCRIPTION_NO_READY_PROFILES")
+}
+
+func verifyManagedDelivery(ctx context.Context, origin, format string) error {
+	switch format {
+	case "", "code":
+		return subscription.VerifyActivation(ctx, origin)
+	case "link":
+		return subscription.VerifySubscriptionRoute(ctx, origin)
+	default:
 		return errors.New("DELIVERY_UNAVAILABLE")
 	}
-	if err := subscription.VerifyDeliveryHealth(a.ctx, origin); err != nil {
+}
+
+func (a *App) issueManagedSubscription(username, uuid, origin, format string, create bool) error {
+	if err := verifyManagedDelivery(a.ctx, origin, format); err != nil {
 		return err
 	}
 	if !create {

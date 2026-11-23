@@ -191,10 +191,26 @@ func (d *deskControl) Prepare(ctx context.Context, request operations.Request) (
 			return operations.Plan{}, operations.ErrUnavailable
 		}
 		validationApp := &App{ctx: ctx, store: validationStore}
+		defer validationStore.Close()
 		_, e = validationApp.resolveUserMutationServers()
-		_ = validationStore.Close()
 		if e != nil {
 			return operations.Plan{}, errors.New("IDENTITY_CONFLICT")
+		}
+		if request.Action == createSubscription {
+			nodes, err := validationStore.SubscriptionNodes(ctx)
+			if err != nil {
+				return operations.Plan{}, operations.ErrUnavailable
+			}
+			ready := false
+			for _, node := range nodes {
+				if len(deployableEnabledProfiles(node)) > 0 {
+					ready = true
+					break
+				}
+			}
+			if !ready {
+				return operations.Plan{}, errors.New("SUBSCRIPTION_NO_READY_PROFILES")
+			}
 		}
 		username := strings.TrimSpace(request.Values["username"])
 		if username == "" {

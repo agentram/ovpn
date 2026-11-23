@@ -217,6 +217,11 @@ func (s *Service) execute(ctx context.Context, journal *journal, r record, recov
 				return ErrStale
 			}
 		}
+		if guard, ok := s.backend.(ApplyGuard); ok {
+			if err := guard.BeforeApply(ctx, r.Plan); err != nil {
+				return err
+			}
+		}
 		r.Job.State = "running"
 		if err := persist(); err != nil {
 			return err
