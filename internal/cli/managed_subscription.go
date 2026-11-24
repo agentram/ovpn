@@ -118,7 +118,7 @@ func (a *App) loadSubscriptionNodes() ([]subscriptionNode, error) {
 	return nodes, nil
 }
 
-func (a *App) managedEntries(bundle subscription.Bundle, nodes []subscriptionNode) ([]subscription.Entry, error) {
+func (a *App) managedEntries(bundle subscription.Bundle, nodes []subscriptionNode, labels subscriptionLabels) ([]subscription.Entry, error) {
 	var entries []subscription.Entry
 	for _, node := range nodes {
 		srv := node.server
@@ -157,7 +157,7 @@ func (a *App) managedEntries(bundle subscription.Bundle, nodes []subscriptionNod
 			if err != nil {
 				return nil, err
 			}
-			parsed.Fragment = srv.Name + " · " + profile
+			parsed.Fragment = labels.fragment(srv.Name, profile)
 			entries = append(entries, subscription.Entry{Link: parsed.String(), ExpiresAt: user.ExpiryDate, NodeID: srv.ID})
 		}
 	}
@@ -177,6 +177,10 @@ func (a *App) syncManagedSubscriptions() error {
 	if err != nil || len(bundles) == 0 {
 		return err
 	}
+	labels, err := a.readSubscriptionLabels()
+	if err != nil {
+		return err
+	}
 	nodes, err := a.loadSubscriptionNodes()
 	if err != nil {
 		return err
@@ -186,7 +190,7 @@ func (a *App) syncManagedSubscriptions() error {
 		if bundle.Disabled {
 			continue
 		}
-		entries, err := a.managedEntries(bundle, nodes)
+		entries, err := a.managedEntries(bundle, nodes, labels)
 		if err == nil && !reflect.DeepEqual(entries, bundle.Entries) {
 			_, _, err = store.PublishManaged(bundle.ID, bundle.Owner, bundle.ManagedKey, entries, false, false)
 		}
@@ -276,6 +280,9 @@ func (d *deskControl) BeforeApply(ctx context.Context, plan operations.Plan) err
 		return err
 	}
 	defer a.store.Close()
+	if _, err := a.readSubscriptionLabels(); err != nil {
+		return err
+	}
 	if err := verifyManagedDelivery(ctx, plan.Request.Values["base-url"], plan.Request.Values["format"]); err != nil {
 		return err
 	}
@@ -303,6 +310,10 @@ func verifyManagedDelivery(ctx context.Context, origin, format string) error {
 }
 
 func (a *App) issueManagedSubscription(username, uuid, origin, format string, create bool) error {
+	labels, err := a.readSubscriptionLabels()
+	if err != nil {
+		return err
+	}
 	if err := verifyManagedDelivery(a.ctx, origin, format); err != nil {
 		return err
 	}
@@ -338,7 +349,7 @@ func (a *App) issueManagedSubscription(username, uuid, origin, format string, cr
 	if err != nil {
 		return err
 	}
-	entries, err := a.managedEntries(bundle, nodes)
+	entries, err := a.managedEntries(bundle, nodes, labels)
 	if err != nil {
 		return err
 	}

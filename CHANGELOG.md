@@ -6,6 +6,7 @@ The format is based on Keep a Changelog and this repository uses plain semantic 
 
 ## Unreleased
 
+- Allow workspace-local names for nodes and transport profiles in managed subscriptions.
 - Retire account-based delivery. Preserve existing anonymous device receipts, and verify delivery before creating subscription users.
 - Manage VPN subscriptions through Desk and CLI, publish verified public routes, and report profile revisions.
 

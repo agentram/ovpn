@@ -2,7 +2,12 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"net/url"
+	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -57,13 +62,13 @@ func TestManagedSubscriptionUsesOnlyAppliedClientNodes(t *testing.T) {
 		{server: enabled[1], known: true, users: verified},
 	}
 	bundle := subscription.Bundle{Owner: "alice", ManagedKey: key}
-	profiles, err := app.managedEntries(bundle, nodes)
+	profiles, err := app.managedEntries(bundle, nodes, nil)
 	if err != nil || len(profiles) != 2 || !strings.Contains(profiles[0].Link, originalDomain) {
 		t.Fatal("failed to use the applied route for the new server", err)
 	}
 	nodes[0].known = false
 	bundle.Entries = profiles
-	saved, err := app.managedEntries(bundle, nodes)
+	saved, err := app.managedEntries(bundle, nodes, nil)
 	if err != nil || len(saved) != 2 || saved[0].Link != profiles[0].Link {
 		t.Fatal("temporarily unreachable node did not keep its last route", err)
 	}
@@ -75,10 +80,177 @@ func TestManagedSubscriptionUsesOnlyAppliedClientNodes(t *testing.T) {
 	if err = app.store.UpdateUser(app.ctx, identity); err != nil {
 		t.Fatal(err)
 	}
-	saved, err = app.managedEntries(bundle, nodes)
+	saved, err = app.managedEntries(bundle, nodes, nil)
 	if err != nil || len(saved) != 1 || saved[0].NodeID == direct.ID {
 		t.Fatal("a local disable left the old route published", err)
 	}
+}
+
+func TestManagedSubscriptionLabelsPublishAndRefreshWithoutChangingRoutes(t *testing.T) {
+	app := newTestAppWithLinkedUser(t)
+	server, err := app.store.GetServerByName(app.ctx, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transports := []string{
+		model.TransportProfileRealityTCPVision, model.TransportProfileTLSSelfSNIWeb, model.TransportProfilePlainXHTTP,
+	}
+	server.EnabledProfiles = model.EnabledProfilesCSV(server.PrimaryProfile, strings.Join(transports, ","))
+	if err := app.store.UpdateServer(app.ctx, server); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.store.SetSubscriptionNode(app.ctx, server.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.store.SaveAppliedSubscriptionNode(app.ctx, *server); err != nil {
+		t.Fatal(err)
+	}
+	user, err := app.store.GetUser(app.ctx, server.ID, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.remoteHTTPHook = func(model.Server, string, string, any) ([]byte, error) {
+		return json.Marshal(model.UserStatusResponse{
+			Users: []model.UserAccessStatus{{
+				Username: user.Username, UUID: user.UUID, EffectiveEnabled: true, HasRuntimeIdentity: true,
+			}},
+		})
+	}
+	if err := os.MkdirAll(app.managedBundleDir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := subscription.Open(app.managedBundleDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	labelsPath := filepath.Join(app.dataDir, "delivery", subscriptionLabelsFile)
+	write := func(value string) {
+		t.Helper()
+		if err := os.WriteFile(labelsPath, []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fragments := func(entries []subscription.Entry) []string {
+		t.Helper()
+		var names []string
+		for _, entry := range entries {
+			u, err := url.Parse(entry.Link)
+			if err != nil {
+				t.Fatal("invalid published URL")
+			}
+			names = append(names, u.Fragment)
+		}
+		return names
+	}
+	owner := subscription.Bundle{Owner: user.Username, ManagedKey: subscriptionIdentity(user.UUID)}
+	nodes, err := app.loadSubscriptionNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fallback, err := app.readSubscriptionLabels()
+	if err != nil || fallback != nil {
+		t.Fatal("missing file should retain default labels", err)
+	}
+	defaults, err := app.managedEntries(owner, nodes, fallback)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultNames := fragments(defaults)
+	if len(defaultNames) != 3 {
+		t.Fatalf("expected three fixture routes, got %d", len(defaultNames))
+	}
+
+	write(`{"main":{"name":"VPN","profiles":{
+		"vless-xhttp-plain":"Резервный 2","vless-tcp-tls-selfsni-web":"Резервный","vless-reality-tcp-vision":"Основной"
+	}}}`)
+	labels, err := app.readSubscriptionLabels()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := app.managedEntries(owner, nodes, labels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _, err := store.PublishManaged("", owner.Owner, owner.ManagedKey, entries, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := func() subscription.Bundle {
+		t.Helper()
+		bundle, err := store.Read(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bundle
+	}
+	first := read()
+	byDefault := map[string]string{
+		"main · " + model.TransportProfileRealityTCPVision: "VPN · Основной",
+		"main · " + model.TransportProfileTLSSelfSNIWeb:    "VPN · Резервный",
+		"main · " + model.TransportProfilePlainXHTTP:       "VPN · Резервный 2",
+	}
+	assertPublication := func(bundle subscription.Bundle, names []string) {
+		t.Helper()
+		if !reflect.DeepEqual(fragments(bundle.Entries), names) || bundle.TokenHash != first.TokenHash {
+			t.Fatalf("unexpected labels or changed delivery token")
+		}
+		for i, entry := range bundle.Entries {
+			actual, _, _ := strings.Cut(entry.Link, "#")
+			expected, _, _ := strings.Cut(defaults[i].Link, "#")
+			if actual != expected || entry.NodeID != defaults[i].NodeID {
+				t.Fatalf("renaming changed connection route at position %d", i)
+			}
+		}
+	}
+	wanted := []string{byDefault[defaultNames[0]], byDefault[defaultNames[1]], byDefault[defaultNames[2]]}
+	assertPublication(first, wanted)
+	if err := app.syncManagedSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(first, read()) {
+		t.Fatal("unchanged sync rewrote the bundle")
+	}
+
+	write(`{"main":{"name":"VPN","profiles":{"vless-tcp-tls-selfsni-web":"Второй"}}}`)
+	if err := app.syncManagedSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	wanted = nil
+	for _, name := range defaultNames {
+		if strings.HasSuffix(name, model.TransportProfileTLSSelfSNIWeb) {
+			wanted = append(wanted, "VPN · Второй")
+		} else {
+			wanted = append(wanted, strings.Replace(name, "main · ", "VPN · ", 1))
+		}
+	}
+	last := read()
+	assertPublication(last, wanted)
+	for _, invalid := range []string{
+		`{"main":{"profiles":{"route-2":"Резервный"}}}`,
+		`{"main":{"name":"two\nlines"}}`,
+		`{"main":{"other":"VPN"}}`,
+		`{}` + `{}`,
+	} {
+		write(invalid)
+		if err := app.syncManagedSubscriptions(); !errors.Is(err, errSubscriptionLabels) {
+			t.Fatalf("invalid labels did not fail sync: %v", err)
+		}
+		if !reflect.DeepEqual(last, read()) {
+			t.Fatal("invalid labels changed the published bundle")
+		}
+	}
+	if err := app.issueManagedSubscription(user.Username, user.UUID, "", "code", false); !errors.Is(err, errSubscriptionLabels) {
+		t.Fatalf("invalid labels were not rejected before attempting issuance: %v", err)
+	}
+	if err := os.Remove(labelsPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.syncManagedSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	assertPublication(read(), defaultNames)
 }
 
 func TestSubscriptionPlanQueuesUserProvisioningBeforeDelivery(t *testing.T) {

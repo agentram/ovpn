@@ -14,6 +14,31 @@ OVPN publishes profiles from the most recent verified deploy. A new or changed p
 
 Use `ovpn subscription list --username <user>` to compare the support ID and profile revision in a problem report with the published list. Use `ovpn user subscription issue` to give another phone a code. With `--format link`, issuing a new link also stops updates for earlier device codes. Use `ovpn user subscription disable --username <user>` to stop both delivery and VPN access. Check the operation's per-node results and retry any failed step. Keep the bundles and invitation directory private and exclude them from backups that are shared publicly.
 
+### Profile names
+
+Optionally create `<data-dir>/delivery/profile-labels.json` in the Desk or CLI
+workspace. Use the registered server name as the key and stable transport IDs
+for profile names:
+
+```json
+{
+  "example-node": {
+    "name": "VPN",
+    "profiles": {
+      "vless-reality-tcp-vision": "Основной",
+      "vless-tcp-tls-selfsni-web": "Резервный",
+      "vless-xhttp-plain": "Резервный 2"
+    }
+  }
+}
+```
+
+Issuing access or running `ovpn --data-dir <data-dir> subscription sync` applies
+the names to the VLESS labels after checking the node. Missing overrides use
+the original names. If the file is invalid, the last published list is kept.
+Changing a label does not change the endpoint or profile identity. Clients
+still filter the list according to their transport support.
+
 ## Export a file
 
 ```bash
