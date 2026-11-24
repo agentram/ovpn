@@ -69,8 +69,8 @@ func (s *Invites) Issue(bundle Bundle, origin string, now time.Time, ttl time.Du
 	if len(prefix)+base64.RawURLEncoding.EncodedLen(32) > 512 {
 		return "", errors.New("invitation origin is too long")
 	}
-	if ttl < time.Minute || ttl > 24*time.Hour {
-		return "", errors.New("invitation lifetime must be between one minute and 24 hours")
+	if ttl < time.Minute || ttl > 72*time.Hour {
+		return "", errors.New("invitation lifetime must be between one minute and 72 hours")
 	}
 	if err := bundle.validate(); err != nil {
 		return "", err

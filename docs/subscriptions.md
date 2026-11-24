@@ -100,7 +100,7 @@ ovpn subscription invite --bundle-dir ./subscription-bundles --invite-dir ./invi
   --id <subscription-id> --base-url https://subscriptions.example.net
 ```
 
-Give the code to the intended user for **Enter code**. Add `--out ./invite.png` to issue a new code as a QR image. A code expires after 30 minutes by default and activates one app installation. The app can retry the same activation after an interrupted request. Preserve the `/activate` and `/device/` paths at the HTTPS reverse proxy. Exclude activation request bodies and secret URLs from logs.
+Give the code to the intended user for **Enter code**. Add `--out ./invite.png` to issue a new code as a QR image. A code expires after 30 minutes by default and activates one app installation. Use `--ttl 72h` when the recipient needs three days to activate. The app can retry the same activation after an interrupted request. Preserve the `/activate` and `/device/` paths at the HTTPS reverse proxy. Exclude activation request bodies and secret URLs from logs.
 
 The installation follows the same published profile list. Rotating or revoking the parent subscription stops updates for its activated installations. Server-side access uses the underlying VPN user's credentials.
 

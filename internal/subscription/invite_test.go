@@ -116,6 +116,37 @@ func TestActivationRejectsExpiredUnclaimedCode(t *testing.T) {
 	}
 }
 
+func TestThreeDayInvitation(t *testing.T) {
+	_, store, handler := openFixture(t)
+	var err error
+	handler.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _, err := store.Publish("", "alice", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	const origin = "https://subscriptions.example.net"
+	raw, err := handler.invites.Issue(bundle, origin, now, 72*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, code, _ := strings.Cut(raw, "#")
+	handler.now = func() time.Time { return now.Add(71 * time.Hour) }
+	if postActivation(handler, code, newToken()) != http.StatusNoContent {
+		t.Fatal("three-day code did not activate on the third day")
+	}
+	if _, err = handler.invites.Issue(bundle, origin, now, 72*time.Hour+time.Second); err == nil {
+		t.Fatal("invitation exceeded the three-day limit")
+	}
+}
+
 func issueFixture(t *testing.T, invites *Invites, bundle Bundle, now time.Time) string {
 	t.Helper()
 	raw, err := invites.Issue(bundle, "https://subscriptions.example.net", now, time.Hour)
