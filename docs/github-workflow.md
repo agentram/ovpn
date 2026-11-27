@@ -16,7 +16,7 @@ Assign one GitHub owner when the issue becomes active. Add a label for the type 
 - Put actionable findings on the relevant lines of the diff. Submit a review with a verdict and any outstanding checks. Reply with the fix or decision before resolving a thread. Keep threads that still need evidence open.
 - Keep VERSION, the README version, and the first numbered changelog entry aligned. Follow the target repository's release rules and record any deferred validation with its owner.
 
-CI, local tests, emulator tests, and physical-device tests are different sources of evidence. Record what ran and where. If an artifact is pending, write that in the PR and add the link after it is available. Limit public records to public evidence. Keep private artifacts and internal details in the repository or private project that owns them. Use synthetic configuration and inspect packages, examples, and screenshots before sharing.
+CI, local tests, emulator tests, and physical-device tests are different sources of evidence. Record what ran and where. If an artifact is pending, write that in the PR and add the link after it is available. Use only sanitized, publicly shareable evidence in public issues and PRs. Store private artifacts and internal details in an access-controlled private repository or project. Use synthetic configuration and inspect packages, examples, and screenshots before sharing.
 
 ## Hand off a stage
 
