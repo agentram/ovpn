@@ -1,6 +1,7 @@
 name: Feature request
 description: Propose an improvement to ovpn.
 title: "[Feature]: "
+labels: [enhancement]
 body:
   - type: markdown
     attributes:
@@ -35,6 +36,18 @@ body:
       description: Who benefits, what changes, and what risks or complexity do you expect?
     validations:
       required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Describe how to verify the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Related work and evidence
+      description: Link related issues, PRs, or builds. Use synthetic examples and remove identifiers, credentials, and access links before sharing screenshots or logs.
   - type: checkboxes
     id: confirmations
     attributes:
