@@ -4,18 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
-## Unreleased
-
-- Allow workspace-local names for nodes and transport profiles in managed subscriptions.
-- Retire account-based delivery. Preserve existing anonymous device receipts, and verify delivery before creating subscription users.
-- Manage VPN subscriptions through Desk and CLI, publish verified public routes, and report profile revisions.
-
 ## 1.13.0
 
 Move the desktop, Android and iOS application source and build pipelines into separate repositories. Keep the CLI, server components and client-compatible VPN access APIs here. Replace deployment-specific test fixture values with synthetic data.
 
 ### Added
-- Bind account invitations to a verified recipient email, enforce unique mailbox ownership, and rate-limit activation attempts. Document Google and email OTP onboarding and account migration.
+- Manage VPN subscriptions through Desk and CLI, publish verified public routes, and report profile revisions. Allow workspace-local names for nodes and transport profiles.
 - Add proxy/backend topology, direct-routing presets, agent-collected HAProxy health and backend-first HA application with verified backups and dependency failure blocking. Include entry-server setup and actual HAProxy Docker failover/recovery acceptance in CI.
 - Add user creation, enable/disable, expiry and rolling quota changes, explicit QR/link delivery, and one-time setup codes that verify trusted HTTPS delivery and the published profile snapshot before issue.
 - Expose the CLI command catalog through additive machine protocol 1 methods. Review affected servers and input values before writes; deletion, restore and cleanup require a separate typed confirmation.
@@ -28,9 +22,11 @@ Move the desktop, Android and iOS application source and build pipelines into se
 - Restore from a staged archive even if the runtime was lost. Snapshot existing state privately and prune only after recovery starts the services successfully.
 - Reject disabled nodes in HA plans and let the server wizard save corrected SSH settings only after validating them.
 - Index the encrypted operation journal, expire unused plans, bound completed history, and show Cancel only to the job's owner.
-- Document separate legacy and account delivery origins so existing Android installations can continue refreshing their receipts.
+- Verify delivery before creating subscription users and keep interrupted operations resumable.
 
 ### Changed
+- Retire Google and email sign-in for subscription delivery. Existing anonymous device receipts continue to work.
+- Keep setup codes valid for 30 minutes by default and allow a longer one-time code lifetime of up to 72 hours.
 - Fix SQLite file URIs for Windows workspaces and observation history, including spaces and non-ASCII paths. Keep the version command independent of local state and check native workspace access in the packaging matrix.
 - Replace overflowing action button grids with compact primary actions and a searchable grouped catalog. Translate diagnostic task states and keep task completion separate from connection success.
 - Preserve usage for disabled users, keep missing quota data unknown, and verify suspended access without requiring an active quota policy. Mark incomplete user distribution as partial and checkpoint local repair per target.
