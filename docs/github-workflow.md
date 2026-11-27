@@ -6,7 +6,7 @@ This workflow applies to Core, Android, Desk, iOS, and future OVPN repositories.
 
 Describe the user or operator problem, the expected outcome, and how it will be accepted. Add relevant links and one small, sanitized example when it helps a reader understand the task. Use the security reporting channel for sensitive findings.
 
-Assign one GitHub owner when the issue becomes active. Add a label for the type of work and a milestone for the intended acceptance or release. Milestones are per repository. Use the private OVPN Delivery project to see work across repositories. Its statuses are Backlog, In progress, In review, Validation, Paused, and Done. When handing off an issue, update the assignee and the project status, then leave a short note explaining the next action.
+Assign one GitHub owner when the issue becomes active. Add a label for the type of work and a milestone for the intended acceptance or release. Milestones are per repository. Use the private OVPN Desk project for operator tooling and the private O Tunnel Mobile project for Android and iOS. Each project uses Backlog, In progress, In review, Validation, Paused, and Done. Track shared Core work in the project that owns the outcome and link it from the other project when it affects both. When handing off an issue, update the assignee and the project status, then leave a short note explaining the next action.
 
 ## Open and review the PR
 
@@ -33,5 +33,5 @@ Use one active executor and one heavy run by default. Record the repository and 
 ## Set up a new OVPN repository
 
 1. Add the bug and feature forms, PR template, and a contributor link to this guide. Set CODEOWNERS to the repository's actual maintainers and confirm review-request access.
-2. Add repository labels and milestones for the work. Link the repository to the private OVPN Delivery project and use the shared statuses.
+2. Add repository labels and milestones for the work. Link the repository to the private project that owns its product and use the shared statuses.
 3. Document the repository's checks, package and version rules, and artifact locations. Test that an issue can be assigned, a PR can request review and reference it, and readers can access the evidence intended for them.
