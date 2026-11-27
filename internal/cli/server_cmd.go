@@ -7,9 +7,14 @@ func (a *App) serverCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "server", Short: "Manage servers"}
 	cmd.AddCommand(
 		a.newServerAddCmd(),
+		a.newServerInspectCmd(),
+		a.newServerTestCmd(),
+		a.newServerSetSSHCmd(),
 		a.newServerBackendCmd(),
+		a.newServerHAApplyCmd(),
 		a.newServerProfileCmd(),
 		a.newServerInitCmd(),
+		a.newServerSubscriptionCmd(),
 		a.newServerListCmd(),
 		a.newServerSetXrayVersionCmd(),
 		a.newServerSetRealityTargetCmd(),

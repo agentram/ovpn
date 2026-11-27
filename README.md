@@ -8,7 +8,7 @@
 
 The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime files, and pushes them to Linux hosts. Optional HAProxy support can route traffic to a VPN backend pool.
 
-It is intended for operators who prefer a local CLI and SSH workflow over a web panel. It is not a hosted VPN service; it gives you reproducible files and commands for your own servers.
+Manage your own servers locally with the CLI. OVPN generates standard VLESS profiles for compatible clients.
 
 [Download a release](https://github.com/agentram/ovpn/releases/latest) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
 
@@ -88,7 +88,6 @@ For an optional HTTPS check from the operator machine, run `./ovpn user probe --
 - [Traffic probes and Xray Checker](docs/probes.md)
 - [Client subscriptions](docs/subscriptions.md)
 - [Automatic observation and Checker/Knife](docs/observation.md)
-- [Desktop development build](docs/desktop.md) · [Design proposal](docs/design/desktop/README.md)
 - [Documentation map](#documentation-map)
 
 ## Production model
@@ -184,7 +183,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.12.0`
+- Current pinned version: `1.13.0`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -205,7 +204,7 @@ flowchart LR
 
 ## Requirements
 
-- Release binary, or Go `1.27.3+` when building from source
+- Release binary, or Go `1.27.4+` when building from source
 - SSH key access to the target host
 - Target host running Debian `12+` or Ubuntu `22.04+`
 - Clean Linux host recommended
@@ -499,7 +498,6 @@ By default, cleanup removes remote runtime files and disables local server metad
 
 ## VPN clients
 
-[O Tunnel](apps/android/README.md) is the OVPN client for Android with setup codes, QR import and TCP/TLS or TCP/REALITY profiles.
 
 End-user setup instructions cover iOS, Android, Windows, and macOS:
 

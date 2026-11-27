@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,17 +19,18 @@ import (
 )
 
 type routeDeps struct {
-	store       *remote.Store
-	collector   *stats.Collector
-	quota       *stats.QuotaEnforcer
-	expiry      *stats.ExpiryEnforcer
-	runtime     stats.RuntimeManager
-	metrics     *agentMetrics
-	logger      *slog.Logger
-	xrayAPI     string
-	dbPath      string
-	collectOnce func(context.Context) error
-	refreshOnce func(context.Context)
+	haMetricsURL string
+	store        *remote.Store
+	collector    *stats.Collector
+	quota        *stats.QuotaEnforcer
+	expiry       *stats.ExpiryEnforcer
+	runtime      stats.RuntimeManager
+	metrics      *agentMetrics
+	logger       *slog.Logger
+	xrayAPI      string
+	dbPath       string
+	collectOnce  func(context.Context) error
+	refreshOnce  func(context.Context)
 }
 
 func parseSinceParam(raw string, fallback time.Duration) (time.Time, error) {
@@ -203,6 +205,7 @@ func newMetricsRefreshFunc(store *remote.Store, logger *slog.Logger, metrics *ag
 func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 	// Serialize runtime add/remove calls to avoid concurrent AlterInbound races against one Xray process.
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/ha/status", handleHAStatus(d.haMetricsURL))
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		hctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
@@ -344,6 +347,31 @@ func registerHTTPRoutes(ctx context.Context, mux *http.ServeMux, d routeDeps) {
 			return
 		}
 		writeJSON(w, http.StatusOK, status)
+	})
+	mux.HandleFunc("/users/online", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		result := model.UserPresence{Supported: os.Getenv("OVPN_USER_ONLINE_STATS") == "true", SampledAt: time.Now().UTC().Format(time.RFC3339), Online: []string{}}
+		if !result.Supported {
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		client, err := xrayapi.New(ctx, d.xrayAPI)
+		if err != nil {
+			http.Error(w, "presence unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		defer client.Close()
+		result.Online, err = client.OnlineUsers(ctx)
+		if err != nil {
+			http.Error(w, "presence unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, http.StatusOK, result)
 	})
 	mux.HandleFunc("/users/status", func(w http.ResponseWriter, r *http.Request) {
 		email := strings.TrimSpace(r.URL.Query().Get("email"))

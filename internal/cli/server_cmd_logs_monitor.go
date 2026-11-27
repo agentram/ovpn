@@ -42,14 +42,14 @@ func (a *App) newServerLogsCmd() *cobra.Command {
 			runner := a.newRunner("server.logs")
 			a.log().Info("fetching remote logs", "server", srv.Name, "host", srv.Host, "service", emptyAsAll(service), "tail", tail, "follow", follow)
 			if follow {
-				return runner.ExecStream(a.ctx, sshFromServer(*srv), remoteCmd, os.Stdout, os.Stderr)
+				return runner.ExecStream(a.ctx, sshFromServer(*srv), remoteCmd, a.output(), a.output())
 			}
 			res, err := runner.Exec(a.ctx, sshFromServer(*srv), remoteCmd)
 			if err != nil {
 				return fmt.Errorf("fetch logs for server %s on %s: %w", srv.Name, srv.Host, err)
 			}
 			if strings.TrimSpace(res.Stdout) != "" {
-				fmt.Print(res.Stdout)
+				fmt.Fprint(a.output(), res.Stdout)
 			}
 			if strings.TrimSpace(res.Stderr) != "" {
 				fmt.Fprint(os.Stderr, res.Stderr)
@@ -93,7 +93,7 @@ func (a *App) newServerMonitorUpCmd() *cobra.Command {
 			if err := deploy.MonitoringUpRemote(a.ctx, runner, sshFromServer(*srv)); err != nil {
 				return err
 			}
-			fmt.Println("monitoring stack started")
+			fmt.Fprintln(a.output(), "monitoring stack started")
 			return nil
 		},
 	}
@@ -114,7 +114,7 @@ func (a *App) newServerMonitorDownCmd() *cobra.Command {
 			if err := deploy.MonitoringDownRemote(a.ctx, runner, sshFromServer(*srv)); err != nil {
 				return err
 			}
-			fmt.Println("monitoring stack stopped")
+			fmt.Fprintln(a.output(), "monitoring stack stopped")
 			return nil
 		},
 	}
@@ -136,7 +136,7 @@ func (a *App) newServerMonitorStatusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println(out)
+			fmt.Fprintln(a.output(), out)
 			return nil
 		},
 	}
@@ -196,14 +196,14 @@ func (a *App) newServerMonitorTelegramSetupCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("telegram setup plan for %s (%s)\n", srv.Name, srv.Host)
-			fmt.Printf("- upload token file: %s\n", deploy.RemoteDir+"/monitoring/secrets/telegram_bot_token")
-			fmt.Printf("- notify chat ids: %s\n", emptyAsAll(notifyChatIDs))
-			fmt.Printf("- owner user id: %s\n", emptyAsAll(ownerUserID))
-			fmt.Printf("- deploy runtime bundle: %v\n", true)
-			fmt.Printf("- start monitoring stack: %v\n", setup.monitorUp)
-			fmt.Printf("- send test telegram notify: %v\n", setup.testNotify)
-			fmt.Printf("- dry-run mode: %v\n", a.dryRun)
+			fmt.Fprintf(a.output(), "telegram setup plan for %s (%s)\n", srv.Name, srv.Host)
+			fmt.Fprintf(a.output(), "- upload token file: %s\n", deploy.RemoteDir+"/monitoring/secrets/telegram_bot_token")
+			fmt.Fprintf(a.output(), "- notify chat ids: %s\n", emptyAsAll(notifyChatIDs))
+			fmt.Fprintf(a.output(), "- owner user id: %s\n", emptyAsAll(ownerUserID))
+			fmt.Fprintf(a.output(), "- deploy runtime bundle: %v\n", true)
+			fmt.Fprintf(a.output(), "- start monitoring stack: %v\n", setup.monitorUp)
+			fmt.Fprintf(a.output(), "- send test telegram notify: %v\n", setup.testNotify)
+			fmt.Fprintf(a.output(), "- dry-run mode: %v\n", a.dryRun)
 
 			restoreEnv := setEnvOverrides(map[string]string{
 				"OVPN_TELEGRAM_NOTIFY_CHAT_IDS": notifyChatIDs,
@@ -245,7 +245,7 @@ func (a *App) newServerMonitorTelegramSetupCmd() *cobra.Command {
 					return fmt.Errorf("send test telegram notification: %w", err)
 				}
 			}
-			fmt.Println("telegram setup complete")
+			fmt.Fprintln(a.output(), "telegram setup complete")
 			return nil
 		},
 	}

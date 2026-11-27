@@ -60,7 +60,7 @@ func (a *App) restartCmd() *cobra.Command {
 			if err := deploy.RestartRemote(a.ctx, runner, sshFromServer(*srv)); err != nil {
 				return fmt.Errorf("restart server %s on %s: %w", srv.Name, srv.Host, err)
 			}
-			fmt.Println("restart complete")
+			fmt.Fprintln(a.output(), "restart complete")
 			return nil
 		},
 	}

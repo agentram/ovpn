@@ -32,13 +32,13 @@ func TestNewRootCmdRegistersTopLevelCommands(t *testing.T) {
 func TestNewRootCmdPersistentSetupAndTeardown(t *testing.T) {
 	cmd := NewRootCmd()
 	dataDir := t.TempDir()
-	cmd.SetArgs([]string{"--data-dir", dataDir, "--debug", "version"})
+	cmd.SetArgs([]string{"--data-dir", dataDir, "--debug", "server", "list"})
 	stdout, _, err := captureStdoutStderr(t, cmd.Execute)
 	if err != nil {
-		t.Fatalf("root command version execute: %v", err)
+		t.Fatalf("root command server list execute: %v", err)
 	}
 	if strings.TrimSpace(stdout) == "" {
-		t.Fatalf("unexpected version output: %q", stdout)
+		t.Fatalf("unexpected server inventory output: %q", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(dataDir, "ovpn.db")); err != nil {
 		t.Fatalf("expected local store to be initialized: %v", err)

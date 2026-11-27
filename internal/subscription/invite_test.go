@@ -116,6 +116,37 @@ func TestActivationRejectsExpiredUnclaimedCode(t *testing.T) {
 	}
 }
 
+func TestThreeDayInvitation(t *testing.T) {
+	_, store, handler := openFixture(t)
+	var err error
+	handler.invites, err = OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _, err := store.Publish("", "alice", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	const origin = "https://subscriptions.example.net"
+	raw, err := handler.invites.Issue(bundle, origin, now, 72*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, code, _ := strings.Cut(raw, "#")
+	handler.now = func() time.Time { return now.Add(71 * time.Hour) }
+	if postActivation(handler, code, newToken()) != http.StatusNoContent {
+		t.Fatal("three-day code did not activate on the third day")
+	}
+	if _, err = handler.invites.Issue(bundle, origin, now, 72*time.Hour+time.Second); err == nil {
+		t.Fatal("invitation exceeded the three-day limit")
+	}
+}
+
 func issueFixture(t *testing.T, invites *Invites, bundle Bundle, now time.Time) string {
 	t.Helper()
 	raw, err := invites.Issue(bundle, "https://subscriptions.example.net", now, time.Hour)
@@ -134,4 +165,70 @@ func postActivation(handler http.Handler, code, session string) int {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/activate", strings.NewReader(string(body))))
 	return w.Code
+}
+
+func TestLegacyInvitationMigration(t *testing.T) {
+	_, store, handler := openFixture(t)
+	invites, err := OpenInvites(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler.invites = invites
+	id, _, err := store.Publish("", "migration fixture", "", []Entry{{Link: fixtureLink}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := store.Read(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name     string
+		emailTag string
+		claim    func(string) string
+		works    bool
+	}{
+		{name: "unclaimed invitation"},
+		{name: "account claim", claim: func(session string) string {
+			return tokenHash("account:v1:" + tokenHash("synthetic subject") + ":" + session)
+		}},
+		{name: "recipient invitation", emailTag: tokenHash("synthetic mailbox"), claim: tokenHash},
+		{name: "anonymous device claim", claim: tokenHash, works: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			code, session := newToken(), newToken()
+			digest := tokenHash(code)
+			record, err := json.Marshal(invitation{Bundle: id, Generation: bundle.TokenHash,
+				ExpiresAt: time.Now().Add(time.Hour), LegacyEmailTag: test.emailTag})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := invites.create(digest+".invite", record); err != nil {
+				t.Fatal(err)
+			}
+			if test.claim != nil {
+				if err := invites.create(digest+".claim", []byte(test.claim(session))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			activation, delivery := http.StatusNotFound, http.StatusNotFound
+			if test.works {
+				activation, delivery = http.StatusNoContent, http.StatusOK
+			}
+			if got := postActivation(handler, code, session); got != activation {
+				t.Fatalf("activation = %d, want %d", got, activation)
+			}
+			if got := request(handler, http.MethodGet, "/device/"+digest+"/"+session).Code; got != delivery {
+				t.Fatalf("download = %d, want %d", got, delivery)
+			}
+			if actual, err := invites.read(digest + ".invite"); err != nil || string(actual) != string(record) {
+				t.Fatal("legacy invitation changed")
+			}
+		})
+	}
+	for _, path := range []string{"/account", "/account/profiles"} {
+		if got := request(handler, http.MethodGet, path).Code; got != http.StatusNotFound {
+			t.Fatalf("%s = %d, want 404", path, got)
+		}
+	}
 }

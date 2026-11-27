@@ -2,8 +2,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -18,25 +20,37 @@ import (
 )
 
 type App struct {
-	ctx            context.Context
-	store          *local.Store
-	dataDir        string
-	dryRun         bool
-	repoRoot       string
-	logger         *slog.Logger
-	logLevel       string
-	debug          bool
-	verbose        bool
-	remoteHTTPHook func(model.Server, string, string, any) ([]byte, error)
-	remoteExecHook func(ssh.Config, time.Duration, string) (ssh.Result, error)
-	sleepHook      func(time.Duration)
+	sharedContent   string
+	sharedData      json.RawMessage
+	internal        bool
+	writer          io.Writer
+	operationTarget int64
+	ctx             context.Context
+	store           *local.Store
+	dataDir         string
+	dryRun          bool
+	repoRoot        string
+	logger          *slog.Logger
+	logLevel        string
+	debug           bool
+	verbose         bool
+	remoteHTTPHook  func(model.Server, string, string, any) ([]byte, error)
+	remoteExecHook  func(ssh.Config, time.Duration, string) (ssh.Result, error)
+	sleepHook       func(time.Duration)
 }
 
 var errRuntimeQuotaBlocked = errors.New("runtime add skipped: user is blocked by quota")
 
 // NewRootCmd builds the root `ovpn` command, wiring global flags and lazily opening local state in PersistentPreRunE.
 func NewRootCmd() *cobra.Command {
-	app := &App{ctx: context.Background()}
+	return newRootCmd(&App{ctx: context.Background()})
+}
+
+func newRootCmd(app *App) *cobra.Command {
+	defaultDataDir := app.dataDir
+	if defaultDataDir == "" {
+		defaultDataDir = util.DefaultDataDir()
+	}
 	cmd := &cobra.Command{
 		Use:   "ovpn",
 		Short: "ovpn manages self-hosted Xray VLESS+REALITY servers over SSH",
@@ -84,7 +98,7 @@ func NewRootCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.PersistentFlags().StringVar(&app.dataDir, "data-dir", util.DefaultDataDir(), "ovpn local data directory")
+	cmd.PersistentFlags().StringVar(&app.dataDir, "data-dir", defaultDataDir, "ovpn local data directory")
 	cmd.PersistentFlags().BoolVar(&app.dryRun, "dry-run", false, "preview actions without mutating remote resources")
 	cmd.PersistentFlags().StringVar(&app.logLevel, "log-level", "info", "Log level: debug|info|warn|error")
 	cmd.PersistentFlags().BoolVar(&app.debug, "debug", false, "Enable debug logs (shorthand for --log-level=debug)")
@@ -101,5 +115,20 @@ func NewRootCmd() *cobra.Command {
 	cmd.AddCommand(app.versionCmd())
 	cmd.AddCommand(app.machineCmd())
 	cmd.AddCommand(app.observeCmd())
+	attachOperationHandlers(cmd, app)
 	return cmd
+}
+
+func (a *App) output() io.Writer {
+	if a.writer != nil {
+		return a.writer
+	}
+	return os.Stdout
+}
+
+func outputOrDefault(writers []io.Writer) io.Writer {
+	if len(writers) > 0 && writers[0] != nil {
+		return writers[0]
+	}
+	return os.Stdout
 }

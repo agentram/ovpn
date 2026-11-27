@@ -3,7 +3,6 @@ package local
 import (
 	"context"
 	"database/sql"
-	"net/url"
 	"path/filepath"
 	"strconv"
 
@@ -45,7 +44,7 @@ func Open(ctx context.Context, dataDir string) (*Store, error) {
 func (s *Store) Close() error { return s.db.Close() }
 
 func sqliteDSN(path string) string {
-	u := url.URL{Scheme: "file", Path: path}
+	u := util.FileURL(path)
 	q := u.Query()
 	q.Add("_pragma", "busy_timeout("+strconv.Itoa(sqliteBusyTimeoutMS)+")")
 	u.RawQuery = q.Encode()

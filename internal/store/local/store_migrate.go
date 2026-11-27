@@ -39,6 +39,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			updated_at TEXT NOT NULL,
 			last_deploy_at TEXT
 		);`,
+		`CREATE TABLE IF NOT EXISTS subscription_nodes (
+			server_id INTEGER PRIMARY KEY,
+			applied_config BLOB,
+			FOREIGN KEY(server_id) REFERENCES servers(id) ON DELETE CASCADE
+		);`,
 		`CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			server_id INTEGER NOT NULL,

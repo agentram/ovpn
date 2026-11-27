@@ -90,9 +90,9 @@ func (a *App) newUserAddCmd() *cobra.Command {
 			}
 
 			if len(targets) == 1 {
-				fmt.Printf("user added: %s\n", add.username)
+				fmt.Fprintf(a.output(), "user added: %s\n", add.username)
 			} else {
-				fmt.Printf("user added on %d servers: %s\n", len(targets), add.username)
+				fmt.Fprintf(a.output(), "user added on %d servers: %s\n", len(targets), add.username)
 			}
 			return nil
 		},
@@ -149,9 +149,9 @@ func (a *App) newUserExpirySetCmd() *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Printf("expiry updated for user %s\n", set.username)
+				fmt.Fprintf(a.output(), "expiry updated for user %s\n", set.username)
 			} else {
-				fmt.Printf("expiry updated for user %s on %d servers\n", set.username, len(targets))
+				fmt.Fprintf(a.output(), "expiry updated for user %s on %d servers\n", set.username, len(targets))
 			}
 			return nil
 		},
@@ -196,9 +196,9 @@ func (a *App) newUserExpiryClearCmd() *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Printf("expiry cleared for user %s\n", clear.username)
+				fmt.Fprintf(a.output(), "expiry cleared for user %s\n", clear.username)
 			} else {
-				fmt.Printf("expiry cleared for user %s on %d servers\n", clear.username, len(targets))
+				fmt.Fprintf(a.output(), "expiry cleared for user %s on %d servers\n", clear.username, len(targets))
 			}
 			return nil
 		},
@@ -241,9 +241,9 @@ func (a *App) newUserRemoveCmd() *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Println("user removed")
+				fmt.Fprintln(a.output(), "user removed")
 			} else {
-				fmt.Printf("user removed on %d servers\n", len(targets))
+				fmt.Fprintf(a.output(), "user removed on %d servers\n", len(targets))
 			}
 			return nil
 		},
@@ -302,9 +302,9 @@ func (a *App) newUserSetEnabledCmd(enable bool) *cobra.Command {
 				}
 			}
 			if len(targets) == 1 {
-				fmt.Printf("user %s %sd\n", toggle.username, name)
+				fmt.Fprintf(a.output(), "user %s %sd\n", toggle.username, name)
 			} else {
-				fmt.Printf("user %s %sd on %d servers\n", toggle.username, name, len(targets))
+				fmt.Fprintf(a.output(), "user %s %sd on %d servers\n", toggle.username, name, len(targets))
 			}
 			return nil
 		},
@@ -344,7 +344,7 @@ func (a *App) newUserListCmd() *cobra.Command {
 				}
 			}
 			rows := buildUserAuditRows(users, quotaByEmail, now)
-			fmt.Println(renderUserAuditTable(rows))
+			fmt.Fprintln(a.output(), renderUserAuditTable(rows))
 			if quotaErr != nil {
 				fmt.Fprintf(os.Stderr, "quota runtime unavailable: %v\n", quotaErr)
 			}
@@ -404,7 +404,7 @@ func (a *App) newUserShowCmd() *cobra.Command {
 				out["quota_summary"] = quotaSummary(quota)
 			}
 			b, _ := json.MarshalIndent(out, "", "  ")
-			fmt.Println(string(b))
+			fmt.Fprintln(a.output(), string(b))
 			return nil
 		},
 	}

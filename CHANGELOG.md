@@ -4,7 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
-## Unreleased
+## 1.13.0
+
+Move the desktop, Android and iOS application source and build pipelines into separate repositories. Keep the CLI, server components and client-compatible VPN access APIs here. Replace deployment-specific test fixture values with synthetic data.
+
+### Added
+- Manage VPN subscriptions through Desk and CLI, publish verified public routes, and report profile revisions. Allow workspace-local names for nodes and transport profiles.
+- Add proxy/backend topology, direct-routing presets, agent-collected HAProxy health and backend-first HA application with verified backups and dependency failure blocking. Include entry-server setup and actual HAProxy Docker failover/recovery acceptance in CI.
+- Add user creation, enable/disable, expiry and rolling quota changes, explicit QR/link delivery, and one-time setup codes that verify trusted HTTPS delivery and the published profile snapshot before issue.
+- Expose the CLI command catalog through additive machine protocol 1 methods. Review affected servers and input values before writes; deletion, restore and cleanup require a separate typed confirmation.
+- Coordinate CLI and Desk mutations with an encrypted operation journal, snapshot checks, idempotency keys, process ownership and local/remote writer locks. Reconcile interrupted user changes and retain separate outcomes for each server.
+- Add a server setup wizard with fingerprint review, pinned SSH trust, SSH/sudo checks and installation, plus deployment, restart, profile/backend, log, debug, backup and recovery actions.
+- Refresh service/traffic data every 30 seconds and current Xray presence every 10 seconds while Desk is open. Show unknown readings explicitly and keep per-server rolling quotas separate.
+- Check every eligible user/profile every 15 minutes after consent, with immediate refresh for changed access, four shared traffic slots, one slot per server, native TLS/REALITY probes and pinned Checker for compatible XHTTP. Keep Knife in advanced diagnostics and mask probe activity from current-user presence.
+
+### Security
+- Update the WebSocket dependency to address GO-2026-6278.
+
+### Fixed
+- Restore from a staged archive even if the runtime was lost. Snapshot existing state privately and prune only after recovery starts the services successfully.
+- Reject disabled nodes in HA plans and let the server wizard save corrected SSH settings only after validating them.
+- Index the encrypted operation journal, expire unused plans, bound completed history, and show Cancel only to the job's owner.
+- Verify delivery before creating subscription users and keep interrupted operations resumable.
+
+### Changed
+- Retire Google and email sign-in for subscription delivery. Existing anonymous device receipts continue to work.
+- Keep setup codes valid for 30 minutes by default and allow a longer one-time code lifetime of up to 72 hours.
+- Fix SQLite file URIs for Windows workspaces and observation history, including spaces and non-ASCII paths. Keep the version command independent of local state and check native workspace access in the packaging matrix.
+- Replace overflowing action button grids with compact primary actions and a searchable grouped catalog. Translate diagnostic task states and keep task completion separate from connection success.
+- Preserve usage for disabled users, keep missing quota data unknown, and verify suspended access without requiring an active quota policy. Mark incomplete user distribution as partial and checkpoint local repair per target.
+- Require Go 1.27.4 for the standard-library HTTP security fix and use GTK4/WebKitGTK 6 dependencies for native Linux builds.
+- Create private, consistent SQLite backup snapshots while monitoring continues; validate remote archives and checksums before reporting backup success.
+- Bundle matching Linux agent binaries into development Desk workers so deployment does not require Go source on the operator's computer.
+- Extend regression coverage with real-worker Desk journeys, telemetry/queue edges, independent-process locking and crash-after-write recovery. Native three-platform acceptance and the five-person usability pilot remain release gates.
 
 ## 1.12.0
 

@@ -338,3 +338,36 @@ func TestPublicListenerRequiresTLS(t *testing.T) {
 		t.Fatal("invalid subscription id accepted")
 	}
 }
+
+func TestManagedSubscriptionCanBeEmptiedAndDisabledWithoutExposingUnknownIDs(t *testing.T) {
+	_, store, handler := openFixture(t)
+	key := tokenHash("managed-identity")
+	id, token, err := store.PublishManaged("", "fixture", key, []Entry{{Link: fixtureLink}}, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/sub/" + id + "/" + token
+	first := request(handler, http.MethodGet, path)
+	if first.Code != 200 || first.Header().Get("OVPN-Subscription-Revision") == "" ||
+		first.Header().Get("OVPN-Subscription-ID") != id {
+		t.Fatal("missing managed profile metadata")
+	}
+	if _, _, err = store.PublishManaged(id, "fixture", key, nil, false, false); err != nil {
+		t.Fatal(err)
+	}
+	empty := request(handler, http.MethodGet, path)
+	if empty.Code != 204 || empty.Header().Get("OVPN-Subscription-State") != "empty" {
+		t.Fatal("client cannot recognize an authoritative empty list")
+	}
+	if _, _, err = store.PublishManaged(id, "fixture", key, nil, false, true); err != nil {
+		t.Fatal(err)
+	}
+	stopped := request(handler, http.MethodGet, path)
+	unknown := request(handler, http.MethodGet, "/sub/"+id+"/"+tokenHash("wrong"))
+	if stopped.Code != 410 || stopped.Header().Get("OVPN-Subscription-State") != "disabled" || unknown.Code != 404 {
+		t.Fatal("a disabled subscription must have an authenticated terminal state only")
+	}
+	if _, _, err := store.PublishManaged(id, "fixture", key, []Entry{{Link: fixtureLink}}, false, false); err == nil {
+		t.Fatal("periodic publication revived a disabled subscription")
+	}
+}

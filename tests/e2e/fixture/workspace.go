@@ -73,3 +73,40 @@ func disableAlice(ctx context.Context, dir string) error {
 	user.Enabled = false
 	return store.UpdateUser(ctx, user)
 }
+
+func haWorkspace(ctx context.Context, dir string) error {
+	st, err := local.Open(ctx, dir)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	first, err := st.GetServerByName(ctx, "Primary fixture")
+	if err != nil {
+		return err
+	}
+	second, err := st.GetServerByName(ctx, "Backup fixture")
+	if err != nil {
+		return err
+	}
+	first.EnabledProfiles = model.TransportProfileRealityTCPVision + "," + model.TransportProfileTLSSelfSNIWeb
+	for _, server := range []*model.Server{first, second} {
+		server.ProxyServiceUUID = "33333333-3333-4333-8333-333333333333"
+		if err := st.UpdateServer(ctx, server); err != nil {
+			return err
+		}
+	}
+	proxy := *first
+	proxy.ID = 0
+	proxy.Name = "Entry fixture"
+	proxy.Role = model.ServerRoleProxy
+	proxy.ProxyPreset = model.ProxyPresetCN
+	if err := st.AddServer(ctx, &proxy); err != nil {
+		return err
+	}
+	for i, server := range []*model.Server{first, second} {
+		if err := st.AddProxyBackend(ctx, &model.ProxyBackend{ProxyServerID: proxy.ID, BackendServerID: server.ID, Enabled: true, Priority: i + 1}); err != nil {
+			return err
+		}
+	}
+	return nil
+}

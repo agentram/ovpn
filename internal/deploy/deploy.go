@@ -93,9 +93,10 @@ func buildBootstrapCommand() string {
 		"if ! command -v docker >/dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y ca-certificates curl gnupg; fi",
 		"if ! command -v docker >/dev/null 2>&1; then curl -fsSL https://get.docker.com | sh; fi",
 		"if ! sudo docker compose version >/dev/null 2>&1; then sudo apt-get update -y && sudo apt-get install -y docker-compose-plugin; fi",
-		"sudo mkdir -p " + RemoteDir + " " + RemoteBackupDir,
+		"sudo mkdir -p " + RemoteDir,
+		"sudo install -d -m 0700 -o root -g root " + RemoteBackupDir,
 		// Runtime children and snapshots retain their service-specific ownership.
-		"sudo chown \"$USER:$(id -gn)\" " + RemoteDir + " " + RemoteBackupDir,
+		"sudo chown \"$USER:$(id -gn)\" " + RemoteDir,
 	}, " && ")
 }
 
@@ -159,7 +160,7 @@ func UploadBundle(ctx context.Context, runner Runner, cfg ssh.Config, bundleDir 
 
 // buildDeployBackupCommand renders the script that snapshots the live runtime dir and prunes old snapshots.
 func buildDeployBackupCommand(backupStamp string) string {
-	return fmt.Sprintf("set -e; if [ -d %[1]s ]; then sudo cp -a %[1]s %[2]s/ovpn-%[3]s; fi; old_snapshots=$(find %[2]s -mindepth 1 -maxdepth 1 -name 'ovpn-*' -printf '%%T@ %%p\\n' | sort -nr | awk 'NR>%[4]d {print $2}'); if [ -n \"$old_snapshots\" ]; then printf '%%s\\n' \"$old_snapshots\" | xargs -r sudo rm -rf; fi", RemoteDir, RemoteBackupDir, backupStamp, SnapshotRetentionCount)
+	return fmt.Sprintf("set -e; sudo install -d -m 0700 -o root -g root %[2]s; if [ -d %[1]s ]; then sudo cp -a %[1]s %[2]s/ovpn-%[3]s; fi; old_snapshots=$(sudo find %[2]s -mindepth 1 -maxdepth 1 -type d -name 'ovpn-*' -printf '%%T@ %%p\\n' | sort -nr | awk 'NR>%[4]d {print $2}'); if [ -n \"$old_snapshots\" ]; then printf '%%s\\n' \"$old_snapshots\" | xargs -r sudo rm -rf; fi", RemoteDir, RemoteBackupDir, backupStamp, SnapshotRetentionCount)
 }
 
 // buildDeployComposeValidateCommand renders the `docker compose config` validation for a staged bundle.

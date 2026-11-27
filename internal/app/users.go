@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -63,8 +64,32 @@ func (s ReadService) Users(ctx context.Context, cursor string, limit int) (dto.U
 	if more {
 		users = users[:limit]
 	}
+	assignments, err := st.UserAssignmentIDs(ctx)
+	if err != nil {
+		return result, &Error{Code: "WORKSPACE_UNAVAILABLE"}
+	}
+	servers, err := st.ListServers(ctx)
+	if err != nil {
+		return result, &Error{Code: "WORKSPACE_UNAVAILABLE"}
+	}
+	enabled := map[int64]bool{}
+	for _, server := range servers {
+		if server.Enabled {
+			enabled[server.ID] = true
+		}
+	}
 	for _, u := range users {
-		result.Items = append(result.Items, dto.User{Username: u.Username, ConfiguredNodes: u.ConfiguredNodes, EnabledNodes: u.EnabledNodes,
+		missing := len(enabled)
+		for _, id := range assignments[u.Username] {
+			if enabled[id] {
+				missing--
+			}
+		}
+		nodes := []string{}
+		for _, id := range assignments[u.Username] {
+			nodes = append(nodes, "node-"+strconv.FormatInt(id, 10))
+		}
+		result.Items = append(result.Items, dto.User{NodeIDs: nodes, MissingNodes: missing, Username: u.Username, ConfiguredNodes: u.ConfiguredNodes, EnabledNodes: u.EnabledNodes,
 			EligibleNodes: u.EligibleNodes, DisabledNodes: u.DisabledNodes, ExpiredNodes: u.ExpiredNodes, BlockedNodes: u.BlockedNodes,
 			EarliestExpiry: u.EarliestExpiry, QuotaMinBytes: u.QuotaMinBytes, QuotaMaxBytes: u.QuotaMaxBytes, DefaultQuotaNodes: u.DefaultQuotaNodes, UnmeteredNodes: u.UnmeteredNodes, PolicyDiff: u.PolicyDiff, IdentityConflict: u.IdentityConflict})
 	}

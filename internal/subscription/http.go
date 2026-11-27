@@ -59,15 +59,39 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, "/sub/") {
+		w.Header().Set(deliveryHeader, deliveryVersion)
+	}
+	if h.invites != nil && strings.HasPrefix(r.URL.Path, "/device/") {
+		w.Header().Set(deviceHeader, deliveryVersion)
+	}
 	bundle, err := h.lookup(r.URL.Path)
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	if bundle.ManagedKey != "" {
+		if bundle.Disabled {
+			w.Header().Set("OVPN-Subscription-State", "disabled")
+			w.WriteHeader(http.StatusGone)
+			return
+		}
+		// IDs and revisions are for correlating a report with the publisher.
+		// Neither value grants access to any delivery endpoint.
+		w.Header().Set("OVPN-Subscription-ID", bundle.ID)
+	}
 	data, err := Encode(bundle.Entries, h.now(), "base64")
 	if err != nil {
+		if bundle.ManagedKey != "" {
+			w.Header().Set("OVPN-Subscription-State", "empty")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		w.WriteHeader(http.StatusNotFound)
 		return
+	}
+	if bundle.ManagedKey != "" {
+		w.Header().Set("OVPN-Subscription-Revision", ProfileRevision(string(data)))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(bundle.Title)))
@@ -99,12 +123,20 @@ func (h *Handler) lookup(path string) (Bundle, error) {
 	return Bundle{}, ErrNotFound
 }
 
+const (
+	deliveryHeader   = "OVPN-Delivery-Version"
+	deviceHeader     = "OVPN-Device-Version"
+	activationHeader = "OVPN-Activation-Version"
+	deliveryVersion  = "1"
+)
+
 func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", "POST")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	w.Header().Set(activationHeader, deliveryVersion)
 	var request struct {
 		Code    string `json:"code"`
 		Session string `json:"session"`
@@ -114,14 +146,15 @@ func (h *Handler) activate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	switch err := h.invites.redeem(h.store, request.Code, request.Session, h.now()); {
+	status := http.StatusNoContent
+	err := h.invites.redeem(h.store, request.Code, request.Session, h.now())
+	switch {
 	case errors.Is(err, ErrNotFound):
-		w.WriteHeader(http.StatusNotFound)
+		status = http.StatusNotFound
 	case err != nil:
-		w.WriteHeader(http.StatusServiceUnavailable)
-	default:
-		w.WriteHeader(http.StatusNoContent)
+		status = http.StatusServiceUnavailable
 	}
+	w.WriteHeader(status)
 }
 
 type ServeOptions struct {

@@ -2,6 +2,43 @@
 
 A subscription groups a user's active server profiles behind one URL. Publish a new snapshot after deploying endpoint or profile changes; clients receive it when they refresh the subscription. Publishing changes delivery files only.
 
+## Managed subscriptions
+
+In Desk, open **Users → Create subscription** to create a VPN user and issue either a one-time setup code or a personal HTTPS link. The user imports it from **Add subscription** in O Tunnel. The same link works in clients that accept a Base64 list of VLESS links. Subscriptions use the existing per-server traffic quotas.
+
+1. Run the delivery service with access to the workspace's `delivery/bundles` and `delivery/invites` directories behind HTTPS.
+2. Opt in each public entrypoint with `ovpn server subscription <server>`, then deploy it. Pass `--publish=false` to remove a server from managed subscriptions. For HA, opt in to the proxy and any backends you intend to offer as separate direct connections.
+3. Create a subscription with `ovpn user subscription create --username <user> --base-url https://subscriptions.example.net`. Add `--format link` for a reusable HTTPS link.
+
+OVPN publishes profiles from the most recent verified deploy. A new or changed provider endpoint is published after deployment, and O Tunnel refreshes when it opens and the saved list is stale. Its background schedule is subject to the operating system. Desk retries transient failures and reconciles quota state every five minutes while open. To keep reconciliation running on a headless control host, schedule `ovpn subscription sync` every five minutes in that workspace. The HTTP delivery service can continue serving existing files while the publisher is offline.
+
+Use `ovpn subscription list --username <user>` to compare the support ID and profile revision in a problem report with the published list. Use `ovpn user subscription issue` to give another phone a code. With `--format link`, issuing a new link also stops updates for earlier device codes. Use `ovpn user subscription disable --username <user>` to stop both delivery and VPN access. Check the operation's per-node results and retry any failed step. Keep the bundles and invitation directory private and exclude them from backups that are shared publicly.
+
+### Profile names
+
+Optionally create `<data-dir>/delivery/profile-labels.json` in the Desk or CLI
+workspace. Use the registered server name as the key and stable transport IDs
+for profile names:
+
+```json
+{
+  "example-node": {
+    "name": "VPN",
+    "profiles": {
+      "vless-reality-tcp-vision": "Основной",
+      "vless-tcp-tls-selfsni-web": "Резервный",
+      "vless-xhttp-plain": "Резервный 2"
+    }
+  }
+}
+```
+
+Issuing access or running `ovpn --data-dir <data-dir> subscription sync` applies
+the names to the VLESS labels after checking the node. Missing overrides use
+the original names. If the file is invalid, the last published list is kept.
+Changing a label does not change the endpoint or profile identity. Clients
+still filter the list according to their transport support.
+
 ## Export a file
 
 ```bash
@@ -63,7 +100,7 @@ ovpn subscription invite --bundle-dir ./subscription-bundles --invite-dir ./invi
   --id <subscription-id> --base-url https://subscriptions.example.net
 ```
 
-Give the code to the intended user for **Enter code**. Add `--out ./invite.png` to issue a new code as a QR image. A code expires after 30 minutes by default and activates one app installation. The app can retry the same activation after an interrupted request. Preserve the `/activate` and `/device/` paths at the HTTPS reverse proxy. Exclude activation request bodies and secret URLs from logs.
+Give the code to the intended user for **Enter code**. Add `--out ./invite.png` to issue a new code as a QR image. A code expires after 30 minutes by default and activates one app installation. Use `--ttl 72h` when the recipient needs three days to activate. The app can retry the same activation after an interrupted request. Preserve the `/activate` and `/device/` paths at the HTTPS reverse proxy. Exclude activation request bodies and secret URLs from logs.
 
 The installation follows the same published profile list. Rotating or revoking the parent subscription stops updates for its activated installations. Server-side access uses the underlying VPN user's credentials.
 
@@ -88,3 +125,11 @@ Revoking or rotating a subscription token stops future downloads. Already import
 ## Compatibility
 
 The Base64 link-list format is consumed by [v2rayN](https://github.com/2dust/v2rayN/blob/master/v2rayN/ServiceLib/Handler/SubscriptionHandler.cs) and documented by [Xray Checker](https://xray-checker.kutovoy.dev/configuration/subscription/). Add the URL as a subscription rather than as one VLESS node. The automated regression covers HTTPS delivery, Base64 decoding and native Xray traffic for REALITY/TCP and self-SNI TLS; import in individual GUI app versions still needs verification. Existing [transport compatibility limits](transports.md) apply, especially to experimental profiles. Automatic failover depends on the client configuration and is not provided by a link list alone.
+
+## Upgrading from account-based delivery
+
+Remove the legacy account flags from the delivery service configuration before restarting it.
+Update the HTTPS delivery service before issuing access. Keep the bundle and invitation directories in place. HTTPS subscription URLs and already
+claimed anonymous device subscriptions continue to refresh. Issue a fresh code for any
+unclaimed legacy invitation or device previously enrolled through account sign-in.
+Cached profiles can remain usable until access expires or is revoked on the VPN servers.

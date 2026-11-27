@@ -24,6 +24,7 @@ import (
 	"ovpn/internal/app/dto"
 	"ovpn/internal/clientcfg"
 	"ovpn/internal/probe"
+	"ovpn/internal/probequeue"
 	"ovpn/internal/version"
 
 	metricdto "github.com/prometheus/client_model/go"
@@ -156,6 +157,14 @@ func Verify(ctx context.Context, tool Tool) (Tool, error) {
 
 func (r Runner) Run(ctx context.Context, engine string, tool Tool, input Input) dto.Observation {
 	result := dto.Observation{Source: engine, EngineVersion: Version(engine), Revision: input.Revision, Outcome: "observer_error", FailureClass: "observer", Code: "TOOL_UNAVAILABLE", Bytes: -1, Unverified: []string{"runtime", "udp", "dns", "ipv6", "gui-import", "wire-bytes"}}
+	if engine != "native" {
+		release, err := probequeue.Shared.Acquire(ctx, input.Config)
+		if err != nil {
+			result.Code = "CHECK_QUEUE_BUSY"
+			return result
+		}
+		defer release()
+	}
 	target := r.TargetURL
 	if target == "" {
 		target = TargetURL

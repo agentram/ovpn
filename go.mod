@@ -1,6 +1,6 @@
 module ovpn
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/google/uuid v1.6.0
@@ -10,6 +10,7 @@ require (
 	github.com/prometheus/common v0.72.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
 	github.com/xtls/xray-core v1.260327.1-0.20260728075948-5ca6f4b7d4dc
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sys v0.49.0
@@ -27,7 +28,7 @@ require (
 	github.com/cloudflare/circl v1.6.4 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/klauspost/compress v1.20.2 // indirect
@@ -50,14 +51,12 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sagernet/sing v0.5.1 // indirect
 	github.com/sagernet/sing-shadowsocks v0.2.7 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/vishvananda/netlink v1.3.1 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/xtls/reality v0.0.0-20260322125925-9234c772ba8f // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/mobile v0.0.0-20261011034528-197770444867 // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
@@ -73,9 +72,4 @@ require (
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-)
-
-tool (
-	golang.org/x/mobile/cmd/gobind
-	golang.org/x/mobile/cmd/gomobile
 )

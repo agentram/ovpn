@@ -9,15 +9,23 @@ type Summary struct {
 }
 
 // Server contains inventory only. Runtime health requires a separate observation.
+type Backend struct {
+	ServerID string `json:"serverId"`
+	Enabled  bool   `json:"enabled"`
+	Priority int    `json:"priority"`
+}
+
 type Server struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Role           string   `json:"role"`
-	Enabled        bool     `json:"enabled"`
-	PrimaryProfile string   `json:"primaryProfile"`
-	Profiles       []string `json:"profiles"`
-	XrayVersion    string   `json:"xrayVersion"`
-	Runtime        string   `json:"runtime"`
+	ProxyPreset    string    `json:"proxyPreset,omitempty"`
+	Backends       []Backend `json:"backends,omitempty"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Role           string    `json:"role"`
+	Enabled        bool      `json:"enabled"`
+	PrimaryProfile string    `json:"primaryProfile"`
+	Profiles       []string  `json:"profiles"`
+	XrayVersion    string    `json:"xrayVersion"`
+	Runtime        string    `json:"runtime"`
 }
 
 type ServerPage struct {

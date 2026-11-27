@@ -16,12 +16,18 @@ import (
 )
 
 // Invites stores activation records separately from the published bundles.
-type Invites struct{ root *os.Root }
+type Invites struct {
+	root *os.Root
+}
+
+const deviceInvitationVersion = 1
 
 type invitation struct {
-	Bundle     string    `json:"bundle"`
-	Generation string    `json:"generation"`
-	ExpiresAt  time.Time `json:"expires_at"`
+	Version        int       `json:"version"`
+	Bundle         string    `json:"bundle"`
+	Generation     string    `json:"generation"`
+	ExpiresAt      time.Time `json:"expires_at"`
+	LegacyEmailTag string    `json:"email_tag,omitempty"`
 }
 
 func OpenInvites(dir string) (*Invites, error) {
@@ -32,7 +38,9 @@ func OpenInvites(dir string) (*Invites, error) {
 	return &Invites{root: root}, nil
 }
 
-func (s *Invites) Close() error { return s.root.Close() }
+func (s *Invites) Close() error {
+	return s.root.Close()
+}
 
 func newToken() string { return base64.RawURLEncoding.EncodeToString(randomBytes(32)) }
 
@@ -61,8 +69,8 @@ func (s *Invites) Issue(bundle Bundle, origin string, now time.Time, ttl time.Du
 	if len(prefix)+base64.RawURLEncoding.EncodedLen(32) > 512 {
 		return "", errors.New("invitation origin is too long")
 	}
-	if ttl < time.Minute || ttl > 24*time.Hour {
-		return "", errors.New("invitation lifetime must be between one minute and 24 hours")
+	if ttl < time.Minute || ttl > 72*time.Hour {
+		return "", errors.New("invitation lifetime must be between one minute and 72 hours")
 	}
 	if err := bundle.validate(); err != nil {
 		return "", err
@@ -71,7 +79,7 @@ func (s *Invites) Issue(bundle Bundle, origin string, now time.Time, ttl time.Du
 		return "", err
 	}
 	code := newToken()
-	record := invitation{Bundle: bundle.ID, Generation: bundle.TokenHash, ExpiresAt: now.Add(ttl).UTC()}
+	record := invitation{Version: deviceInvitationVersion, Bundle: bundle.ID, Generation: bundle.TokenHash, ExpiresAt: now.Add(ttl).UTC()}
 	raw, err := json.Marshal(record)
 	if err != nil {
 		return "", err
@@ -88,7 +96,8 @@ func (s *Invites) bundle(id string, bundles *Store) (Bundle, invitation, error) 
 	}
 	raw, err := s.read(id + ".invite")
 	var record invitation
-	if err != nil || json.Unmarshal(raw, &record) != nil || !validDigest(record.Generation) {
+	if err != nil || json.Unmarshal(raw, &record) != nil || !validDigest(record.Generation) ||
+		record.LegacyEmailTag != "" || (record.Version != 0 && record.Version != deviceInvitationVersion) {
 		return Bundle{}, invitation{}, ErrNotFound
 	}
 	bundle, err := bundles.Read(record.Bundle)
@@ -104,23 +113,23 @@ func (s *Invites) redeem(bundles *Store, code, session string, now time.Time) er
 	}
 	id := tokenHash(code)
 	bundle, record, err := s.bundle(id, bundles)
-	if err != nil {
-		return err
+	if err != nil || bundle.Disabled {
+		return ErrNotFound
 	}
 	if _, err := Encode(bundle.Entries, now, "base64"); err != nil {
 		return err
 	}
 	receipt := []byte(tokenHash(session))
 	name := id + ".claim"
-	if !now.Before(record.ExpiresAt) {
+	// Older records may have required an account even without a recipient tag.
+	// Only an existing anonymous device claim can be reused for those records.
+	if record.Version == 0 || !now.Before(record.ExpiresAt) {
 		return s.verifyClaim(name, receipt)
 	}
-	// Install a complete receipt without overwriting a concurrent claim.
-	if err := s.create(name, receipt); errors.Is(err, os.ErrExist) {
-		return s.verifyClaim(name, receipt)
-	} else {
+	if err := s.create(name, receipt); !errors.Is(err, os.ErrExist) {
 		return err
 	}
+	return s.verifyClaim(name, receipt)
 }
 
 func (s *Invites) deviceBundle(bundles *Store, id, session string) (Bundle, error) {

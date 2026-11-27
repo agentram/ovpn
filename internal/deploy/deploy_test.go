@@ -935,7 +935,7 @@ func TestBuildDeployBackupCommandIncludesRetentionPrune(t *testing.T) {
 	cmd := buildDeployBackupCommand("20260412T010203")
 	for _, want := range []string{
 		"sudo cp -a /opt/ovpn /opt/ovpn-backups/ovpn-20260412T010203",
-		"find /opt/ovpn-backups -mindepth 1 -maxdepth 1 -name 'ovpn-*'",
+		"find /opt/ovpn-backups -mindepth 1 -maxdepth 1 -type d -name 'ovpn-*'",
 		"NR>7",
 		"xargs -r sudo rm -rf",
 	} {

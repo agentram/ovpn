@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"ovpn/internal/ha"
 	"ovpn/internal/model"
 	"ovpn/internal/util"
 	"ovpn/internal/xraycfg"
@@ -146,30 +147,7 @@ func (a *App) attachedBackendServers(proxy model.Server) ([]model.Server, error)
 }
 
 func (a *App) ensureVPNBackendsCompatible(backends []model.Server) error {
-	if len(backends) == 0 {
-		return fmt.Errorf("proxy server has no attached backends")
-	}
-	for _, backend := range backends {
-		if !backend.IsVPN() {
-			return fmt.Errorf("server %s is role %s, expected vpn backend", backend.Name, backend.NormalizedRole())
-		}
-		if !backend.IsTransportProfileEnabled(model.TransportProfileRealityTCPVision) {
-			return fmt.Errorf("vpn backend %s requires %s on 443/tcp for the proxy relay", backend.Name, model.TransportProfileRealityTCPVision)
-		}
-	}
-	base := backends[0]
-	var issues []string
-	for _, backend := range backends[1:] {
-		diff := realityParityDiff(base, backend, true)
-		if len(diff) == 0 {
-			continue
-		}
-		issues = append(issues, fmt.Sprintf("server %s differs from %s in: %s", backend.Name, base.Name, strings.Join(diff, ", ")))
-	}
-	if len(issues) > 0 {
-		return fmt.Errorf("REALITY parity check failed:\n- %s", strings.Join(issues, "\n- "))
-	}
-	return nil
+	return ha.ValidatePool(backends)
 }
 
 func (a *App) validateAttachedBackendProfiles(srv model.Server, profiles []string) error {

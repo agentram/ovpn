@@ -261,6 +261,8 @@ type QuotaStatusResponse struct {
 }
 
 type UserAccessStatus struct {
+	TrafficKnown       bool       `json:"traffic_known"`
+	QuotaPolicyKnown   bool       `json:"quota_policy_known"`
 	Username           string     `json:"username"`
 	Email              string     `json:"email"`
 	UUID               string     `json:"uuid"`
@@ -285,4 +287,11 @@ type UserStatusResponse struct {
 	Expiring2DUsers       int                `json:"expiring_2d_users"`
 	ExpiredUsers          int                `json:"expired_users"`
 	Users                 []UserAccessStatus `json:"users"`
+}
+
+// UserPresence contains identifiers only within the private management channel.
+type UserPresence struct {
+	Supported bool     `json:"supported"`
+	SampledAt string   `json:"sampled_at"`
+	Online    []string `json:"online"`
 }

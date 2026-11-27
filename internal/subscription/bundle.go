@@ -29,17 +29,21 @@ var ErrNotFound = errors.New("subscription not found")
 type Entry struct {
 	Link      string     `json:"link"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	NodeID    int64      `json:"node_id,omitempty"`
 }
 
 // Bundle contains only the credentials needed to deliver one user's subscription.
 // The delivery token itself is never persisted.
 type Bundle struct {
-	Version   int     `json:"version"`
-	ID        string  `json:"id"`
-	Owner     string  `json:"owner"`
-	Title     string  `json:"title"`
-	TokenHash string  `json:"token_hash"`
-	Entries   []Entry `json:"entries"`
+	Version    int        `json:"version"`
+	ID         string     `json:"id"`
+	Owner      string     `json:"owner"`
+	Title      string     `json:"title"`
+	TokenHash  string     `json:"token_hash"`
+	Entries    []Entry    `json:"entries"`
+	ManagedKey string     `json:"managed_key,omitempty"`
+	Disabled   bool       `json:"disabled,omitempty"`
+	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
 }
 
 type Store struct{ root *os.Root }
@@ -139,6 +143,43 @@ func (s *Store) lock(id string) (func(), error) {
 // Publish creates a subscription when id is empty, or replaces a published snapshot.
 // Existing URLs keep working unless rotate is true. Updates and revocation share a lock.
 func (s *Store) Publish(id, owner, title string, entries []Entry, rotate bool) (string, string, error) {
+	return s.publish(id, owner, title, entries, rotate, "", false)
+}
+
+// PublishManaged retains the delivery token on refresh and binds the bundle to
+// the original VPN identity, even if the name is reused later.
+func (s *Store) PublishManaged(id, owner, key string, entries []Entry, rotate, disabled bool) (string, string, error) {
+	if len(key) != sha256.Size*2 {
+		return "", "", fmt.Errorf("invalid managed subscription identity")
+	}
+	return s.publish(id, owner, "", entries, rotate, key, disabled)
+}
+
+func (s *Store) Managed() ([]Bundle, error) {
+	dir, err := s.root.Open(".")
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	names, err := dir.Readdirnames(-1)
+	if err != nil {
+		return nil, err
+	}
+	var bundles []Bundle
+	for _, name := range names {
+		id, ok := strings.CutSuffix(name, ".json")
+		if !ok || !validID(id) {
+			continue
+		}
+		b, err := s.Read(id)
+		if err == nil && b.ManagedKey != "" {
+			bundles = append(bundles, b)
+		}
+	}
+	return bundles, nil
+}
+
+func (s *Store) publish(id, owner, title string, entries []Entry, rotate bool, key string, disabled bool) (string, string, error) {
 	if !validText(owner) || title != "" && !validText(title) {
 		return "", "", fmt.Errorf("invalid subscription owner or title")
 	}
@@ -167,47 +208,87 @@ func (s *Store) Publish(id, owner, title string, entries []Entry, rotate bool) (
 		if err != nil {
 			return "", "", err
 		}
-		if bundle.Owner != owner {
+		if bundle.Owner != owner || bundle.ManagedKey != key {
 			return "", "", fmt.Errorf("subscription belongs to a different user")
+		}
+		if bundle.Disabled && !disabled {
+			return "", "", fmt.Errorf("subscription has been disabled")
 		}
 	}
 	if title != "" {
 		bundle.Title = title
 	}
-	bundle.Entries = entries
+	bundle.Entries, bundle.ManagedKey, bundle.Disabled = entries, key, disabled
+	if key != "" {
+		now := time.Now().UTC()
+		bundle.UpdatedAt = &now
+	}
 	token := ""
 	if create || rotate {
 		token = base64.RawURLEncoding.EncodeToString(randomBytes(32))
 		bundle.TokenHash = tokenHash(token)
 	}
-	raw, err := json.MarshalIndent(bundle, "", "  ")
-	if err != nil || len(raw) > maxBundleBytes {
-		return "", "", fmt.Errorf("subscription bundle exceeds the size limit")
-	}
-	tmp := ".subscription-" + randomHex()
-	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return "", "", err
-	}
-	defer s.root.Remove(tmp)
-	if _, err := f.Write(raw); err != nil {
-		_ = f.Close()
-		return "", "", err
-	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		return "", "", err
-	}
-	if err := f.Close(); err != nil {
-		return "", "", err
-	}
-	if err := s.root.Rename(tmp, id+".json"); err != nil {
+	if err := s.write(bundle); err != nil {
 		return "", "", err
 	}
 	return id, token, nil
 }
 
+// RestoreManagedRotation keeps previously issued access usable when a new
+// link could not be verified. A newer publisher's changes are never reverted.
+func (s *Store) RestoreManagedRotation(previous Bundle, discardedToken string) error {
+	unlock, err := s.lock(previous.ID)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	current, err := s.Read(previous.ID)
+	if err != nil {
+		return err
+	}
+	if previous.ManagedKey == "" || current.ManagedKey != previous.ManagedKey ||
+		current.Disabled || current.TokenHash != tokenHash(discardedToken) {
+		return fmt.Errorf("subscription changed while checking its new link")
+	}
+	// Preserve entries published with the current generation.
+	current.TokenHash = previous.TokenHash
+	return s.write(current)
+}
+
+func (s *Store) write(bundle Bundle) error {
+	raw, err := json.MarshalIndent(bundle, "", "  ")
+	if err != nil || len(raw) > maxBundleBytes {
+		return fmt.Errorf("subscription bundle exceeds the size limit")
+	}
+	tmp := ".subscription-" + randomHex()
+	f, err := s.root.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer s.root.Remove(tmp)
+	if _, err := f.Write(raw); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return s.root.Rename(tmp, bundle.ID+".json")
+}
+
 func (s *Store) Revoke(id string) error {
+	bundle, err := s.Read(id)
+	if err != nil {
+		return err
+	}
+	if bundle.ManagedKey != "" {
+		_, _, err := s.PublishManaged(id, bundle.Owner, bundle.ManagedKey, nil, false, true)
+		return err
+	}
 	unlock, err := s.lock(id)
 	if err != nil {
 		return err
@@ -219,6 +300,9 @@ func (s *Store) Revoke(id string) error {
 		return err
 	}
 }
+
+// ProfileRevision identifies the exact list delivered to the client.
+func ProfileRevision(encoded string) string { return tokenHash(encoded)[:16] }
 
 func Encode(entries []Entry, now time.Time, format string) ([]byte, error) {
 	if format != "base64" && format != "links" {
