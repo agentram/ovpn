@@ -1,6 +1,7 @@
 name: Bug report
 description: Report a reproducible defect in ovpn.
 title: "[Bug]: "
+labels: [bug]
 body:
   - type: markdown
     attributes:
@@ -65,6 +66,18 @@ body:
       placeholder: Debian 12, amd64, Go 1.26.x, Docker 28.x
     validations:
       required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Describe how to verify the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Related work and evidence
+      description: Link related issues, PRs, or builds. Use synthetic examples and remove identifiers, credentials, and access links before sharing screenshots or logs.
   - type: checkboxes
     id: confirmations
     attributes:

@@ -1,5 +1,7 @@
 # Contributing
 
+Use the [OVPN GitHub workflow](docs/github-workflow.md) for issues, pull requests, reviews, and handoffs.
+
 ## Before you open a PR
 
 - use Discussions for questions and design exploration
