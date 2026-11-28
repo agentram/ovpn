@@ -151,8 +151,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.resolve.outputs.version }}
         run: |
+          set -euo pipefail
+          if tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/tags/$VERSION" --jq .sha 2>/dev/null)"; then
+            if [ "$tag_sha" != "$GITHUB_SHA" ]; then
+              echo "Tag $VERSION points to a different commit" >&2
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f ref="refs/tags/$VERSION" -f sha="$GITHUB_SHA" >/dev/null
+          fi
           gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" --latest=false --title "$VERSION" \
+            --verify-tag --latest=false --title "$VERSION" \
             --notes 'Source-only release. The source archives contain the applicable license and notices. No prebuilt binaries are included.'
 
   runtime-assets:
