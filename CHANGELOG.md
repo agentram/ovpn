@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog and this repository uses plain semantic versions without a `v` prefix.
 
+## 1.13.2
+
+- Release OVPN Core source under Apache License 2.0. This release contains source archives. Earlier releases retain their existing terms.
+
 ## 1.13.1
 
 - Update GitHub issue and pull request templates to record ownership, review decisions, and release evidence.

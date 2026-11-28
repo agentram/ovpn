@@ -10,13 +10,13 @@ The CLI keeps server and user state in `~/.ovpn`, renders Docker Compose runtime
 
 Manage your own servers locally with the CLI. OVPN generates standard VLESS profiles for compatible clients.
 
-[Download a release](https://github.com/agentram/ovpn/releases/latest) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
+[Core 1.13.2 source release](https://github.com/agentram/ovpn/releases/tag/1.13.2) · [Project site](https://agentram.github.io/ovpn/) · [Client setup](docs/clients.md)
 
 ## Quick start
 
 ### 1. Download the CLI
 
-Open the [latest release](https://github.com/agentram/ovpn/releases/latest) and choose the archive for your workstation:
+Core 1.13.2 is a source-only release. For an existing prebuilt CLI, open [release 1.13.1](https://github.com/agentram/ovpn/releases/tag/1.13.1) and choose the archive for your workstation:
 
 | Workstation | Archive suffix |
 | --- | --- |
@@ -183,7 +183,7 @@ flowchart LR
 
 ## Versioning
 
-- Current pinned version: `1.13.1`
+- Current pinned version: `1.13.2`
 - Check locally: `./ovpn version`
 - Release source of truth:
   - `VERSION`
@@ -555,5 +555,4 @@ This repository includes an optional sponsor button and public donation page:
 
 ## License
 
-This repository is source-available under the `Attribution-NonCommercial Source License 1.0 (ovpn)`.
-You may use, modify, and share it for non-commercial purposes with attribution. Commercial use requires separate permission.
+OVPN Core is licensed under the [Apache License 2.0](LICENSE), which permits commercial use under its terms. Third-party components retain their own licenses. Core 1.13.2 ships as source only. Releases before 1.13.2 retain their original licensing terms.

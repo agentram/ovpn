@@ -37,16 +37,19 @@ Automatic release flow:
 3. prepend the matching changelog entry
 4. merge to `main`
 5. `release.yml` validates both files
-6. if both files changed together and the tag does not already exist, the workflow builds artifacts and creates the GitHub release
+6. if both files changed together and the release and tag are absent, the
+   workflow follows `RELEASE_FORMAT`
 
-Manual rebuild flow:
+In `source` mode, GitHub publishes the tagged source archives. The runtime
+build, binary packaging and checksum jobs are skipped. Use `workflow_dispatch`
+with the version in `VERSION` to retry a missing source release. If the tag
+already exists, it must point to the dispatch commit.
 
-- use `workflow_dispatch` on `release.yml`
-- the requested version must match `VERSION`
-- the target release must already exist
-- assets are rebuilt and re-uploaded with `--clobber`
-
-Release archives contain only the `ovpn` executable. Linux `ovpn-agent` and `ovpn-telegram-bot` runtime binaries are still built in the workflow, but they are embedded into `ovpn` for remote deploy and Telegram setup instead of being shipped as top-level sidecars.
+In `binary` mode, the workflow builds and publishes platform archives.
+Manual dispatch with the version in `VERSION` creates a missing release or
+rebuilds assets for an existing release. Resume binary distribution only
+after verifying the notices and corresponding source required by the
+statically linked and embedded dependencies.
 
 ## Required secrets and repository settings
 

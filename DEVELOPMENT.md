@@ -112,3 +112,7 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/example/hosts.yml pla
 - public CI/release automation: `docs/ci.md`
 - testing strategy: `docs/testing.md`
 - upgrades and cleanup: `docs/upgrades.md`
+
+## Release format
+
+`RELEASE_FORMAT` is set to `source`. The release workflow publishes the tagged source archives and skips building and publishing binaries. Before switching to `binary`, verify the terms of statically linked and embedded dependencies and package the required notices and corresponding source. The CLI links GPL-licensed dependencies through Xray.
